@@ -1,0 +1,100 @@
+{
+    "2025-04-17": {
+        "apps": {
+            "Code.exe": {
+                "time": 415781,
+                "category": "Code",
+                "description": "Visual Studio Code"
+            },
+            "data.json - electron-app - Visual Studio Code": {
+                "time": 18874,
+                "category": "Code",
+                "domain": "chatgpt.com",
+                "description": "Brave Browser"
+            },
+            "Electron App Installer Creation - Brave": {
+                "time": 272879,
+                "category": "Miscellaneous",
+                "domain": "chatgpt.com",
+                "description": "Brave Browser"
+            },
+            "electron.exe": {
+                "time": 257332,
+                "category": "Code",
+                "description": "Electron"
+            },
+            "Electron": {
+                "time": 2455,
+                "category": "Miscellaneous",
+                "domain": "chatgpt.com",
+                "description": "Brave Browser"
+            },
+            "New Tab - Brave": {
+                "time": 198005,
+                "category": "Miscellaneous",
+                "domain": null,
+                "description": "Brave Browser"
+            },
+            "how to make installer of electron js app - Brave Search - Brave": {
+                "time": 31000,
+                "category": "Miscellaneous",
+                "domain": null,
+                "description": "Brave Browser"
+            },
+            "dataProcessor.js - electron-app - Visual Studio Code": {
+                "time": 1007,
+                "category": "Code",
+                "domain": null,
+                "description": "Brave Browser"
+            }
+        },
+        "11:00": {
+            "Code.exe": {
+                "time": 415781,
+                "category": "Code",
+                "description": "Visual Studio Code"
+            },
+            "data.json - electron-app - Visual Studio Code": {
+                "time": 18874,
+                "category": "Code",
+                "domain": "chatgpt.com",
+                "description": "Brave Browser"
+            },
+            "Electron App Installer Creation - Brave": {
+                "time": 272879,
+                "category": "Miscellaneous",
+                "domain": "chatgpt.com",
+                "description": "Brave Browser"
+            },
+            "electron.exe": {
+                "time": 257332,
+                "category": "Code",
+                "description": "Electron"
+            },
+            "Electron": {
+                "time": 2455,
+                "category": "Miscellaneous",
+                "domain": "chatgpt.com",
+                "description": "Brave Browser"
+            },
+            "New Tab - Brave": {
+                "time": 198005,
+                "category": "Miscellaneous",
+                "domain": null,
+                "description": "Brave Browser"
+            },
+            "how to make installer of electron js app - Brave Search - Brave": {
+                "time": 31000,
+                "category": "Miscellaneous",
+                "domain": null,
+                "description": "Brave Browser"
+            },
+            "dataProcessor.js - electron-app - Visual Studio Code": {
+                "time": 1007,
+                "category": "Code",
+                "domain": null,
+                "description": "Brave Browser"
+            }
+        }
+    }
+}
