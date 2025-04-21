@@ -4,19 +4,14 @@ An Electron application with React
 
 
 
-### Install
+Step 1. ### Install
 
 ```bash
 $ npm install
 ```
 
-### Development
 
-```bash
-$ npm run dev
-```
-
-### Build
+Step 2. ### Build
 
 ```bash
 # For windows
@@ -28,14 +23,21 @@ $ npm run build:mac
 # For Linux
 $ npm run build:linux
 ```
-### Artefact
+
+Step 3. ### Development
+
+```bash
+$ npm run dev
+```
+
+Step 4. ### Artefact
 
 ```bash
 $ npx @electron/packager . focusbook --platform=win32 --arch=x64 --icon=icon.ico --overwrite
 
 ```
 
-### Installer for exe
+Step 5. ### Installer for exe
 ```bash
 $ node createInstaller.js
 ```
