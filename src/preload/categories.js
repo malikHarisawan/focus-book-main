@@ -10,7 +10,7 @@ const APP_CATEGORIES = {
         "color": "#b381c9"
     },
     "Communication": {
-        "apps": ["Skype.exe", "mail.google.com"],
+        "apps": ["Skype.exe", "mail.google.com","ms-teams.exe"],
         "keywords": [ "email","Gmail", "meeting","Microsoft Teams", "call", "message", "messaging", "inbox", "outbox", "contact", "social"],
         "color": "#5ac26d"
     },
@@ -20,7 +20,7 @@ const APP_CATEGORIES = {
         "color": "#36a2eb"
     },
     "Entertainment": {
-        "apps": ["Spotify.exe","vlc.exe","youtube.com"],
+        "apps": ["Spotify.exe","vlc.exe"],
         "keywords": ["YouTube","music", "movie", 'HD','watch',"game", "entertainment", "video", "stream", "play", "song", "album", "artist", "band", "concert", "show", "series", "episode", "season", "trailer", "teaser", "cinema", "theater", "fun", "leisure", "hobby", "relaxation"],
         "color": "#ff6384"
     },

@@ -65,7 +65,7 @@ const ProductiveAreaChart = ({ data }) => {
             </linearGradient>
           </defs>
           <XAxis dataKey="day" stroke="#ffffff" />
-          <YAxis stroke="#ffffff" />
+          {/* <YAxis stroke="#ffffff" /> */}
           <CartesianGrid strokeDasharray="3 3" />
           <Tooltip content={<CustomTooltip />} />
           <Area

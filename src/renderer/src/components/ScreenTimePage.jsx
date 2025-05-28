@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from "react";
 import UsageChart from "./UsageChart";
 import MostUsedList from "./MostUsedList";
-import ProductiveAreaChart from "./ProductiveAreaChart "
+import ProductiveAreaChart from "./Dashboard/ProductiveAreaChart "
 import {
   processUsageChartData,
   processMostUsedApps,
@@ -27,17 +27,14 @@ const ScreenTimePage = () => {
    const loadAndProcessData = async () => {
     try {
       const jsonData = await window.activeWindow.getAppUsageStats();
-      console.log("finallllllll ",jsonData)
       const processedChartData = processUsageChartData(jsonData, selectedDate, view);
       setChartData(processedChartData);
 
       const processedProductiveChartData = processProductiveChartData(jsonData, selectedDate, view);
-      console.log("processedProductiveChartData", processedProductiveChartData)
       setProductiveData(processedProductiveChartData);
 
       const processedAppsData = processMostUsedApps(jsonData, selectedDate);
       setAppsData(processedAppsData);
-        console.log("MostUsed apps", processedAppsData)
       const screenTime = getTotalScreenTime(jsonData, selectedDate , processedChartData , view);
       setTotalTime(screenTime);
 
