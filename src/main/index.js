@@ -16,6 +16,10 @@ let app_name = null;
 let n_pid = null;
 let isCleaningUp = false;
 
+// Timer management state
+const activeTimers = new Set();
+let cleanupTimeout = null;
+
 function createWindow() {
     mainWindow = new BrowserWindow({
         width: 1200,
@@ -57,9 +61,32 @@ function createWindow() {
 }
 
 function clearAppTimers() {
-    if (timerInterval) {
-        clearInterval(timerInterval);
-        timerInterval = null;
+    try {
+        if (timerInterval) {
+            clearInterval(timerInterval);
+            activeTimers.delete(timerInterval);
+            timerInterval = null;
+            console.log('Focus timer cleared');
+        }
+        
+        // Clear any remaining tracked timers
+        activeTimers.forEach(timerId => {
+            try {
+                clearInterval(timerId);
+                clearTimeout(timerId);
+            } catch (error) {
+                console.error('Error clearing timer:', error);
+            }
+        });
+        activeTimers.clear();
+        
+        // Clear cleanup timeout
+        if (cleanupTimeout) {
+            clearTimeout(cleanupTimeout);
+            cleanupTimeout = null;
+        }
+    } catch (error) {
+        console.error('Error in clearAppTimers:', error);
     }
 }
 
@@ -180,30 +207,78 @@ app.whenReady().then(() => {
     });
 });
 
-// Centralized cleanup function
+// Centralized cleanup function with timeout protection
 function cleanup() {
+    if (isCleaningUp) {
+        console.log('Cleanup already in progress');
+        return;
+    }
+    
+    console.log('Starting application cleanup...');
     isCleaningUp = true;
-    clearAppTimers();
     
-    if (popupWindow && !popupWindow.isDestroyed()) {
-        popupWindow.close();
-        popupWindow = null;
-    }
+    // Set a timeout to force exit if cleanup takes too long
+    cleanupTimeout = setTimeout(() => {
+        console.log('Cleanup timeout reached, forcing exit');
+        process.exit(0);
+    }, 5000);
     
-    if (mainWindow && !mainWindow.isDestroyed()) {
-        mainWindow.close();
-        mainWindow = null;
-    }
-    
-    if (tray) {
-        tray.destroy();
-        tray = null;
+    try {
+        // Clear all timers first
+        clearAppTimers();
+        
+        // Close popup window
+        if (popupWindow && !popupWindow.isDestroyed()) {
+            try {
+                popupWindow.close();
+            } catch (error) {
+                console.error('Error closing popup window:', error);
+            }
+            popupWindow = null;
+        }
+        
+        // Close main window
+        if (mainWindow && !mainWindow.isDestroyed()) {
+            try {
+                mainWindow.close();
+            } catch (error) {
+                console.error('Error closing main window:', error);
+            }
+            mainWindow = null;
+        }
+        
+        // Destroy tray
+        if (tray && !tray.isDestroyed()) {
+            try {
+                tray.destroy();
+            } catch (error) {
+                console.error('Error destroying tray:', error);
+            }
+            tray = null;
+        }
+        
+        // Clear global shortcuts
+        try {
+            globalShortcut.unregisterAll();
+        } catch (error) {
+            console.error('Error unregistering shortcuts:', error);
+        }
+        
+        console.log('Cleanup completed successfully');
+        
+        // Clear the cleanup timeout since we completed successfully
+        if (cleanupTimeout) {
+            clearTimeout(cleanupTimeout);
+            cleanupTimeout = null;
+        }
+        
+    } catch (error) {
+        console.error('Error during cleanup:', error);
     }
 }
 
 app.on('will-quit', () => {
     cleanup();
-    globalShortcut.unregisterAll();
 });
 
 app.on('window-all-closed', (e) => {
@@ -214,6 +289,38 @@ app.on('window-all-closed', (e) => {
 
 app.on('before-quit', () => {
     cleanup();
+});
+
+// Add comprehensive process signal handlers for graceful shutdown
+process.on('SIGTERM', () => {
+    console.log('Received SIGTERM, shutting down gracefully');
+    cleanup();
+    setTimeout(() => process.exit(0), 1000);
+});
+
+process.on('SIGINT', () => {
+    console.log('Received SIGINT, shutting down gracefully');
+    cleanup();
+    setTimeout(() => process.exit(0), 1000);
+});
+
+process.on('SIGUSR2', () => {
+    console.log('Received SIGUSR2 (nodemon restart), shutting down gracefully');
+    cleanup();
+    process.exit(0);
+});
+
+// Handle uncaught exceptions
+process.on('uncaughtException', (error) => {
+    console.error('Uncaught Exception:', error);
+    cleanup();
+    setTimeout(() => process.exit(1), 1000);
+});
+
+// Handle unhandled promise rejections
+process.on('unhandledRejection', (reason, promise) => {
+    console.error('Unhandled Rejection at:', promise, 'reason:', reason);
+    // Don't exit for unhandled rejections, just log them
 });
 
 ipcMain.on('stay-focused', (event, data) => {
@@ -311,6 +418,12 @@ ipcMain.on('start-focus', (event, isFocused) => {
             clearAppTimers();
         }
     }, 1500);
+    
+    // Track the timer for cleanup
+    if (timerInterval) {
+        activeTimers.add(timerInterval);
+        console.log('Focus timer started and tracked');
+    }
 });
 
 ipcMain.on('end-focus', (event, isFocused) => {

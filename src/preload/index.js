@@ -1,9 +1,7 @@
 const { contextBridge, ipcRenderer } = require('electron');
 const activeWindows = require('electron-active-window');
 const { spawn } = require('child_process');
-import { json } from 'stream/consumers';
 import APP_CATEGORIES from './categories';
-import { time } from 'console';
 const { exec } = require('child_process');
 const util = require('util');
 const execPromise = util.promisify(exec);
@@ -13,6 +11,134 @@ let lastActiveApp = null;
 let lastUpdateTime = Date.now();
 let Distracted_List = ["Entertainment"];
 let customCategoryMappings = {};
+
+// Interval management system
+class IntervalManager {
+    constructor() {
+        this.intervals = new Map();
+        this.timeouts = new Map();
+        this.isShuttingDown = false;
+        this.setupCleanupHandlers();
+    }
+    
+    setupCleanupHandlers() {
+        // Listen for window unload
+        window.addEventListener('beforeunload', () => {
+            this.cleanup();
+        });
+        
+        // Listen for cleanup signals from main process
+        ipcRenderer.on('cleanup', () => {
+            this.cleanup();
+        });
+    }
+    
+    setInterval(callback, delay, name = 'unnamed') {
+        if (this.isShuttingDown) {
+            console.log(`Not starting interval ${name} - shutting down`);
+            return null;
+        }
+        
+        const intervalId = setInterval(() => {
+            if (this.isShuttingDown) {
+                this.clearInterval(name);
+                return;
+            }
+            
+            try {
+                callback();
+            } catch (error) {
+                console.error(`Error in interval ${name}:`, error);
+            }
+        }, delay);
+        
+        this.intervals.set(name, intervalId);
+        console.log(`Started interval: ${name}`);
+        return intervalId;
+    }
+    
+    clearInterval(name) {
+        const intervalId = this.intervals.get(name);
+        if (intervalId) {
+            clearInterval(intervalId);
+            this.intervals.delete(name);
+            console.log(`Cleared interval: ${name}`);
+        }
+    }
+    
+    setTimeout(callback, delay, name = 'unnamed') {
+        if (this.isShuttingDown) {
+            console.log(`Not starting timeout ${name} - shutting down`);
+            return null;
+        }
+        
+        const timeoutId = setTimeout(() => {
+            this.timeouts.delete(name);
+            
+            if (this.isShuttingDown) {
+                return;
+            }
+            
+            try {
+                callback();
+            } catch (error) {
+                console.error(`Error in timeout ${name}:`, error);
+            }
+        }, delay);
+        
+        this.timeouts.set(name, timeoutId);
+        console.log(`Started timeout: ${name}`);
+        return timeoutId;
+    }
+    
+    clearTimeout(name) {
+        const timeoutId = this.timeouts.get(name);
+        if (timeoutId) {
+            clearTimeout(timeoutId);
+            this.timeouts.delete(name);
+            console.log(`Cleared timeout: ${name}`);
+        }
+    }
+    
+    cleanup() {
+        if (this.isShuttingDown) {
+            return;
+        }
+        
+        console.log('IntervalManager: Starting cleanup...');
+        this.isShuttingDown = true;
+        
+        // Clear all intervals
+        this.intervals.forEach((intervalId, name) => {
+            try {
+                clearInterval(intervalId);
+                console.log(`Cleaned up interval: ${name}`);
+            } catch (error) {
+                console.error(`Error cleaning interval ${name}:`, error);
+            }
+        });
+        
+        // Clear all timeouts
+        this.timeouts.forEach((timeoutId, name) => {
+            try {
+                clearTimeout(timeoutId);
+                console.log(`Cleaned up timeout: ${name}`);
+            } catch (error) {
+                console.error(`Error cleaning timeout ${name}:`, error);
+            }
+        });
+        
+        this.intervals.clear();
+        this.timeouts.clear();
+        console.log('IntervalManager: Cleanup completed');
+    }
+    
+    getActiveIntervals() {
+        return Array.from(this.intervals.keys());
+    }
+}
+
+const intervalManager = new IntervalManager();
 // Initialize tracking data
 (async function initializeTracking() {
     try {
@@ -552,10 +678,14 @@ function mergeTimeByDomain(data) {
     return result;
 }
 
-setInterval(updateAppUsage, 30000);
-setInterval(() => {
+// Start managed intervals with better timing
+intervalManager.setInterval(() => {
+    updateAppUsage().catch(err => console.error('Error in updateAppUsage:', err));
+}, 60000, 'appUsageTracking'); // Increased from 30s to 60s for better performance
+
+intervalManager.setInterval(() => {
     saveData().catch(err => console.error('Error in saveData interval:', err));
-}, 60000);
+}, 120000, 'dataSaving'); // Increased from 60s to 120s to reduce I/O frequency
 
 
 async function loadCategories() {
@@ -619,6 +749,12 @@ contextBridge.exposeInMainWorld('electronAPI', {
         if (validChannels.includes(channel)) {
             ipcRenderer.send(channel, data)
         }
+    },
+    cleanup: () => {
+        intervalManager.cleanup();
+    },
+    getActiveIntervals: () => {
+        return intervalManager.getActiveIntervals();
     }
 });
 
@@ -663,10 +799,18 @@ function getFormattedStats(date) {
 
 
 function handlecooldown() {
-    isCoolDown = true
-    setTimeout(() => {
-        isCoolDown = false
-    }, 60000 * 5)
+    isCoolDown = true;
+    
+    // Clear any existing cooldown timeout
+    intervalManager.clearTimeout('cooldown');
+    
+    // Set new managed timeout
+    intervalManager.setTimeout(() => {
+        isCoolDown = false;
+        console.log('Cooldown period ended');
+    }, 60000 * 5, 'cooldown');
+    
+    console.log('Cooldown started for 5 minutes');
 }
 ipcRenderer.on('cooldown', () => {
     handlecooldown()

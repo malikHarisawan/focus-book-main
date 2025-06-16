@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { Sidebar } from "./sidebar";
 import { Header } from "./header";
+import { useParticleAnimation } from "../../hooks/use-animation-frame";
 
 export function MainLayout({ children }) {
   const [productivityScore, setProductivityScore] = useState(85);
@@ -29,79 +30,40 @@ export function MainLayout({ children }) {
     return () => clearInterval(interval);
   }, []);
 
-  // Particle effect
+  // Particle animation with proper cleanup
+  const particleAnimation = useParticleAnimation(canvasRef.current, {
+    particleCount: 50, // Reduced for better performance
+    enabled: !isLoading, // Don't animate while loading
+    pauseOnHidden: true
+  });
+
+  // Handle canvas setup
   useEffect(() => {
     const canvas = canvasRef.current;
     if (!canvas) return;
 
-    const ctx = canvas.getContext("2d");
-    if (!ctx) return;
-
-    canvas.width = canvas.offsetWidth;
-    canvas.height = canvas.offsetHeight;
-
-    const particles = [];
-    const particleCount = 100;
-
-    class Particle {
-      constructor() {
-        this.x = Math.random() * canvas.width;
-        this.y = Math.random() * canvas.height;
-        this.size = Math.random() * 3 + 1;
-        this.speedX = (Math.random() - 0.5) * 0.5;
-        this.speedY = (Math.random() - 0.5) * 0.5;
-        this.color = `rgba(${Math.floor(Math.random() * 100) + 100}, ${Math.floor(Math.random() * 100) + 150}, ${Math.floor(Math.random() * 55) + 200}, ${Math.random() * 0.5 + 0.2})`;
-      }
-
-      update() {
-        this.x += this.speedX;
-        this.y += this.speedY;
-
-        if (this.x > canvas.width) this.x = 0;
-        if (this.x < 0) this.x = canvas.width;
-        if (this.y > canvas.height) this.y = 0;
-        if (this.y < 0) this.y = canvas.height;
-      }
-
-      draw() {
-        if (!ctx) return;
-        ctx.fillStyle = this.color;
-        ctx.beginPath();
-        ctx.arc(this.x, this.y, this.size, 0, Math.PI * 2);
-        ctx.fill();
-      }
-    }
-
-    for (let i = 0; i < particleCount; i++) {
-      particles.push(new Particle());
-    }
-
-    function animate() {
-      if (!ctx || !canvas) return;
-      ctx.clearRect(0, 0, canvas.width, canvas.height);
-
-      for (const particle of particles) {
-        particle.update();
-        particle.draw();
-      }
-
-      requestAnimationFrame(animate);
-    }
-
-    animate();
-
-    const handleResize = () => {
-      if (!canvas) return;
-      canvas.width = canvas.offsetWidth;
-      canvas.height = canvas.offsetHeight;
-    };
-
-    window.addEventListener("resize", handleResize);
-
-    return () => {
-      window.removeEventListener("resize", handleResize);
-    };
+    // Set initial canvas size
+    const rect = canvas.getBoundingClientRect();
+    canvas.width = rect.width;
+    canvas.height = rect.height;
   }, []);
+
+  // Cleanup animation on unmount and call preload cleanup
+  useEffect(() => {
+    return () => {
+      // Stop particle animation
+      if (particleAnimation) {
+        particleAnimation.stop();
+      }
+      
+      // Call preload cleanup if available
+      if (window.electronAPI?.cleanup) {
+        window.electronAPI.cleanup();
+      }
+      
+      console.log('MainLayout: Cleanup completed');
+    };
+  }, [particleAnimation]);
 
   return (
     <div className="dark min-h-screen bg-gradient-to-br from-black to-slate-900 text-slate-100 relative overflow-hidden">

@@ -4,7 +4,7 @@
 import * as React from "react"
 
 const TOAST_LIMIT = 1
-const TOAST_REMOVE_DELAY = 1000000
+const TOAST_REMOVE_DELAY = 5000 // Reduced from 1000000ms to 5000ms (5 seconds)
 
 const actionTypes = {
   ADD_TOAST: "ADD_TOAST",
@@ -23,8 +23,11 @@ function genId() {
 const toastTimeouts = new Map()
 
 const addToRemoveQueue = (toastId) => {
+  // Clear existing timeout for this toast if it exists
   if (toastTimeouts.has(toastId)) {
-    return
+    const existingTimeout = toastTimeouts.get(toastId);
+    clearTimeout(existingTimeout);
+    console.log(`Cleared existing timeout for toast: ${toastId}`);
   }
 
   const timeout = setTimeout(() => {
@@ -33,9 +36,31 @@ const addToRemoveQueue = (toastId) => {
       type: "REMOVE_TOAST",
       toastId: toastId,
     })
+    console.log(`Toast auto-removed: ${toastId}`);
   }, TOAST_REMOVE_DELAY)
 
   toastTimeouts.set(toastId, timeout)
+  console.log(`Added timeout for toast: ${toastId}`);
+}
+
+// Function to clear all pending timeouts
+const clearAllTimeouts = () => {
+  console.log(`Clearing ${toastTimeouts.size} pending toast timeouts`);
+  toastTimeouts.forEach((timeout, toastId) => {
+    clearTimeout(timeout);
+    console.log(`Cleared timeout for toast: ${toastId}`);
+  });
+  toastTimeouts.clear();
+}
+
+// Function to clear specific timeout
+const clearToastTimeout = (toastId) => {
+  if (toastTimeouts.has(toastId)) {
+    const timeout = toastTimeouts.get(toastId);
+    clearTimeout(timeout);
+    toastTimeouts.delete(toastId);
+    console.log(`Manually cleared timeout for toast: ${toastId}`);
+  }
 }
 
 export const reducer = (state, action) => {
@@ -57,14 +82,15 @@ export const reducer = (state, action) => {
     case "DISMISS_TOAST": {
       const { toastId } = action
 
-      // ! Side effects ! - This could be extracted into a dismissToast() action,
-      // but I'll keep it here for simplicity
+      // Clear existing timeouts before adding new ones to remove queue
       if (toastId) {
-        addToRemoveQueue(toastId)
+        clearToastTimeout(toastId);
+        addToRemoveQueue(toastId);
       } else {
         state.toasts.forEach((toast) => {
-          addToRemoveQueue(toast.id)
-        })
+          clearToastTimeout(toast.id);
+          addToRemoveQueue(toast.id);
+        });
       }
 
       return {
@@ -81,11 +107,15 @@ export const reducer = (state, action) => {
     }
     case "REMOVE_TOAST":
       if (action.toastId === undefined) {
+        // Clear all timeouts when removing all toasts
+        clearAllTimeouts();
         return {
           ...state,
           toasts: [],
         }
       }
+      // Clear specific timeout when removing specific toast
+      clearToastTimeout(action.toastId);
       return {
         ...state,
         toasts: state.toasts.filter((t) => t.id !== action.toastId),
@@ -143,6 +173,12 @@ function useToast() {
       if (index > -1) {
         listeners.splice(index, 1)
       }
+      
+      // Clear all timeouts when component unmounts
+      if (listeners.length === 0) {
+        console.log('Last toast listener removed, clearing all timeouts');
+        clearAllTimeouts();
+      }
     }
   }, [state])
 
@@ -150,6 +186,11 @@ function useToast() {
     ...state,
     toast,
     dismiss: (toastId) => dispatch({ type: "DISMISS_TOAST", toastId }),
+    clearAll: () => {
+      clearAllTimeouts();
+      dispatch({ type: "REMOVE_TOAST" });
+    },
+    getPendingTimeouts: () => toastTimeouts.size
   }
 }
 
@@ -168,4 +209,4 @@ function useCategoryChangeToast() {
   return { showCategoryChangeToast }
 }
 
-export { useToast, toast, useCategoryChangeToast }
+export { useToast, toast, useCategoryChangeToast, clearAllTimeouts }
