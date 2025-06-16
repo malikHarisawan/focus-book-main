@@ -11,7 +11,7 @@ const path = require('path');
 let appUsageData = {};
 let lastActiveApp = null;
 let lastUpdateTime = Date.now();
-let Distracted_List = ["Entertainment", "Idle"];
+let Distracted_List = ["Entertainment"];
 let customCategoryMappings = {};
 // Initialize tracking data
 (async function initializeTracking() {
@@ -134,6 +134,7 @@ async function updateAppUsage() {
     try {
         const state = await getCurrentState(120);
         if (state == "idle" || state == "locked") return
+        console.log("State ===>> ", state)
         const currentWindow = await getActiveWindow();
         if (!isValidWindow(currentWindow)) {
             return;
@@ -219,7 +220,7 @@ async function updateUsageData(currentWindow, hasAppSwitched) {
     const currentTime = Date.now();
     if (lastActiveApp && lastActiveApp.windowClass) {
         const timeSpent = currentTime - lastUpdateTime;
-        if(timeSpent > 1000 * 2){
+        if(timeSpent > 1000 * 10){
 
             const formattedDate = getFormattedDate();
             const formattedHour = getFormattedHour();
@@ -293,19 +294,35 @@ function updateAppTime(formattedDate, appClass, description, timeSpent, formatte
     appUsageData[formattedDate][formattedHour][appClass].time += timeSpent;
     appUsageData[formattedDate][formattedHour][appClass].category = getCategory(description || appClass);
 
-    // Same logic for hourly data - only add timestamps when app is switched
-    if (hasAppSwitched || appUsageData[formattedDate][formattedHour][appClass].timestamps.length === 0) {
-        appUsageData[formattedDate][formattedHour][appClass].timestamps.push({
+    const timestamps = appUsageData[formattedDate][formattedHour][appClass].timestamps;
+    
+    if (timestamps.length === 0) {
+        // First entry for this app in this hour
+        timestamps.push({
             start: new Date().toString(),
             duration: timeSpent
         });
     } else {
-        // Update the duration of the last timestamp entry
-        const lastIndex = appUsageData[formattedDate][formattedHour][appClass].timestamps.length - 1;
-        if (lastIndex >= 0) {
-            appUsageData[formattedDate][formattedHour][appClass].timestamps[lastIndex].duration += timeSpent;
+        // Check if the last timestamp is recent (within last 10 seconds)
+        const lastTimestamp = timestamps[timestamps.length - 1];
+        const lastStart = new Date(lastTimestamp.start);
+        const now = new Date();
+        const timeDiff = now - lastStart;
+        
+        // If last timestamp is recent and we're on the same app, update it
+        // Otherwise, create a new timestamp (genuine app switch)
+        if (timeDiff < 10000 && !hasAppSwitched) { // 10 seconds threshold
+            lastTimestamp.duration += timeSpent;
+        } else {
+            timestamps.push({
+                start: new Date().toString(),
+                duration: timeSpent
+            });
         }
     }
+    if (appUsageData[formattedDate][formattedHour][appClass].time > 3600000) {
+    console.warn(`Hour ${formattedHour} for ${appClass} exceeds 1 hour: ${appUsageData[formattedDate][formattedHour][appClass].time}ms`);
+}
 }
 
 function updateChromeTime(formattedDate, windowName, description, active_url, timeSpent, formattedHour, hasAppSwitched) {
@@ -349,20 +366,32 @@ function updateChromeTime(formattedDate, windowName, description, active_url, ti
     appUsageData[formattedDate][formattedHour][windowName].time += timeSpent;
     appUsageData[formattedDate][formattedHour][windowName].category = getCategory(active_url ||description || windowName);
 
-    // Same logic for hourly data - only add timestamps when app/tab is switched
-    if (hasAppSwitched || appUsageData[formattedDate][formattedHour][windowName].timestamps.length === 0) {
-        appUsageData[formattedDate][formattedHour][windowName].timestamps.push({
+    const timestamps = appUsageData[formattedDate][formattedHour][windowName].timestamps;
+    
+    if (timestamps.length === 0) {
+        // First entry for this app in this hour
+        timestamps.push({
             start: new Date().toString(),
             duration: timeSpent
-           
         });
     } else {
-        // Update the duration of the last timestamp entry
-        const lastIndex = appUsageData[formattedDate][formattedHour][windowName].timestamps.length - 1;
-        if (lastIndex >= 0) {
-            appUsageData[formattedDate][formattedHour][windowName].timestamps[lastIndex].duration += timeSpent;
+        // Check if the last timestamp is recent (within last 10 seconds)
+        const lastTimestamp = timestamps[timestamps.length - 1];
+        const lastStart = new Date(lastTimestamp.start);
+        const now = new Date();
+        const timeDiff = now - lastStart;
+        
+        // If last timestamp is recent and we're on the same app, update it
+        // Otherwise, create a new timestamp (genuine app switch)
+        if (timeDiff < 10000 && !hasAppSwitched) { // 10 seconds threshold
+            lastTimestamp.duration += timeSpent;
+        } else {
+            timestamps.push({
+                start: new Date().toString(),
+                duration: timeSpent
+            });
         }
-    };
+    }
 }
 
 
@@ -660,7 +689,6 @@ async function updateAppCategory(appIdentifier, category,selectedDate,appKey) {
         const customCategoriesMap = await loadCustomCategoryMappings();
         
         customCategoriesMap[appIdentifier] = category;
-        console.log("appUsageData[selectedDate]",appUsageData[selectedDate])
 
            if (appUsageData[selectedDate]) {
       if (appUsageData[selectedDate].apps && 
@@ -675,8 +703,10 @@ async function updateAppCategory(appIdentifier, category,selectedDate,appKey) {
           value[appKey].category = category;
         }
       }
-      
+
       await saveData();
+      console.log("appUsageData[selectedDate]",appUsageData[selectedDate])
+
     }
         await saveCustomCategoryMappings(customCategoriesMap);
         return true;

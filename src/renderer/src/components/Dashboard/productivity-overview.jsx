@@ -38,8 +38,14 @@ export default function ProductivityOverview() {
   }
   useEffect(() => {
     loadAndProcessData()
+     handleVisibilityChange()
+    document.addEventListener('visibilitychange', handleVisibilityChange)
   }, [selectedDate])
-
+ function handleVisibilityChange() {
+      if (document.visibilityState === 'visible') {
+        loadAndProcessData()
+      }
+    }
   const loadAndProcessData = async () => {
 
     const jsonData = await window.activeWindow.getAppUsageStats();

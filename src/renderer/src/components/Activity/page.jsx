@@ -53,7 +53,15 @@ export default function AppUsageTable() {
 
   useEffect(()=>{
     loadApps()
+    handleVisibilityChange()
+    document.addEventListener('visibilitychange', handleVisibilityChange)
   },[selectedDate])
+
+  function handleVisibilityChange() {
+      if (document.visibilityState === 'visible') {
+        loadApps()
+      }
+    }
   // Add the bulk categorize handler function inside the AppUsageTable component
  async function loadApps(){
   const jsonData = await window.activeWindow.getAppUsageStats();
