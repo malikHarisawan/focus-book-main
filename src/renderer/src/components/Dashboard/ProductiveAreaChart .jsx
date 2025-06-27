@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useState, useEffect } from "react";
 import {
   AreaChart,
   Area,
@@ -7,9 +7,13 @@ import {
   CartesianGrid,
   Tooltip,
   ResponsiveContainer,
+  Brush,
 } from "recharts";
 
 const ProductiveAreaChart = ({ data }) => {
+  const [selectedRange, setSelectedRange] = useState(null);
+  const [aggregatedData, setAggregatedData] = useState({ productive: 0, unproductive: 0, total: 0 });
+
   if (!data || data.length === 0) {
     return (
       <div className="bg-gray-800 p-4 rounded-md h-[250px] flex items-center justify-center">
@@ -17,29 +21,87 @@ const ProductiveAreaChart = ({ data }) => {
       </div>
     );
   }
+
+  useEffect(() => {
+    calculateAggregatedData();
+  }, [data, selectedRange]);
+
+  const calculateAggregatedData = () => {
+    let startIndex = 0;
+    let endIndex = data.length - 1;
+    
+    if (selectedRange) {
+      startIndex = selectedRange.startIndex;
+      endIndex = selectedRange.endIndex;
+    }
+    
+    let totalProductive = 0;
+    let totalUnproductive = 0;
+    
+    for (let i = startIndex; i <= endIndex; i++) {
+      if (data[i]) {
+        totalProductive += data[i].productive || 0;
+        totalUnproductive += data[i].unproductive || 0;
+      }
+    }
+    
+    setAggregatedData({
+      productive: totalProductive,
+      unproductive: totalUnproductive,
+      total: totalProductive + totalUnproductive
+    });
+  };
+
+  const handleBrushChange = (brushData) => {
+    if (brushData && brushData.startIndex !== undefined && brushData.endIndex !== undefined) {
+      setSelectedRange({
+        startIndex: brushData.startIndex,
+        endIndex: brushData.endIndex
+      });
+    } else {
+      setSelectedRange(null);
+    }
+  };
   const formatTooltipValue = (value) => {
-    if (value === 0) return;
+    if (value === 0) return "0m";
     const hours = Math.floor(value / 3600);
     const minutes = Math.floor((value % 3600) / 60);
     return hours > 0 ? `${hours}h ${minutes}m` : `${minutes}m`;
   };
 
-  const CustomTooltip = ({ active, payload, label }) => {
-    if (active && payload && payload.length) {
+  const CustomTooltip = ({ active }) => {
+    if (active) {
+      const productiveTime = formatTooltipValue(aggregatedData.productive);
+      const unproductiveTime = formatTooltipValue(aggregatedData.unproductive);
+      const totalTime = formatTooltipValue(aggregatedData.total);
+      const productivePercentage = aggregatedData.total > 0 
+        ? Math.round((aggregatedData.productive / aggregatedData.total) * 100) 
+        : 0;
+      
       return (
         <div className="bg-gray-800 p-3 rounded border border-gray-700">
-          <p className="text-gray-200 font-medium">{label}</p>
-          <div className="mt-2">
-            {payload.map((entry, index) => (
-              <div key={index} className="flex items-center gap-2 my-1">
-                <div
-                  className="w-3 h-3 rounded-full"
-                  style={{ backgroundColor: entry.color }}
-                />
-                <span className="text-gray-300">{entry.name}: </span>
-                <span className="text-white">{formatTooltipValue(entry.value)}</span>
-              </div>
-            ))}
+          <p className="text-gray-200 font-medium mb-2">
+            {selectedRange ? 'Selected Range' : 'Current Day Total'}
+          </p>
+          <div className="space-y-1">
+            <div className="flex items-center gap-2">
+              <div className="w-3 h-3 rounded-full bg-green-500" />
+              <span className="text-gray-300">Productive: </span>
+              <span className="text-white">{productiveTime}</span>
+            </div>
+            <div className="flex items-center gap-2">
+              <div className="w-3 h-3 rounded-full bg-red-500" />
+              <span className="text-gray-300">Unproductive: </span>
+              <span className="text-white">{unproductiveTime}</span>
+            </div>
+            <div className="flex items-center gap-2 pt-1 border-t border-gray-600">
+              <span className="text-gray-300">Total: </span>
+              <span className="text-cyan-400 font-medium">{totalTime}</span>
+            </div>
+            <div className="flex items-center gap-2">
+              <span className="text-gray-300">Productivity: </span>
+              <span className="text-green-400 font-medium">{productivePercentage}%</span>
+            </div>
           </div>
         </div>
       );
@@ -81,6 +143,13 @@ const ProductiveAreaChart = ({ data }) => {
             name="Unproductive"
             stroke="#ff6b6b"
             fill="url(#colorUnproductive)"
+          />
+          <Brush 
+            dataKey="day" 
+            height={30} 
+            stroke="#06b6d4" 
+            fill="#1f2937"
+            onChange={handleBrushChange}
           />
         </AreaChart>
       </ResponsiveContainer>

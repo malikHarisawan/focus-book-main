@@ -5,7 +5,7 @@ import { Link } from "react-router-dom";
 import { Activity, BarChart3, Calendar, Command, Hexagon, ListTodo, Settings, Target, Timer } from "lucide-react";
 import { Button } from "../ui/button";
 import { Card, CardContent } from "..//ui/card";
-import { StatusItem } from "../dashboard/status-item";
+import { StatusItem } from "../Dashboard/status-item";
 
 export function Sidebar({
   productivityScore,
