@@ -14,6 +14,12 @@ const ProductiveAreaChart = ({ data }) => {
   const [selectedRange, setSelectedRange] = useState(null);
   const [aggregatedData, setAggregatedData] = useState({ productive: 0, unproductive: 0, total: 0 });
 
+  useEffect(() => {
+    if (data && data.length > 0) {
+      calculateAggregatedData();
+    }
+  }, [data, selectedRange]);
+
   if (!data || data.length === 0) {
     return (
       <div className="bg-gray-800 p-4 rounded-md h-[250px] flex items-center justify-center">
@@ -21,10 +27,6 @@ const ProductiveAreaChart = ({ data }) => {
       </div>
     );
   }
-
-  useEffect(() => {
-    calculateAggregatedData();
-  }, [data, selectedRange]);
 
   const calculateAggregatedData = () => {
     let startIndex = 0;
