@@ -1,6 +1,6 @@
-"use client"
+'use client'
 
-import { useEffect, useState } from "react"
+import { useEffect, useState } from 'react'
 import {
   Settings,
   User,
@@ -16,58 +16,73 @@ import {
   RefreshCw,
   Trash2,
   Download,
-  Upload,
-} from "lucide-react"
-const allCategories = ['Code','Browsing','Entertainment', 'Communication','Utility','Documenting', 'Learning', 'Personal', 'Miscellaneous'];
+  Upload
+} from 'lucide-react'
+const allCategories = [
+  'Code',
+  'Browsing',
+  'Entertainment',
+  'Communication',
+  'Utility',
+  'Documenting',
+  'Learning',
+  'Personal',
+  'Miscellaneous'
+]
 
 export default function SettingsPage() {
-  const [activeTab, setActiveTab] = useState("profile")
-  const [theme, setTheme] = useState("dark")
+  const [activeTab, setActiveTab] = useState('profile')
+  const [theme, setTheme] = useState('dark')
   const [focusMode, setFocusMode] = useState(false)
   const [notifications, setNotifications] = useState(true)
   const [soundEffects, setSoundEffects] = useState(true)
   const [autoStartBreaks, setAutoStartBreaks] = useState(false)
   const [dataCollection, setDataCollection] = useState(true)
-  const [timeFormat, setTimeFormat] = useState("24h")
-  const [weekStart, setWeekStart] = useState("monday")
-  const [language, setLanguage] = useState("english")
-  const [productiveCategories, setproductiveCategories] = useState([]);
-  const [distractedCategories, setdistractedCategories] = useState([]);
-  const [newProCategory, setNewProCategory] = useState('');
-  const [newDisCategory, setNewDisCategory] = useState('');
+  const [timeFormat, setTimeFormat] = useState('24h')
+  const [weekStart, setWeekStart] = useState('monday')
+  const [language, setLanguage] = useState('english')
+  const [productiveCategories, setproductiveCategories] = useState([])
+  const [distractedCategories, setdistractedCategories] = useState([])
+  const [newProCategory, setNewProCategory] = useState('')
+  const [newDisCategory, setNewDisCategory] = useState('')
 
   useEffect(() => {
     const fetchCategories = async () => {
-      const [productive, distracted] = await window.activeWindow.loadCategories();
-      if(productive){
-      setproductiveCategories(productive);
-      setdistractedCategories(distracted);
+      const [productive, distracted] = await window.activeWindow.loadCategories()
+      if (productive) {
+        setproductiveCategories(productive)
+        setdistractedCategories(distracted)
       }
-    };
-    fetchCategories();
-  }, []);
+    }
+    fetchCategories()
+  }, [])
   function loadproCategories() {
-    if (newProCategory && !productiveCategories.includes(newProCategory) && !distractedCategories.includes(newProCategory)) {
+    if (
+      newProCategory &&
+      !productiveCategories.includes(newProCategory) &&
+      !distractedCategories.includes(newProCategory)
+    ) {
       setproductiveCategories([...productiveCategories, newProCategory])
     }
   }
 
   function loaddisCategories() {
-    if (newDisCategory &&!distractedCategories.includes(newDisCategory) && !productiveCategories.includes(newDisCategory)) {
+    if (
+      newDisCategory &&
+      !distractedCategories.includes(newDisCategory) &&
+      !productiveCategories.includes(newDisCategory)
+    ) {
       setdistractedCategories([...distractedCategories, newDisCategory])
     }
   }
   function removeCategory(app) {
-    setproductiveCategories(productiveCategories.filter(c => c != app))
+    setproductiveCategories(productiveCategories.filter((c) => c != app))
   }
   function removedisCategory(app) {
-    setdistractedCategories(distractedCategories.filter(c => c != app))
+    setdistractedCategories(distractedCategories.filter((c) => c != app))
   }
 
-
-
   return (
-
     <div className="grid gap-6">
       <div className="bg-slate-900/50 border border-slate-700/50 backdrop-blur-sm rounded-lg overflow-hidden">
         <div className="border-b border-slate-700/50 pb-3 p-6">
@@ -84,21 +99,22 @@ export default function SettingsPage() {
             <nav className="p-4">
               <ul className="space-y-1">
                 {[
-                  { id: "profile", label: "Profile", icon: User },
-                  { id: "appearance", label: "Appearance", icon: Palette },
-                  { id: "notifications", label: "Notifications", icon: Bell },
-                  { id: "Categories Management", label: "Categories Management", icon: Lock },
-                  { id: "data", label: "Data Management", icon: Database },
-                  { id: "integrations", label: "Integrations", icon: Globe },
-                  { id: "preferences", label: "Preferences", icon: Sliders },
+                  { id: 'profile', label: 'Profile', icon: User },
+                  { id: 'appearance', label: 'Appearance', icon: Palette },
+                  { id: 'notifications', label: 'Notifications', icon: Bell },
+                  { id: 'Categories Management', label: 'Categories Management', icon: Lock },
+                  { id: 'data', label: 'Data Management', icon: Database },
+                  { id: 'integrations', label: 'Integrations', icon: Globe },
+                  { id: 'preferences', label: 'Preferences', icon: Sliders }
                 ].map((item) => (
                   <li key={item.id}>
                     <button
                       onClick={() => setActiveTab(item.id)}
-                      className={`w-full text-left px-4 py-3 rounded-md flex items-center transition-colors ${activeTab === item.id
-                        ? "bg-cyan-500/10 text-cyan-400 border-l-2 border-cyan-500"
-                        : "text-slate-400 hover:bg-slate-800/50 hover:text-slate-200"
-                        }`}
+                      className={`w-full text-left px-4 py-3 rounded-md flex items-center transition-colors ${
+                        activeTab === item.id
+                          ? 'bg-cyan-500/10 text-cyan-400 border-l-2 border-cyan-500'
+                          : 'text-slate-400 hover:bg-slate-800/50 hover:text-slate-200'
+                      }`}
                     >
                       <item.icon className="h-4 w-4 mr-3" />
                       <span>{item.label}</span>
@@ -112,9 +128,11 @@ export default function SettingsPage() {
           {/* Settings Content */}
           <div className="col-span-12 md:col-span-9 p-6">
             {/* Profile Settings */}
-            {activeTab === "profile" && (
+            {activeTab === 'profile' && (
               <div className="space-y-6 animate-fadeIn">
-                <h3 className="text-lg font-medium text-slate-200 border-b border-slate-700/50 pb-2">User Profile</h3>
+                <h3 className="text-lg font-medium text-slate-200 border-b border-slate-700/50 pb-2">
+                  User Profile
+                </h3>
 
                 <div className="flex items-start space-x-6">
                   <div className="relative group">
@@ -132,7 +150,9 @@ export default function SettingsPage() {
                   <div className="flex-1 space-y-4">
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                       <div>
-                        <label className="block text-sm font-medium text-slate-400 mb-1">Full Name</label>
+                        <label className="block text-sm font-medium text-slate-400 mb-1">
+                          Full Name
+                        </label>
                         <input
                           type="text"
                           defaultValue="John Doe"
@@ -140,7 +160,9 @@ export default function SettingsPage() {
                         />
                       </div>
                       <div>
-                        <label className="block text-sm font-medium text-slate-400 mb-1">Display Name</label>
+                        <label className="block text-sm font-medium text-slate-400 mb-1">
+                          Display Name
+                        </label>
                         <input
                           type="text"
                           defaultValue="JohnD"
@@ -174,7 +196,9 @@ export default function SettingsPage() {
 
                   <div className="space-y-4">
                     <div>
-                      <label className="block text-sm font-medium text-slate-400 mb-1">Current Password</label>
+                      <label className="block text-sm font-medium text-slate-400 mb-1">
+                        Current Password
+                      </label>
                       <input
                         type="password"
                         placeholder="••••••••"
@@ -184,7 +208,9 @@ export default function SettingsPage() {
 
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                       <div>
-                        <label className="block text-sm font-medium text-slate-400 mb-1">New Password</label>
+                        <label className="block text-sm font-medium text-slate-400 mb-1">
+                          New Password
+                        </label>
                         <input
                           type="password"
                           placeholder="••••••••"
@@ -192,7 +218,9 @@ export default function SettingsPage() {
                         />
                       </div>
                       <div>
-                        <label className="block text-sm font-medium text-slate-400 mb-1">Confirm New Password</label>
+                        <label className="block text-sm font-medium text-slate-400 mb-1">
+                          Confirm New Password
+                        </label>
                         <input
                           type="password"
                           placeholder="••••••••"
@@ -206,20 +234,23 @@ export default function SettingsPage() {
             )}
 
             {/* Appearance Settings */}
-            {activeTab === "appearance" && (
+            {activeTab === 'appearance' && (
               <div className="space-y-6 animate-fadeIn">
-                <h3 className="text-lg font-medium text-slate-200 border-b border-slate-700/50 pb-2">Appearance</h3>
+                <h3 className="text-lg font-medium text-slate-200 border-b border-slate-700/50 pb-2">
+                  Appearance
+                </h3>
 
                 <div className="space-y-4">
                   <div>
                     <h4 className="text-md font-medium text-slate-300 mb-3">Theme</h4>
                     <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                       <button
-                        onClick={() => setTheme("dark")}
-                        className={`p-4 rounded-lg border ${theme === "dark"
-                          ? "border-cyan-500 bg-slate-800/80 ring-1 ring-cyan-500/50"
-                          : "border-slate-700 bg-slate-800/30 hover:bg-slate-800/50"
-                          } transition-all`}
+                        onClick={() => setTheme('dark')}
+                        className={`p-4 rounded-lg border ${
+                          theme === 'dark'
+                            ? 'border-cyan-500 bg-slate-800/80 ring-1 ring-cyan-500/50'
+                            : 'border-slate-700 bg-slate-800/30 hover:bg-slate-800/50'
+                        } transition-all`}
                       >
                         <div className="flex justify-center mb-2">
                           <Moon className="h-8 w-8 text-cyan-400" />
@@ -231,11 +262,12 @@ export default function SettingsPage() {
                       </button>
 
                       <button
-                        onClick={() => setTheme("light")}
-                        className={`p-4 rounded-lg border ${theme === "light"
-                          ? "border-cyan-500 bg-slate-800/80 ring-1 ring-cyan-500/50"
-                          : "border-slate-700 bg-slate-800/30 hover:bg-slate-800/50"
-                          } transition-all`}
+                        onClick={() => setTheme('light')}
+                        className={`p-4 rounded-lg border ${
+                          theme === 'light'
+                            ? 'border-cyan-500 bg-slate-800/80 ring-1 ring-cyan-500/50'
+                            : 'border-slate-700 bg-slate-800/30 hover:bg-slate-800/50'
+                        } transition-all`}
                       >
                         <div className="flex justify-center mb-2">
                           <Sun className="h-8 w-8 text-amber-400" />
@@ -247,11 +279,12 @@ export default function SettingsPage() {
                       </button>
 
                       <button
-                        onClick={() => setTheme("system")}
-                        className={`p-4 rounded-lg border ${theme === "system"
-                          ? "border-cyan-500 bg-slate-800/80 ring-1 ring-cyan-500/50"
-                          : "border-slate-700 bg-slate-800/30 hover:bg-slate-800/50"
-                          } transition-all`}
+                        onClick={() => setTheme('system')}
+                        className={`p-4 rounded-lg border ${
+                          theme === 'system'
+                            ? 'border-cyan-500 bg-slate-800/80 ring-1 ring-cyan-500/50'
+                            : 'border-slate-700 bg-slate-800/30 hover:bg-slate-800/50'
+                        } transition-all`}
                       >
                         <div className="flex justify-center mb-2">
                           <div className="h-8 w-8 rounded-full bg-gradient-to-r from-slate-300 to-slate-800 flex items-center justify-center">
@@ -270,19 +303,22 @@ export default function SettingsPage() {
                     <h4 className="text-md font-medium text-slate-300 mb-3">Accent Color</h4>
                     <div className="flex flex-wrap gap-3">
                       {[
-                        { color: "cyan", bg: "bg-cyan-500", ring: "ring-cyan-500/50" },
-                        { color: "blue", bg: "bg-blue-500", ring: "ring-blue-500/50" },
-                        { color: "indigo", bg: "bg-indigo-500", ring: "ring-indigo-500/50" },
-                        { color: "purple", bg: "bg-purple-500", ring: "ring-purple-500/50" },
-                        { color: "pink", bg: "bg-pink-500", ring: "ring-pink-500/50" },
-                        { color: "green", bg: "bg-green-500", ring: "ring-green-500/50" },
-                        { color: "amber", bg: "bg-amber-500", ring: "ring-amber-500/50" },
-                        { color: "red", bg: "bg-red-500", ring: "ring-red-500/50" },
+                        { color: 'cyan', bg: 'bg-cyan-500', ring: 'ring-cyan-500/50' },
+                        { color: 'blue', bg: 'bg-blue-500', ring: 'ring-blue-500/50' },
+                        { color: 'indigo', bg: 'bg-indigo-500', ring: 'ring-indigo-500/50' },
+                        { color: 'purple', bg: 'bg-purple-500', ring: 'ring-purple-500/50' },
+                        { color: 'pink', bg: 'bg-pink-500', ring: 'ring-pink-500/50' },
+                        { color: 'green', bg: 'bg-green-500', ring: 'ring-green-500/50' },
+                        { color: 'amber', bg: 'bg-amber-500', ring: 'ring-amber-500/50' },
+                        { color: 'red', bg: 'bg-red-500', ring: 'ring-red-500/50' }
                       ].map((item) => (
                         <button
                           key={item.color}
-                          className={`w-8 h-8 rounded-full ${item.bg} ${item.color === "cyan" ? "ring-2 ring-offset-2 ring-offset-slate-900 " + item.ring : ""
-                            }`}
+                          className={`w-8 h-8 rounded-full ${item.bg} ${
+                            item.color === 'cyan'
+                              ? 'ring-2 ring-offset-2 ring-offset-slate-900 ' + item.ring
+                              : ''
+                          }`}
                           aria-label={`${item.color} accent color`}
                         />
                       ))}
@@ -317,16 +353,20 @@ export default function SettingsPage() {
                     <div className="flex items-center justify-between">
                       <div>
                         <div className="text-slate-300">Enable Focus Mode</div>
-                        <div className="text-sm text-slate-400">Hide distracting elements when focusing</div>
+                        <div className="text-sm text-slate-400">
+                          Hide distracting elements when focusing
+                        </div>
                       </div>
                       <button
                         onClick={() => setFocusMode(!focusMode)}
-                        className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${focusMode ? "bg-cyan-500" : "bg-slate-700"
-                          }`}
+                        className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
+                          focusMode ? 'bg-cyan-500' : 'bg-slate-700'
+                        }`}
                       >
                         <span
-                          className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${focusMode ? "translate-x-6" : "translate-x-1"
-                            }`}
+                          className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
+                            focusMode ? 'translate-x-6' : 'translate-x-1'
+                          }`}
                         />
                       </button>
                     </div>
@@ -336,7 +376,7 @@ export default function SettingsPage() {
             )}
 
             {/* Notifications Settings */}
-            {activeTab === "notifications" && (
+            {activeTab === 'notifications' && (
               <div className="space-y-6 animate-fadeIn">
                 <h3 className="text-lg font-medium text-slate-200 border-b border-slate-700/50 pb-2">
                   Notifications
@@ -346,16 +386,20 @@ export default function SettingsPage() {
                   <div className="flex items-center justify-between">
                     <div>
                       <div className="text-slate-300">Enable Notifications</div>
-                      <div className="text-sm text-slate-400">Receive notifications from the app</div>
+                      <div className="text-sm text-slate-400">
+                        Receive notifications from the app
+                      </div>
                     </div>
                     <button
                       onClick={() => setNotifications(!notifications)}
-                      className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${notifications ? "bg-cyan-500" : "bg-slate-700"
-                        }`}
+                      className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
+                        notifications ? 'bg-cyan-500' : 'bg-slate-700'
+                      }`}
                     >
                       <span
-                        className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${notifications ? "translate-x-6" : "translate-x-1"
-                          }`}
+                        className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
+                          notifications ? 'translate-x-6' : 'translate-x-1'
+                        }`}
                       />
                     </button>
                   </div>
@@ -365,14 +409,30 @@ export default function SettingsPage() {
 
                     {[
                       {
-                        id: "focus",
-                        label: "Focus Timer Alerts",
-                        desc: "Notifications for focus sessions and breaks",
+                        id: 'focus',
+                        label: 'Focus Timer Alerts',
+                        desc: 'Notifications for focus sessions and breaks'
                       },
-                      { id: "tasks", label: "Task Reminders", desc: "Reminders for upcoming and due tasks" },
-                      { id: "goals", label: "Goal Progress", desc: "Updates on your goal progress" },
-                      { id: "analytics", label: "Weekly Reports", desc: "Weekly productivity analytics" },
-                      { id: "system", label: "System Notifications", desc: "App updates and system messages" },
+                      {
+                        id: 'tasks',
+                        label: 'Task Reminders',
+                        desc: 'Reminders for upcoming and due tasks'
+                      },
+                      {
+                        id: 'goals',
+                        label: 'Goal Progress',
+                        desc: 'Updates on your goal progress'
+                      },
+                      {
+                        id: 'analytics',
+                        label: 'Weekly Reports',
+                        desc: 'Weekly productivity analytics'
+                      },
+                      {
+                        id: 'system',
+                        label: 'System Notifications',
+                        desc: 'App updates and system messages'
+                      }
                     ].map((item) => (
                       <div key={item.id} className="flex items-center justify-between py-2">
                         <div>
@@ -392,16 +452,20 @@ export default function SettingsPage() {
                     <div className="flex items-center justify-between">
                       <div>
                         <div className="text-slate-300">Enable Sound Effects</div>
-                        <div className="text-sm text-slate-400">Play sounds for notifications and events</div>
+                        <div className="text-sm text-slate-400">
+                          Play sounds for notifications and events
+                        </div>
                       </div>
                       <button
                         onClick={() => setSoundEffects(!soundEffects)}
-                        className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${soundEffects ? "bg-cyan-500" : "bg-slate-700"
-                          }`}
+                        className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
+                          soundEffects ? 'bg-cyan-500' : 'bg-slate-700'
+                        }`}
                       >
                         <span
-                          className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${soundEffects ? "translate-x-6" : "translate-x-1"
-                            }`}
+                          className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
+                            soundEffects ? 'translate-x-6' : 'translate-x-1'
+                          }`}
                         />
                       </button>
                     </div>
@@ -413,21 +477,25 @@ export default function SettingsPage() {
                       <div className="text-slate-300 mb-2">Quiet Hours</div>
                       <div className="grid grid-cols-2 gap-4">
                         <div>
-                          <label className="block text-sm font-medium text-slate-400 mb-1">From</label>
+                          <label className="block text-sm font-medium text-slate-400 mb-1">
+                            From
+                          </label>
                           <select className="w-full bg-slate-800/50 border border-slate-700 rounded-md px-3 py-2 text-slate-200 focus:outline-none focus:ring-1 focus:ring-cyan-500 focus:border-cyan-500">
                             {Array.from({ length: 24 }).map((_, i) => (
                               <option key={i} value={i}>
-                                {i.toString().padStart(2, "0")}:00
+                                {i.toString().padStart(2, '0')}:00
                               </option>
                             ))}
                           </select>
                         </div>
                         <div>
-                          <label className="block text-sm font-medium text-slate-400 mb-1">To</label>
+                          <label className="block text-sm font-medium text-slate-400 mb-1">
+                            To
+                          </label>
                           <select className="w-full bg-slate-800/50 border border-slate-700 rounded-md px-3 py-2 text-slate-200 focus:outline-none focus:ring-1 focus:ring-cyan-500 focus:border-cyan-500">
                             {Array.from({ length: 24 }).map((_, i) => (
                               <option key={i} value={i}>
-                                {i.toString().padStart(2, "0")}:00
+                                {i.toString().padStart(2, '0')}:00
                               </option>
                             ))}
                           </select>
@@ -440,16 +508,19 @@ export default function SettingsPage() {
             )}
 
             {/* Privacy Settings */}
-            {activeTab === "Categories Management" && (
+            {activeTab === 'Categories Management' && (
               <div className="space-y-6 animate-fadeIn">
-                <h3 className="text-lg font-medium text-slate-200 border-b border-slate-700/50 pb-2">Manage Categories</h3>
+                <h3 className="text-lg font-medium text-slate-200 border-b border-slate-700/50 pb-2">
+                  Manage Categories
+                </h3>
                 <div className="space-y-4">
                   <div className="pt-4 border-t border-slate-700/50">
                     <div className="space-y-3">
-
                       <div>
                         <div className="pt-4 border-t border-slate-700/50">
-                          <h4 className="text-md font-medium text-slate-300 mb-3">Manage Productive Categories</h4>
+                          <h4 className="text-md font-medium text-slate-300 mb-3">
+                            Manage Productive Categories
+                          </h4>
 
                           <div className="flex flex-wrap gap-2 mb-3 ">
                             {productiveCategories.map((app) => (
@@ -460,7 +531,8 @@ export default function SettingsPage() {
                                 {app}
                                 <button
                                   onClick={() => removeCategory(app)}
-                                  className="ml-2 text-slate-400 hover:text-slate-200">
+                                  className="ml-2 text-slate-400 hover:text-slate-200"
+                                >
                                   <svg
                                     xmlns="http://www.w3.org/2000/svg"
                                     className="h-4 w-4"
@@ -483,27 +555,30 @@ export default function SettingsPage() {
                               value={newProCategory}
                               onChange={(e) => setNewProCategory(e.target.value)}
                               className="flex-1 bg-slate-800 border border-slate-700 rounded-l-md px-3 py-2 text-slate-200 focus:outline-none focus:ring-1 focus:ring-cyan-500 focus:border-cyan-500"
-
                             >
-                              <option value="" >Select Category</option>
+                              <option value="">Select Category</option>
                               {allCategories.map((cat, idx) => (
-                                <option  key={idx} value={cat}>{cat}</option>
+                                <option key={idx} value={cat}>
+                                  {cat}
+                                </option>
                               ))}
                             </select>
-                            <button onClick={loadproCategories}
-                              className="bg-cyan-600 hover:bg-cyan-700 text-white px-4 py-2 rounded-r-md transition-colors">
+                            <button
+                              onClick={loadproCategories}
+                              className="bg-cyan-600 hover:bg-cyan-700 text-white px-4 py-2 rounded-r-md transition-colors"
+                            >
                               Add
                             </button>
                           </div>
                         </div>
-
                       </div>
                     </div>
                   </div>
 
                   <div className="pt-4 border-t border-slate-700/50">
-                    <h4 className="text-md font-medium text-slate-300 mb-3">Manage Distracted Categories</h4>
-
+                    <h4 className="text-md font-medium text-slate-300 mb-3">
+                      Manage Distracted Categories
+                    </h4>
 
                     <div className="flex flex-wrap gap-2 mb-3">
                       {distractedCategories.map((app) => (
@@ -514,7 +589,8 @@ export default function SettingsPage() {
                           {app}
                           <button
                             onClick={() => removedisCategory(app)}
-                            className="ml-2 text-slate-400 hover:text-slate-200">
+                            className="ml-2 text-slate-400 hover:text-slate-200"
+                          >
                             <svg
                               xmlns="http://www.w3.org/2000/svg"
                               className="h-4 w-4"
@@ -537,16 +613,18 @@ export default function SettingsPage() {
                         value={newDisCategory}
                         onChange={(e) => setNewDisCategory(e.target.value)}
                         className="flex-1 bg-slate-800 border border-slate-700 rounded-l-md px-3 py-2 text-slate-200 focus:outline-none focus:ring-1 focus:ring-cyan-500 focus:border-cyan-500"
-
                       >
-                        <option  value="">Select Category</option>
+                        <option value="">Select Category</option>
                         {allCategories.map((cat, idx) => (
-                          <option  key={idx} value={cat}>{cat}</option>
+                          <option key={idx} value={cat}>
+                            {cat}
+                          </option>
                         ))}
                       </select>
                       <button
                         onClick={loaddisCategories}
-                        className="bg-cyan-600 hover:bg-cyan-700 text-white px-4 py-2 rounded-r-md transition-colors">
+                        className="bg-cyan-600 hover:bg-cyan-700 text-white px-4 py-2 rounded-r-md transition-colors"
+                      >
                         Add
                       </button>
                     </div>
@@ -556,7 +634,7 @@ export default function SettingsPage() {
             )}
 
             {/* Data Management Settings */}
-            {activeTab === "data" && (
+            {activeTab === 'data' && (
               <div className="space-y-6 animate-fadeIn">
                 <h3 className="text-lg font-medium text-slate-200 border-b border-slate-700/50 pb-2">
                   Data Management
@@ -568,13 +646,15 @@ export default function SettingsPage() {
                       <Download className="h-4 w-4 mr-2 text-cyan-500" />
                       Export Data
                     </h4>
-                    <p className="text-sm text-slate-400 mb-3">Download your productivity data in various formats</p>
+                    <p className="text-sm text-slate-400 mb-3">
+                      Download your productivity data in various formats
+                    </p>
 
                     <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                       {[
-                        { format: "CSV", icon: "📊", desc: "Spreadsheet compatible" },
-                        { format: "JSON", icon: "{ }", desc: "Developer friendly" },
-                        { format: "PDF", icon: "📄", desc: "Printable report" },
+                        { format: 'CSV', icon: '📊', desc: 'Spreadsheet compatible' },
+                        { format: 'JSON', icon: '{ }', desc: 'Developer friendly' },
+                        { format: 'PDF', icon: '📄', desc: 'Printable report' }
                       ].map((item) => (
                         <button
                           key={item.format}
@@ -593,7 +673,9 @@ export default function SettingsPage() {
                       <Upload className="h-4 w-4 mr-2 text-cyan-500" />
                       Import Data
                     </h4>
-                    <p className="text-sm text-slate-400 mb-3">Import productivity data from other sources</p>
+                    <p className="text-sm text-slate-400 mb-3">
+                      Import productivity data from other sources
+                    </p>
 
                     <div className="border-2 border-dashed border-slate-700 rounded-lg p-6 text-center">
                       <div className="flex justify-center mb-2">
@@ -604,7 +686,9 @@ export default function SettingsPage() {
                       <button className="bg-cyan-600 hover:bg-cyan-700 text-white px-4 py-2 rounded-md transition-colors">
                         Browse Files
                       </button>
-                      <p className="text-xs text-slate-500 mt-3">Supports CSV, JSON, and compatible formats</p>
+                      <p className="text-xs text-slate-500 mt-3">
+                        Supports CSV, JSON, and compatible formats
+                      </p>
                     </div>
                   </div>
 
@@ -613,22 +697,30 @@ export default function SettingsPage() {
                       <Trash2 className="h-4 w-4 mr-2 text-red-500" />
                       Delete Data
                     </h4>
-                    <p className="text-sm text-slate-400 mb-3">Permanently delete your productivity data</p>
+                    <p className="text-sm text-slate-400 mb-3">
+                      Permanently delete your productivity data
+                    </p>
 
                     <div className="space-y-3">
                       <button className="w-full flex justify-between items-center p-3 bg-slate-800 hover:bg-slate-700 border border-slate-700 rounded-lg transition-colors">
                         <span className="text-slate-300">Clear activity history</span>
-                        <span className="text-xs bg-slate-700 text-slate-300 px-2 py-1 rounded">Last 30 days</span>
+                        <span className="text-xs bg-slate-700 text-slate-300 px-2 py-1 rounded">
+                          Last 30 days
+                        </span>
                       </button>
 
                       <button className="w-full flex justify-between items-center p-3 bg-slate-800 hover:bg-slate-700 border border-slate-700 rounded-lg transition-colors">
                         <span className="text-slate-300">Reset all statistics</span>
-                        <span className="text-xs bg-slate-700 text-slate-300 px-2 py-1 rounded">All time</span>
+                        <span className="text-xs bg-slate-700 text-slate-300 px-2 py-1 rounded">
+                          All time
+                        </span>
                       </button>
 
                       <button className="w-full flex justify-between items-center p-3 bg-red-900/20 hover:bg-red-900/30 border border-red-900/50 rounded-lg transition-colors">
                         <span className="text-red-400">Delete account and all data</span>
-                        <span className="text-xs bg-red-900/50 text-red-300 px-2 py-1 rounded">Permanent</span>
+                        <span className="text-xs bg-red-900/50 text-red-300 px-2 py-1 rounded">
+                          Permanent
+                        </span>
                       </button>
                     </div>
                   </div>
@@ -638,13 +730,17 @@ export default function SettingsPage() {
                       <Database className="h-4 w-4 mr-2 text-cyan-500" />
                       Backup & Sync
                     </h4>
-                    <p className="text-sm text-slate-400 mb-3">Configure automatic backups and synchronization</p>
+                    <p className="text-sm text-slate-400 mb-3">
+                      Configure automatic backups and synchronization
+                    </p>
 
                     <div className="space-y-3">
                       <div className="flex items-center justify-between">
                         <div>
                           <div className="text-slate-300">Automatic Backups</div>
-                          <div className="text-xs text-slate-400">Create regular backups of your data</div>
+                          <div className="text-xs text-slate-400">
+                            Create regular backups of your data
+                          </div>
                         </div>
                         <label className="relative inline-flex items-center cursor-pointer">
                           <input type="checkbox" defaultChecked className="sr-only peer" />
@@ -664,7 +760,9 @@ export default function SettingsPage() {
                       </div>
 
                       <div>
-                        <label className="block text-sm font-medium text-slate-400 mb-1">Backup Frequency</label>
+                        <label className="block text-sm font-medium text-slate-400 mb-1">
+                          Backup Frequency
+                        </label>
                         <select className="w-full bg-slate-800/50 border border-slate-700 rounded-md px-3 py-2 text-slate-200 focus:outline-none focus:ring-1 focus:ring-cyan-500 focus:border-cyan-500">
                           <option value="daily">Daily</option>
                           <option value="weekly">Weekly</option>
@@ -678,19 +776,21 @@ export default function SettingsPage() {
             )}
 
             {/* Integrations Settings */}
-            {activeTab === "integrations" && (
+            {activeTab === 'integrations' && (
               <div className="space-y-6 animate-fadeIn">
-                <h3 className="text-lg font-medium text-slate-200 border-b border-slate-700/50 pb-2">Integrations</h3>
+                <h3 className="text-lg font-medium text-slate-200 border-b border-slate-700/50 pb-2">
+                  Integrations
+                </h3>
 
                 <div className="space-y-6">
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     {[
-                      { name: "Google Calendar", icon: "📅", connected: true },
-                      { name: "Microsoft To Do", icon: "✓", connected: false },
-                      { name: "Slack", icon: "💬", connected: true },
-                      { name: "GitHub", icon: "🐙", connected: false },
-                      { name: "Trello", icon: "🔄", connected: false },
-                      { name: "Notion", icon: "📝", connected: true },
+                      { name: 'Google Calendar', icon: '📅', connected: true },
+                      { name: 'Microsoft To Do', icon: '✓', connected: false },
+                      { name: 'Slack', icon: '💬', connected: true },
+                      { name: 'GitHub', icon: '🐙', connected: false },
+                      { name: 'Trello', icon: '🔄', connected: false },
+                      { name: 'Notion', icon: '📝', connected: true }
                     ].map((integration) => (
                       <div
                         key={integration.name}
@@ -703,17 +803,18 @@ export default function SettingsPage() {
                           <div>
                             <div className="text-slate-200 font-medium">{integration.name}</div>
                             <div className="text-xs text-slate-400">
-                              {integration.connected ? "Connected" : "Not connected"}
+                              {integration.connected ? 'Connected' : 'Not connected'}
                             </div>
                           </div>
                         </div>
                         <button
-                          className={`px-3 py-1 rounded-md text-sm ${integration.connected
-                            ? "bg-slate-700 text-slate-300 hover:bg-slate-600"
-                            : "bg-cyan-600 text-white hover:bg-cyan-700"
-                            } transition-colors`}
+                          className={`px-3 py-1 rounded-md text-sm ${
+                            integration.connected
+                              ? 'bg-slate-700 text-slate-300 hover:bg-slate-600'
+                              : 'bg-cyan-600 text-white hover:bg-cyan-700'
+                          } transition-colors`}
                         >
-                          {integration.connected ? "Disconnect" : "Connect"}
+                          {integration.connected ? 'Disconnect' : 'Connect'}
                         </button>
                       </div>
                     ))}
@@ -721,11 +822,15 @@ export default function SettingsPage() {
 
                   <div className="bg-slate-800/50 border border-slate-700 rounded-lg p-4">
                     <h4 className="text-md font-medium text-slate-300 mb-3">API Access</h4>
-                    <p className="text-sm text-slate-400 mb-4">Generate API keys to integrate with other services</p>
+                    <p className="text-sm text-slate-400 mb-4">
+                      Generate API keys to integrate with other services
+                    </p>
 
                     <div className="space-y-4">
                       <div>
-                        <label className="block text-sm font-medium text-slate-400 mb-1">API Key</label>
+                        <label className="block text-sm font-medium text-slate-400 mb-1">
+                          API Key
+                        </label>
                         <div className="flex">
                           <input
                             type="text"
@@ -752,11 +857,15 @@ export default function SettingsPage() {
 
                   <div className="bg-slate-800/50 border border-slate-700 rounded-lg p-4">
                     <h4 className="text-md font-medium text-slate-300 mb-3">Webhooks</h4>
-                    <p className="text-sm text-slate-400 mb-4">Configure webhooks to notify external services</p>
+                    <p className="text-sm text-slate-400 mb-4">
+                      Configure webhooks to notify external services
+                    </p>
 
                     <div className="space-y-3">
                       <div>
-                        <label className="block text-sm font-medium text-slate-400 mb-1">Webhook URL</label>
+                        <label className="block text-sm font-medium text-slate-400 mb-1">
+                          Webhook URL
+                        </label>
                         <input
                           type="text"
                           placeholder="https://"
@@ -765,14 +874,16 @@ export default function SettingsPage() {
                       </div>
 
                       <div>
-                        <label className="block text-sm font-medium text-slate-400 mb-1">Events</label>
+                        <label className="block text-sm font-medium text-slate-400 mb-1">
+                          Events
+                        </label>
                         <div className="space-y-2">
                           {[
-                            "Focus session completed",
-                            "Task created",
-                            "Task completed",
-                            "Goal progress updated",
-                            "Weekly report generated",
+                            'Focus session completed',
+                            'Task created',
+                            'Task completed',
+                            'Goal progress updated',
+                            'Weekly report generated'
                           ].map((event) => (
                             <label key={event} className="flex items-center">
                               <input
@@ -795,9 +906,11 @@ export default function SettingsPage() {
             )}
 
             {/* Preferences Settings */}
-            {activeTab === "preferences" && (
+            {activeTab === 'preferences' && (
               <div className="space-y-6 animate-fadeIn">
-                <h3 className="text-lg font-medium text-slate-200 border-b border-slate-700/50 pb-2">Preferences</h3>
+                <h3 className="text-lg font-medium text-slate-200 border-b border-slate-700/50 pb-2">
+                  Preferences
+                </h3>
 
                 <div className="space-y-6">
                   <div className="bg-slate-800/50 border border-slate-700 rounded-lg p-4">
@@ -869,12 +982,14 @@ export default function SettingsPage() {
                         </div>
                         <button
                           onClick={() => setAutoStartBreaks(!autoStartBreaks)}
-                          className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${autoStartBreaks ? "bg-cyan-500" : "bg-slate-700"
-                            }`}
+                          className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
+                            autoStartBreaks ? 'bg-cyan-500' : 'bg-slate-700'
+                          }`}
                         >
                           <span
-                            className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${autoStartBreaks ? "translate-x-6" : "translate-x-1"
-                              }`}
+                            className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
+                              autoStartBreaks ? 'translate-x-6' : 'translate-x-1'
+                            }`}
                           />
                         </button>
                       </div>
@@ -886,14 +1001,16 @@ export default function SettingsPage() {
 
                     <div className="space-y-4">
                       <div>
-                        <label className="block text-sm font-medium text-slate-400 mb-1">Time Format</label>
+                        <label className="block text-sm font-medium text-slate-400 mb-1">
+                          Time Format
+                        </label>
                         <div className="flex space-x-4">
                           <label className="flex items-center">
                             <input
                               type="radio"
                               name="timeFormat"
-                              checked={timeFormat === "12h"}
-                              onChange={() => setTimeFormat("12h")}
+                              checked={timeFormat === '12h'}
+                              onChange={() => setTimeFormat('12h')}
                               className="h-4 w-4 text-cyan-500 focus:ring-cyan-500 border-slate-600 bg-slate-800"
                             />
                             <span className="ml-2 text-slate-300">12-hour (1:30 PM)</span>
@@ -902,8 +1019,8 @@ export default function SettingsPage() {
                             <input
                               type="radio"
                               name="timeFormat"
-                              checked={timeFormat === "24h"}
-                              onChange={() => setTimeFormat("24h")}
+                              checked={timeFormat === '24h'}
+                              onChange={() => setTimeFormat('24h')}
                               className="h-4 w-4 text-cyan-500 focus:ring-cyan-500 border-slate-600 bg-slate-800"
                             />
                             <span className="ml-2 text-slate-300">24-hour (13:30)</span>
@@ -912,7 +1029,9 @@ export default function SettingsPage() {
                       </div>
 
                       <div>
-                        <label className="block text-sm font-medium text-slate-400 mb-1">First Day of Week</label>
+                        <label className="block text-sm font-medium text-slate-400 mb-1">
+                          First Day of Week
+                        </label>
                         <select
                           value={weekStart}
                           onChange={(e) => setWeekStart(e.target.value)}
@@ -925,7 +1044,9 @@ export default function SettingsPage() {
                       </div>
 
                       <div>
-                        <label className="block text-sm font-medium text-slate-400 mb-1">Date Format</label>
+                        <label className="block text-sm font-medium text-slate-400 mb-1">
+                          Date Format
+                        </label>
                         <select className="w-full bg-slate-800/50 border border-slate-700 rounded-md px-3 py-2 text-slate-200 focus:outline-none focus:ring-1 focus:ring-cyan-500 focus:border-cyan-500">
                           <option value="MM/DD/YYYY">MM/DD/YYYY</option>
                           <option value="DD/MM/YYYY">DD/MM/YYYY</option>
@@ -940,7 +1061,9 @@ export default function SettingsPage() {
 
                     <div className="space-y-4">
                       <div>
-                        <label className="block text-sm font-medium text-slate-400 mb-1">Language</label>
+                        <label className="block text-sm font-medium text-slate-400 mb-1">
+                          Language
+                        </label>
                         <select
                           value={language}
                           onChange={(e) => setLanguage(e.target.value)}
@@ -956,7 +1079,9 @@ export default function SettingsPage() {
                       </div>
 
                       <div>
-                        <label className="block text-sm font-medium text-slate-400 mb-1">Timezone</label>
+                        <label className="block text-sm font-medium text-slate-400 mb-1">
+                          Timezone
+                        </label>
                         <select className="w-full bg-slate-800/50 border border-slate-700 rounded-md px-3 py-2 text-slate-200 focus:outline-none focus:ring-1 focus:ring-cyan-500 focus:border-cyan-500">
                           <option value="auto">Auto-detect (System)</option>
                           <option value="utc">UTC</option>
@@ -997,7 +1122,9 @@ export default function SettingsPage() {
                       <div className="flex items-center justify-between">
                         <div>
                           <div className="text-slate-300">Screen Reader Optimizations</div>
-                          <div className="text-sm text-slate-400">Improve screen reader compatibility</div>
+                          <div className="text-sm text-slate-400">
+                            Improve screen reader compatibility
+                          </div>
                         </div>
                         <label className="relative inline-flex items-center cursor-pointer">
                           <input type="checkbox" defaultChecked className="sr-only peer" />
@@ -1018,14 +1145,13 @@ export default function SettingsPage() {
                     window.activeWindow.send('save-categories', {
                       productive: productiveCategories,
                       distracted: distractedCategories
-                    });
-                   
+                    })
                   } catch (error) {
-                    console.error('Error saving settings:', error);
-                 
+                    console.error('Error saving settings:', error)
                   }
                 }}
-                className="bg-cyan-600 hover:bg-cyan-700 text-white px-4 py-2 rounded-md transition-colors flex items-center">
+                className="bg-cyan-600 hover:bg-cyan-700 text-white px-4 py-2 rounded-md transition-colors flex items-center"
+              >
                 <Save className="h-4 w-4 mr-2" />
                 Save Settings
               </button>
@@ -1034,6 +1160,5 @@ export default function SettingsPage() {
         </div>
       </div>
     </div>
-
   )
 }

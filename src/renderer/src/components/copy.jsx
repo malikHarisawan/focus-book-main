@@ -1,14 +1,44 @@
-import React from "react";
-import { Card, CardContent } from "./ui/card";
-import { BarChart3, Flame, Clock4, Trophy } from "lucide-react";
+import React from 'react'
+import { Card, CardContent } from './ui/card'
+import { BarChart3, Flame, Clock4, Trophy } from 'lucide-react'
 
 const data = [
-  { name: "Visual Studio Code", category: "Development", time: "2h 45m", productivity: "Productive", color: "text-green-400" },
-  { name: "Microsoft Word", category: "Office", time: "1h 20m", productivity: "Productive", color: "text-green-400" },
-  { name: "Chrome - Work", category: "Browser", time: "1h 15m", productivity: "Neutral", color: "text-yellow-400" },
-  { name: "Slack", category: "Communication", time: "45m", productivity: "Neutral", color: "text-yellow-400" },
-  { name: "YouTube", category: "Entertainment", time: "30m", productivity: "Distracting", color: "text-red-400" }
-];
+  {
+    name: 'Visual Studio Code',
+    category: 'Development',
+    time: '2h 45m',
+    productivity: 'Productive',
+    color: 'text-green-400'
+  },
+  {
+    name: 'Microsoft Word',
+    category: 'Office',
+    time: '1h 20m',
+    productivity: 'Productive',
+    color: 'text-green-400'
+  },
+  {
+    name: 'Chrome - Work',
+    category: 'Browser',
+    time: '1h 15m',
+    productivity: 'Neutral',
+    color: 'text-yellow-400'
+  },
+  {
+    name: 'Slack',
+    category: 'Communication',
+    time: '45m',
+    productivity: 'Neutral',
+    color: 'text-yellow-400'
+  },
+  {
+    name: 'YouTube',
+    category: 'Entertainment',
+    time: '30m',
+    productivity: 'Distracting',
+    color: 'text-red-400'
+  }
+]
 
 export default function Dashboard() {
   return (
@@ -88,5 +118,5 @@ export default function Dashboard() {
         </div>
       </div>
     </div>
-  );
+  )
 }

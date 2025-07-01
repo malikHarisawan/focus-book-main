@@ -1,19 +1,14 @@
-export default function StatCard({
-  title,
-  value,
-  percentage,
-  color,
-}) {
+export default function StatCard({ title, value, percentage, color }) {
   const getColor = () => {
     switch (color) {
-      case "green":
-        return "from-green-500 to-emerald-500"
-      case "blue":
-        return "from-blue-500 to-cyan-500"
-      case "red":
-        return "from-red-500 to-pink-500"
+      case 'green':
+        return 'from-green-500 to-emerald-500'
+      case 'blue':
+        return 'from-blue-500 to-cyan-500'
+      case 'red':
+        return 'from-red-500 to-pink-500'
       default:
-        return "from-slate-500 to-slate-600"
+        return 'from-slate-500 to-slate-600'
     }
   }
 
@@ -35,7 +30,7 @@ export default function StatCard({
           </div>
         </>
       ) : (
-        <div /> 
+        <div />
       )}
     </div>
   )

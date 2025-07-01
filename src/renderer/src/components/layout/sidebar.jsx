@@ -1,19 +1,25 @@
-"use client"
+'use client'
 
-import { useLocation } from "react-router-dom";
-import { Link } from "react-router-dom";
-import { Activity, BarChart3, Calendar, Command, Hexagon, ListTodo, Settings, Target, Timer } from "lucide-react";
-import { Button } from "../ui/button";
-import { Card, CardContent } from "..//ui/card";
-import { StatusItem } from "../dashboard/status-item";
+import { useLocation } from 'react-router-dom'
+import { Link } from 'react-router-dom'
+import {
+  Activity,
+  BarChart3,
+  Calendar,
+  Command,
+  Hexagon,
+  ListTodo,
+  Settings,
+  Target,
+  Timer
+} from 'lucide-react'
+import { Button } from '../ui/button'
+import { Card, CardContent } from '..//ui/card'
+import { StatusItem } from '../Dashboard/status-item'
 
-export function Sidebar({
-  productivityScore,
-  dailyGoalProgress,
-  weeklyGoalProgress,
-}) {
-  const location = useLocation();
-  const pathname = location.pathname;
+export function Sidebar({ productivityScore, dailyGoalProgress, weeklyGoalProgress }) {
+  const location = useLocation()
+  const pathname = location.pathname
 
   return (
     <Card className="bg-slate-900/50 border-slate-700/50 backdrop-blur-sm h-full w-fit">
@@ -26,14 +32,39 @@ export function Sidebar({
         </div>
 
         <nav className="space-y-2">
-          <NavItem href="/" icon={Command} label="Dashboard" active={pathname === "/"} />
-          <NavItem href="/focus-timer" icon={Timer} label="Focus Timer" active={pathname === "/focus-timer"} />
-          <NavItem href="/activity" icon={Activity} label="Activity" active={pathname === "/activity"} />
-          <NavItem href="/tasks" icon={ListTodo} label="Tasks" active={pathname === "/tasks"} />
-          <NavItem href="/goals" icon={Target} label="Goals" active={pathname === "/goals"} />
-          <NavItem href="/analytics" icon={BarChart3} label="Analytics" active={pathname === "/analytics"} />
-          <NavItem href="/schedule" icon={Calendar} label="Schedule" active={pathname === "/schedule"} />
-          <NavItem href="/settings" icon={Settings} label="Settings" active={pathname === "/settings"} />
+          <NavItem href="/" icon={Command} label="Dashboard" active={pathname === '/'} />
+          <NavItem
+            href="/focus-timer"
+            icon={Timer}
+            label="Focus Timer"
+            active={pathname === '/focus-timer'}
+          />
+          <NavItem
+            href="/activity"
+            icon={Activity}
+            label="Activity"
+            active={pathname === '/activity'}
+          />
+          <NavItem href="/tasks" icon={ListTodo} label="Tasks" active={pathname === '/tasks'} />
+          <NavItem href="/goals" icon={Target} label="Goals" active={pathname === '/goals'} />
+          <NavItem
+            href="/analytics"
+            icon={BarChart3}
+            label="Analytics"
+            active={pathname === '/analytics'}
+          />
+          <NavItem
+            href="/schedule"
+            icon={Calendar}
+            label="Schedule"
+            active={pathname === '/schedule'}
+          />
+          <NavItem
+            href="/settings"
+            icon={Settings}
+            label="Settings"
+            active={pathname === '/settings'}
+          />
         </nav>
 
         <div className="mt-8 pt-6 border-t border-slate-700/50">
@@ -50,17 +81,12 @@ export function Sidebar({
 }
 
 // Component for nav items
-function NavItem({
-  icon: Icon,
-  label,
-  active,
-  href,
-}) {
+function NavItem({ icon: Icon, label, active, href }) {
   return (
     <Button
       variant="ghost"
       asChild
-      className={`w-full justify-start ${active ? "bg-slate-800/70 text-cyan-400" : "text-slate-400 hover:text-slate-100"}`}
+      className={`w-full justify-start ${active ? 'bg-slate-800/70 text-cyan-400' : 'text-slate-400 hover:text-slate-100'}`}
     >
       <Link to={href}>
         <Icon className="mr-2 h-4 w-4" />

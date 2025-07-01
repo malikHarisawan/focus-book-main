@@ -1,145 +1,141 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="en">
-
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Distraction Popup</title>
     <style>
-        /* General styles */
-        body {
-            margin: 0;
-            padding: 0;
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            height: 100vh;
-            background: #242b3af0;
-           
-            color: #ffffff;
-            font-family: "Arial", sans-serif;
-            overflow: hidden;
-        }
+      /* General styles */
+      body {
+        margin: 0;
+        padding: 0;
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        height: 100vh;
+        background: #242b3af0;
 
-        .main {
-            background: #1e1e2e;
-            padding: 30px;
-            border-radius: 12px;
-            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.7);
-            text-align: center;
-            max-width: 360px;
-            width: 100%;
-            z-index: 2;
-        }
+        color: #ffffff;
+        font-family: 'Arial', sans-serif;
+        overflow: hidden;
+      }
 
-        .popup h2 {
-            font-size: 22px;
-            margin-bottom: 15px;
-        }
+      .main {
+        background: #1e1e2e;
+        padding: 30px;
+        border-radius: 12px;
+        box-shadow: 0 10px 30px rgba(0, 0, 0, 0.7);
+        text-align: center;
+        max-width: 360px;
+        width: 100%;
+        z-index: 2;
+      }
 
-        .popup p {
-            font-size: 15px;
-            line-height: 1.6;
-            margin-bottom: 25px;
-        }
+      .popup h2 {
+        font-size: 22px;
+        margin-bottom: 15px;
+      }
 
-        .label-container {
-            margin: 20px 0;
-            background: #28283e;
-            padding: 10px;
-            border-radius: 8px;
-            font-size: 14px;
-            color: #b5b5c3;
-            cursor: pointer;
-        }
+      .popup p {
+        font-size: 15px;
+        line-height: 1.6;
+        margin-bottom: 25px;
+      }
 
-        .button-container {
-            display: flex;
-            gap: 10px;
-            justify-content: center;
-        }
+      .label-container {
+        margin: 20px 0;
+        background: #28283e;
+        padding: 10px;
+        border-radius: 8px;
+        font-size: 14px;
+        color: #b5b5c3;
+        cursor: pointer;
+      }
 
-        button {
-            flex: 1;
-            padding: 12px 16px;
-            font-size: 14px;
-            border: none;
-            border-radius: 8px;
-            cursor: pointer;
-            transition: all 0.3s ease;
-        }
+      .button-container {
+        display: flex;
+        gap: 10px;
+        justify-content: center;
+      }
 
-        #stay-focused {
-            background: #4a90e2;
-            color: #ffffff;
-        }
+      button {
+        flex: 1;
+        padding: 12px 16px;
+        font-size: 14px;
+        border: none;
+        border-radius: 8px;
+        cursor: pointer;
+        transition: all 0.3s ease;
+      }
 
-        #stay-focused:hover {
-            background: #357abd;
-        }
+      #stay-focused {
+        background: #4a90e2;
+        color: #ffffff;
+      }
 
-        #reminder {
-            background: #333;
-            color: #cccccc;
-            opacity: 0.4;
-            cursor: not-allowed;
-        }
+      #stay-focused:hover {
+        background: #357abd;
+      }
 
-        #reminder:hover {
-            background: #444;
-        }
+      #reminder {
+        background: #333;
+        color: #cccccc;
+        opacity: 0.4;
+        cursor: not-allowed;
+      }
 
-        #reminder:enabled {
-            opacity: 1;
-            cursor: pointer;
-        }
+      #reminder:hover {
+        background: #444;
+      }
+
+      #reminder:enabled {
+        opacity: 1;
+        cursor: pointer;
+      }
     </style>
-</head>
+  </head>
 
-<body>
+  <body>
     <div class="main">
-        <div class="popup">
-            <h2>Getting Distracted?</h2>
-            <div class="button-container">
-                <button id="stay-focused">Stay Focused</button>
-                <button id="reminder" disabled>Take a Break</button>
-            </div>
-            <div class="label-container" id="dismiss">
-                This is not a distraction
-            </div>
+      <div class="popup">
+        <h2>Getting Distracted?</h2>
+        <div class="button-container">
+          <button id="stay-focused">Stay Focused</button>
+          <button id="reminder" disabled>Take a Break</button>
         </div>
+        <div class="label-container" id="dismiss">This is not a distraction</div>
+      </div>
     </div>
     <script>
-        const reminderButton = document.getElementById('reminder');
-        const dismiss = document.getElementById('dismiss');
-    
-        document.getElementById('stay-focused').addEventListener('click', () => {
-            console.log("stay-focus")
-            window.electronAPI.sendToMain('stay-focused');
-        });
-    
-        reminderButton.addEventListener('click', () => {
-            console.log("cooool downnnnnnn")
-            window.electronAPI.sendToMain('cooldown');
-        });
-    
-        let timeLeft = 0;
-        const countdownTimer = setInterval(() => {
-            if (timeLeft <= 0) {
-                clearInterval(countdownTimer);
-                reminderButton.disabled = false;
-                reminderButton.textContent = 'Take a Break';
-            } else {
-                reminderButton.textContent = `Take a Break (${timeLeft}s)`;
-                timeLeft--;
-            }
-        }, 1000);
-    
-        dismiss.addEventListener('click',()=>{
-            console.log("dismess clicked")
-            window.electronAPI.sendToMain('dismiss'); 
-        })
-    </script>
-</body>
+      const reminderButton = document.getElementById('reminder')
+      const dismiss = document.getElementById('dismiss')
 
+      document.getElementById('stay-focused').addEventListener('click', () => {
+        console.log('stay-focus')
+        window.electronAPI.sendToMain('stay-focused')
+      })
+
+      reminderButton.addEventListener('click', () => {
+        console.log('cooool downnnnnnn')
+        window.electronAPI.sendToMain('cooldown')
+      })
+
+      let timeLeft = 0
+      const countdownTimer = setInterval(() => {
+        if (timeLeft <= 0) {
+          clearInterval(countdownTimer)
+          reminderButton.disabled = false
+          reminderButton.textContent = 'Take a Break'
+        } else {
+          reminderButton.textContent = `Take a Break (${timeLeft}s)`
+          timeLeft--
+        }
+      }, 1000)
+
+      dismiss.addEventListener('click', () => {
+        console.log('dismess clicked')
+        window.electronAPI.sendToMain('dismiss')
+      })
+    </script>
+  </body>
 </html>
