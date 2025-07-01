@@ -6,9 +6,11 @@ import {
   YAxis,
   CartesianGrid,
   Tooltip,
+
   ResponsiveContainer,
   ReferenceArea,
 } from "recharts";
+
 
 const ProductiveAreaChart = ({ data }) => {
   const [selectedRange, setSelectedRange] = useState(null);
@@ -43,7 +45,7 @@ const ProductiveAreaChart = ({ data }) => {
       <div className="bg-gray-800 p-4 rounded-md h-[250px] flex items-center justify-center">
         <span className="text-gray-500">No data available</span>
       </div>
-    );
+    )
   }
 
   const calculateAggregatedData = () => {
@@ -114,11 +116,13 @@ const ProductiveAreaChart = ({ data }) => {
     setIsDragging(false);
   };
   const formatTooltipValue = (value) => {
+
     if (value === 0) return "0m";
     const hours = Math.floor(value / 3600);
     const minutes = Math.floor((value % 3600) / 60);
     return hours > 0 ? `${hours}h ${minutes}m` : `${minutes}m`;
   };
+
 
   const CustomTooltip = ({ active }) => {
     if (active) {
@@ -131,6 +135,7 @@ const ProductiveAreaChart = ({ data }) => {
       
       return (
         <div className="bg-gray-800 p-3 rounded border border-gray-700">
+
           <p className="text-gray-200 font-medium mb-2">
             {selectedRange ? 'Selected Range' : 'Current Day Total'}
           </p>
@@ -153,12 +158,13 @@ const ProductiveAreaChart = ({ data }) => {
               <span className="text-gray-300">Productivity: </span>
               <span className="text-green-400 font-medium">{productivePercentage}%</span>
             </div>
+
           </div>
         </div>
-      );
+      )
     }
-    return null;
-  };
+    return null
+  }
 
   return (
     <div ref={containerRef} className="bg-gray-800 p-4 rounded-md">
@@ -174,6 +180,7 @@ const ProductiveAreaChart = ({ data }) => {
         )}
       </div>
       <ResponsiveContainer width="100%" height={250}>
+
         <AreaChart
           ref={chartRef}
           data={data}
@@ -182,6 +189,7 @@ const ProductiveAreaChart = ({ data }) => {
           onMouseMove={handleMouseMove}
           onMouseUp={handleMouseUp}
         >
+
           <defs>
             <linearGradient id="colorProductive" x1="0" y1="0" x2="0" y2="1">
               <stop offset="5%" stopColor="#82ca9d" stopOpacity={0.8} />
@@ -232,7 +240,7 @@ const ProductiveAreaChart = ({ data }) => {
         </AreaChart>
       </ResponsiveContainer>
     </div>
-  );
-};
+  )
+}
 
-export default ProductiveAreaChart;
+export default ProductiveAreaChart

@@ -1,16 +1,14 @@
-"use client"
+'use client'
 
-import { Check } from "lucide-react"
-import { useToast } from "../../hooks/use-toast"
-
-
+import { Check } from 'lucide-react'
+import { useToast } from '../../hooks/use-toast'
 
 export default function useCategoryChangeToast() {
   const { toast } = useToast()
 
-  const showCategoryChangeToast = ({appName, category}) => {
+  const showCategoryChangeToast = ({ appName, category }) => {
     toast({
-      title: "Category Updated",
+      title: 'Category Updated',
       description: (
         <div className="flex items-center">
           <span>
@@ -19,7 +17,7 @@ export default function useCategoryChangeToast() {
           <Check className="ml-2 h-4 w-4 text-green-400" />
         </div>
       ),
-      duration: 3000,
+      duration: 3000
     })
   }
 
