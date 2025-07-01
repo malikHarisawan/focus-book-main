@@ -1,7 +1,7 @@
-"use client"
+'use client'
 
-import { useState } from "react"
-import { Button } from "../ui/button"
+import { useState } from 'react'
+import { Button } from '../ui/button'
 import {
   Dialog,
   DialogContent,
@@ -9,31 +9,31 @@ import {
   DialogFooter,
   DialogHeader,
   DialogTitle,
-  DialogTrigger,
-} from "../ui/dialog"
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "../ui/select"
-import { Checkbox } from "../ui/checkbox"
-import { ScrollArea } from "../ui/scroll-area"
-import CategoryBadge  from "./category-badge"
-import { Tag, Check } from "lucide-react"
+  DialogTrigger
+} from '../ui/dialog'
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../ui/select'
+import { Checkbox } from '../ui/checkbox'
+import { ScrollArea } from '../ui/scroll-area'
+import CategoryBadge from './category-badge'
+import { Tag, Check } from 'lucide-react'
 
 export default function BulkCategoryDialog({ apps, onCategorize }) {
   const [selectedApps, setSelectedApps] = useState([])
-  const [selectedCategory, setSelectedCategory] = useState("")
+  const [selectedCategory, setSelectedCategory] = useState('')
   const [open, setOpen] = useState(false)
 
   const categories = [
-    "Browsing",
-    "Code",
-    "Communication",
-    "Documenting",
-    "Entertainment",
-    "Learning",
-    "Messaging",
-    "Miscellaneous",
-    "Personal",
-    "Productivity",
-    "Utility",
+    'Browsing',
+    'Code',
+    'Communication',
+    'Documenting',
+    'Entertainment',
+    'Learning',
+    'Messaging',
+    'Miscellaneous',
+    'Personal',
+    'Productivity',
+    'Utility'
   ]
 
   const handleSelectAll = () => {
@@ -57,7 +57,7 @@ export default function BulkCategoryDialog({ apps, onCategorize }) {
       onCategorize(selectedApps, selectedCategory)
       setOpen(false)
       setSelectedApps([])
-      setSelectedCategory("")
+      setSelectedCategory('')
     }
   }
 
@@ -85,7 +85,7 @@ export default function BulkCategoryDialog({ apps, onCategorize }) {
               onClick={handleSelectAll}
               className="bg-slate-800/50 border-slate-700 text-slate-200 hover:bg-slate-800 hover:text-slate-100"
             >
-              {selectedApps.length === apps.length ? "Deselect All" : "Select All"}
+              {selectedApps.length === apps.length ? 'Deselect All' : 'Select All'}
             </Button>
             <span className="text-sm text-slate-400">
               {selectedApps.length} of {apps.length} selected
@@ -95,7 +95,10 @@ export default function BulkCategoryDialog({ apps, onCategorize }) {
           <ScrollArea className="h-[200px] border border-slate-700 rounded-md p-2">
             <div className="space-y-2">
               {apps.map((app) => (
-                <div key={app.id} className="flex items-center justify-between p-2 rounded hover:bg-slate-800/50">
+                <div
+                  key={app.id}
+                  className="flex items-center justify-between p-2 rounded hover:bg-slate-800/50"
+                >
                   <div className="flex items-center space-x-3">
                     <Checkbox
                       id={`app-${app.id}`}

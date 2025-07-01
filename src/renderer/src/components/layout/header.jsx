@@ -1,15 +1,15 @@
-import { useState } from "react";
-import { Bell, Moon, Search, Sun } from "lucide-react";
-import { Button } from "../ui/button";
-import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "..//ui/tooltip";
-import { Avatar, AvatarFallback, AvatarImage } from "..//ui/avatar";
+import { useState } from 'react'
+import { Bell, Moon, Search, Sun } from 'lucide-react'
+import { Button } from '../ui/button'
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '..//ui/tooltip'
+import { Avatar, AvatarFallback, AvatarImage } from '..//ui/avatar'
 
 export function Header() {
-  const [theme, setTheme] = useState("dark");
+  const [theme, setTheme] = useState('dark')
 
   // Toggle theme
   const toggleTheme = () => {
-    setTheme(theme === "dark" ? "light" : "dark");
+    setTheme(theme === 'dark' ? 'light' : 'dark')
     // In a real app, you would also update the document class or a theme context
   }
 
@@ -31,7 +31,11 @@ export function Header() {
           <TooltipProvider>
             <Tooltip>
               <TooltipTrigger asChild>
-                <Button variant="ghost" size="icon" className="relative text-slate-400 hover:text-slate-100">
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="relative text-slate-400 hover:text-slate-100"
+                >
                   <Bell className="h-5 w-5" />
                   <span className="absolute -top-1 -right-1 h-2 w-2 bg-cyan-500 rounded-full animate-pulse"></span>
                 </Button>
@@ -51,7 +55,7 @@ export function Header() {
                   onClick={toggleTheme}
                   className="text-slate-400 hover:text-slate-100"
                 >
-                  {theme === "dark" ? <Moon className="h-5 w-5" /> : <Sun className="h-5 w-5" />}
+                  {theme === 'dark' ? <Moon className="h-5 w-5" /> : <Sun className="h-5 w-5" />}
                 </Button>
               </TooltipTrigger>
               <TooltipContent>
