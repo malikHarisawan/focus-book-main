@@ -31,29 +31,32 @@ let n_pid = null
 let isCleaningUp = false
 
 function createWindow() {
-  mainWindow = new BrowserWindow({
-    width: 1200,
-    height: 800,
-    resizable: true,
-    show: true,
-    Menu: false,
-    transparent: true,
-    webPreferences: {
-      nodeIntegration: true,
-      contextIsolation: true,
-      preload: path.join(__dirname, '../preload/index.js'),
-      sandbox: false
+
+    mainWindow = new BrowserWindow({
+        width: 1200,
+        height: 800,
+        resizable: true,
+        show: true,
+        Menu: false,
+        transparent: true,
+        webPreferences: {
+            nodeIntegration: true,
+            contextIsolation: true,
+            preload: path.join(__dirname, '../preload/index.js'),
+            sandbox: false,
+        },
+    });
+
+    if (is.dev && process.env['ELECTRON_RENDERER_URL']) {
+        mainWindow.loadURL(process.env['ELECTRON_RENDERER_URL'])
+        console.log("running in dev")
+    } else {
+        console.log("running in prod")
+        mainWindow.loadFile(path.join(__dirname, '../renderer/index.html'));
+        mainWindow.webContents.openDevTools()
+
     }
   })
-
-  if (is.dev && process.env['ELECTRON_RENDERER_URL']) {
-    mainWindow.loadURL(process.env['ELECTRON_RENDERER_URL'])
-    console.log('running in dev')
-  } else {
-    console.log('running in prod')
-    mainWindow.loadFile(path.join(__dirname, '../renderer/index.html'))
-    mainWindow.webContents.openDevTools()
-  }
 
   mainWindow.on('close', (e) => {
     if (!app.isQuiting) {
@@ -390,3 +393,4 @@ ipcMain.on('end-focus', (event, isFocused) => {
     }
   }
 })
+
