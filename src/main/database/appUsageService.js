@@ -267,9 +267,12 @@ class AppUsageService {
       )
 
       if (existingRecord.rows.length > 0) {
+        const currentTimeSpent = existingRecord.rows[0].time_spent
+        const newTimeSpent = currentTimeSpent + timeSpent
+
         await client.query(
           'UPDATE app_usage SET time_spent = $1, category = $2, description = $3, domain = $4, updated_at = CURRENT_TIMESTAMP WHERE id = $5',
-          [timeSpent, category, description, domain, existingRecord.rows[0].id]
+          [newTimeSpent, category, description, domain, existingRecord.rows[0].id]
         )
 
         appUsageId = existingRecord.rows[0].id

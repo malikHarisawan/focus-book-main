@@ -17,7 +17,7 @@ export default defineConfig({
             if (!existsSync(outDir)) {
               mkdirSync(outDir, { recursive: true })
             }
-            
+
             cpSync(srcDir, outDir, { recursive: true })
             console.log(`Copied database directory from ${srcDir} to ${outDir}`)
           } else {
