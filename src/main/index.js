@@ -56,7 +56,6 @@ function createWindow() {
         mainWindow.webContents.openDevTools()
 
     }
-  })
 
   mainWindow.on('close', (e) => {
     if (!app.isQuiting) {

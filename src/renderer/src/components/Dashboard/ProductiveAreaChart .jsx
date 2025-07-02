@@ -200,7 +200,11 @@ const ProductiveAreaChart = ({ data }) => {
               <stop offset="95%" stopColor="#ff6b6b" stopOpacity={0} />
             </linearGradient>
           </defs>
-          <XAxis dataKey="day" stroke="#ffffff" />
+             <XAxis 
+            dataKey="day" 
+            stroke="#ffffff" 
+            style={{ userSelect: 'none', WebkitUserSelect: 'none', MozUserSelect: 'none' }}
+          />
           <CartesianGrid strokeDasharray="3 3" />
           <Tooltip content={<CustomTooltip />} />
           <Area

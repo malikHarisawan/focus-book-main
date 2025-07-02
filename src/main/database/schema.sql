@@ -78,6 +78,11 @@ BEGIN
 END;
 $$ language 'plpgsql';
 
+-- Drop existing triggers before creating new ones
+DROP TRIGGER IF EXISTS update_app_usage_updated_at ON app_usage;
+DROP TRIGGER IF EXISTS update_custom_category_mappings_updated_at ON custom_category_mappings;
+
+-- Create triggers
 CREATE TRIGGER update_app_usage_updated_at 
     BEFORE UPDATE ON app_usage 
     FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
