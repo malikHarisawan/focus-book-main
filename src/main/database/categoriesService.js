@@ -1,250 +1,432 @@
 const { dbConnection } = require('./connection')
+const { Category, CustomCategoryMapping } = require('./models')
 
 class CategoriesService {
-  async getCategories() {
-    try {
-      const result = await dbConnection.query('SELECT name, type FROM categories ORDER BY name')
+  async saveCategories(categories) {
+    return dbConnection.executeWithRetry(async () => {
+      const bulkOps = []
 
-      const categories = {
-        productive: [],
-        distracted: [],
-        neutral: []
+      // Handle productive categories
+      if (categories.productive && Array.isArray(categories.productive)) {
+        for (const categoryName of categories.productive) {
+          bulkOps.push({
+            updateOne: {
+              filter: { name: categoryName },
+              update: {
+                $set: {
+                  name: categoryName,
+                  type: 'productive'
+                }
+              },
+              upsert: true
+            }
+          })
+        }
       }
 
-      result.rows.forEach((row) => {
-        if (categories[row.type]) {
-          categories[row.type].push(row.name)
+      // Handle distracted categories
+      if (categories.distracted && Array.isArray(categories.distracted)) {
+        for (const categoryName of categories.distracted) {
+          bulkOps.push({
+            updateOne: {
+              filter: { name: categoryName },
+              update: {
+                $set: {
+                  name: categoryName,
+                  type: 'distracted'
+                }
+              },
+              upsert: true
+            }
+          })
         }
-      })
+      }
 
-      return categories
-    } catch (error) {
-      console.error('Error getting categories:', error)
-      throw error
-    }
+      if (bulkOps.length > 0) {
+        const result = await Category.bulkWrite(bulkOps, { ordered: false })
+        console.log(
+          `Categories saved: ${result.modifiedCount} updated, ${result.upsertedCount} inserted`
+        )
+        return true
+      }
+
+      return false
+    })
   }
 
   async getCategoriesForSettings() {
-    try {
-      const result = await dbConnection.query('SELECT name, type FROM categories ORDER BY name')
+    return dbConnection.executeWithRetry(async () => {
+      const [productiveCategories, distractedCategories] = await Promise.all([
+        Category.find({ type: 'productive' }).sort({ name: 1 }).lean(),
+        Category.find({ type: 'distracted' }).sort({ name: 1 }).lean()
+      ])
 
-      const categories = {
-        productive: [],
-        distracted: []
-      }
+      const productive = productiveCategories.map((cat) => cat.name)
+      const distracted = distractedCategories.map((cat) => cat.name)
 
-      result.rows.forEach((row) => {
-        if (row.type === 'productive') {
-          categories.productive.push(row.name)
-        } else if (row.type === 'distracted') {
-          categories.distracted.push(row.name)
-        }
-      })
-
-      return [categories.productive, categories.distracted]
-    } catch (error) {
-      console.error('Error getting categories for settings:', error)
-      throw error
-    }
+      return [productive, distracted]
+    })
   }
 
-  async saveCategories(categoriesData) {
-    try {
-      await dbConnection.transaction(async (client) => {
-        await client.query('DELETE FROM categories')
+  async getAllCategories() {
+    return dbConnection.executeWithRetry(async () => {
+      const categories = await Category.find({}).sort({ type: 1, name: 1 }).lean()
 
-        for (const [type, categoryList] of Object.entries(categoriesData)) {
-          if (Array.isArray(categoryList)) {
-            for (const categoryName of categoryList) {
-              await client.query('INSERT INTO categories (name, type) VALUES ($1, $2)', [
-                categoryName,
-                type
-              ])
-            }
-          }
-        }
-      })
+      return categories
+    })
+  }
 
-      return true
-    } catch (error) {
-      console.error('Error saving categories:', error)
-      throw error
-    }
+  async getCategoriesByType(type) {
+    return dbConnection.executeWithRetry(async () => {
+      const categories = await Category.find({ type: type }).sort({ name: 1 }).select('name').lean()
+
+      return categories.map((cat) => cat.name)
+    })
   }
 
   async addCategory(name, type) {
-    try {
-      const result = await dbConnection.query(
-        'INSERT INTO categories (name, type) VALUES ($1, $2) ON CONFLICT (name) DO UPDATE SET type = $2 RETURNING id',
-        [name, type]
-      )
+    return dbConnection.executeWithRetry(async () => {
+      const category = new Category({ name, type })
 
-      return result.rows[0]
-    } catch (error) {
-      console.error('Error adding category:', error)
-      throw error
-    }
+      try {
+        await category.save()
+        return true
+      } catch (error) {
+        if (error.code === 11000) {
+          // Duplicate key error
+          // Update existing category
+          await Category.updateOne({ name }, { type })
+          return true
+        }
+        throw error
+      }
+    })
   }
 
-  async updateCategoryType(name, newType) {
-    try {
-      const result = await dbConnection.query(
-        'UPDATE categories SET type = $1 WHERE name = $2 RETURNING id',
-        [newType, name]
-      )
+  async updateCategory(name, newType) {
+    return dbConnection.executeWithRetry(async () => {
+      const result = await Category.updateOne({ name: name }, { $set: { type: newType } })
 
-      return result.rowCount > 0
-    } catch (error) {
-      console.error('Error updating category type:', error)
-      throw error
-    }
+      return result.modifiedCount > 0
+    })
   }
 
   async deleteCategory(name) {
-    try {
-      const result = await dbConnection.query('DELETE FROM categories WHERE name = $1', [name])
-
-      return result.rowCount > 0
-    } catch (error) {
-      console.error('Error deleting category:', error)
-      throw error
-    }
+    return dbConnection.executeWithRetry(async () => {
+      const result = await Category.deleteOne({ name: name })
+      return result.deletedCount > 0
+    })
   }
 
   async getCustomCategoryMappings() {
-    try {
-      const result = await dbConnection.query(
-        'SELECT app_identifier, custom_category FROM custom_category_mappings ORDER BY app_identifier'
-      )
+    return dbConnection.executeWithRetry(async () => {
+      const mappings = await CustomCategoryMapping.find({})
+        .select('appIdentifier customCategory')
+        .lean()
 
-      const mappings = {}
-      result.rows.forEach((row) => {
-        mappings[row.app_identifier] = row.custom_category
+      const result = {}
+      mappings.forEach((mapping) => {
+        result[mapping.appIdentifier] = mapping.customCategory
       })
 
-      return mappings
-    } catch (error) {
-      console.error('Error getting custom category mappings:', error)
-      throw error
-    }
+      return result
+    })
   }
 
   async saveCustomCategoryMappings(mappings) {
-    try {
-      await dbConnection.transaction(async (client) => {
-        await client.query('DELETE FROM custom_category_mappings')
+    return dbConnection.executeWithRetry(async () => {
+      if (!mappings || typeof mappings !== 'object') {
+        console.log('No valid mappings provided')
+        return false
+      }
 
-        for (const [appIdentifier, customCategory] of Object.entries(mappings)) {
-          await client.query(
-            'INSERT INTO custom_category_mappings (app_identifier, custom_category) VALUES ($1, $2)',
-            [appIdentifier, customCategory]
-          )
-        }
-      })
+      const bulkOps = []
 
-      return true
-    } catch (error) {
-      console.error('Error saving custom category mappings:', error)
-      throw error
-    }
+      for (const [appIdentifier, customCategory] of Object.entries(mappings)) {
+        bulkOps.push({
+          updateOne: {
+            filter: { appIdentifier: appIdentifier },
+            update: {
+              $set: {
+                appIdentifier: appIdentifier,
+                customCategory: customCategory
+              }
+            },
+            upsert: true
+          }
+        })
+      }
+
+      if (bulkOps.length > 0) {
+        const result = await CustomCategoryMapping.bulkWrite(bulkOps, { ordered: false })
+        console.log(
+          `Custom mappings saved: ${result.modifiedCount} updated, ${result.upsertedCount} inserted`
+        )
+        return true
+      }
+
+      return false
+    })
   }
 
   async addCustomCategoryMapping(appIdentifier, customCategory) {
-    try {
-      const result = await dbConnection.query(
-        'INSERT INTO custom_category_mappings (app_identifier, custom_category) VALUES ($1, $2) ON CONFLICT (app_identifier) DO UPDATE SET custom_category = $2, updated_at = CURRENT_TIMESTAMP RETURNING id',
-        [appIdentifier, customCategory]
-      )
+    return dbConnection.executeWithRetry(async () => {
+      const mapping = new CustomCategoryMapping({ appIdentifier, customCategory })
 
-      return result.rows[0]
-    } catch (error) {
-      console.error('Error adding custom category mapping:', error)
-      throw error
-    }
+      try {
+        await mapping.save()
+        return true
+      } catch (error) {
+        if (error.code === 11000) {
+          // Duplicate key error
+          // Update existing mapping
+          await CustomCategoryMapping.updateOne({ appIdentifier }, { customCategory })
+          return true
+        }
+        throw error
+      }
+    })
   }
 
   async removeCustomCategoryMapping(appIdentifier) {
-    try {
-      const result = await dbConnection.query(
-        'DELETE FROM custom_category_mappings WHERE app_identifier = $1',
-        [appIdentifier]
-      )
-
-      return result.rowCount > 0
-    } catch (error) {
-      console.error('Error removing custom category mapping:', error)
-      throw error
-    }
+    return dbConnection.executeWithRetry(async () => {
+      const result = await CustomCategoryMapping.deleteOne({ appIdentifier: appIdentifier })
+      return result.deletedCount > 0
+    })
   }
 
-  async getCustomCategoryForApp(appIdentifier) {
-    try {
-      const result = await dbConnection.query(
-        'SELECT custom_category FROM custom_category_mappings WHERE app_identifier = $1',
-        [appIdentifier]
-      )
+  async getCustomCategoryMapping(appIdentifier) {
+    return dbConnection.executeWithRetry(async () => {
+      const mapping = await CustomCategoryMapping.findOne({ appIdentifier: appIdentifier })
+        .select('customCategory')
+        .lean()
 
-      return result.rows.length > 0 ? result.rows[0].custom_category : null
-    } catch (error) {
-      console.error('Error getting custom category for app:', error)
-      throw error
-    }
+      return mapping ? mapping.customCategory : null
+    })
   }
 
-  async getCategoryType(categoryName) {
-    try {
-      const result = await dbConnection.query('SELECT type FROM categories WHERE name = $1', [
-        categoryName
+  async clearAllCustomMappings() {
+    return dbConnection.executeWithRetry(async () => {
+      const result = await CustomCategoryMapping.deleteMany({})
+      return result.deletedCount
+    })
+  }
+
+  async bulkUpdateCustomMappings(mappingsArray) {
+    return dbConnection.executeWithRetry(async () => {
+      if (!Array.isArray(mappingsArray) || mappingsArray.length === 0) {
+        return false
+      }
+
+      const bulkOps = mappingsArray.map((mapping) => ({
+        updateOne: {
+          filter: { appIdentifier: mapping.appIdentifier },
+          update: {
+            $set: {
+              appIdentifier: mapping.appIdentifier,
+              customCategory: mapping.customCategory
+            }
+          },
+          upsert: true
+        }
+      }))
+
+      const result = await CustomCategoryMapping.bulkWrite(bulkOps, { ordered: false })
+      console.log(
+        `Bulk custom mappings update: ${result.modifiedCount} updated, ${result.upsertedCount} inserted`
+      )
+      return true
+    })
+  }
+
+  async getCategoryStats() {
+    return dbConnection.executeWithRetry(async () => {
+      const [categoryStats, mappingsCount] = await Promise.all([
+        Category.aggregate([
+          {
+            $group: {
+              _id: '$type',
+              count: { $sum: 1 },
+              categories: { $push: '$name' }
+            }
+          }
+        ]),
+        CustomCategoryMapping.countDocuments()
       ])
 
-      return result.rows.length > 0 ? result.rows[0].type : 'neutral'
-    } catch (error) {
-      console.error('Error getting category type:', error)
-      return 'neutral'
-    }
+      return {
+        categoryStats: categoryStats,
+        customMappingsCount: mappingsCount
+      }
+    })
   }
 
-  async getAllCategoryNames() {
-    try {
-      const result = await dbConnection.query('SELECT DISTINCT name FROM categories ORDER BY name')
-
-      return result.rows.map((row) => row.name)
-    } catch (error) {
-      console.error('Error getting all category names:', error)
-      throw error
-    }
-  }
-
-  async bulkUpdateAppCategories(appCategoryMap) {
-    try {
-      await dbConnection.transaction(async (client) => {
-        for (const [appName, newCategory] of Object.entries(appCategoryMap)) {
-          await client.query('UPDATE app_usage SET category = $1 WHERE app_name = $2', [
-            newCategory,
-            appName
-          ])
-        }
+  async searchCategories(searchTerm) {
+    return dbConnection.executeWithRetry(async () => {
+      const categories = await Category.find({
+        name: { $regex: searchTerm, $options: 'i' }
       })
+        .sort({ name: 1 })
+        .lean()
 
-      return true
-    } catch (error) {
-      console.error('Error bulk updating app categories:', error)
-      throw error
-    }
+      return categories
+    })
   }
 
-  async getAppsWithCategory(categoryName) {
-    try {
-      const result = await dbConnection.query(
-        'SELECT DISTINCT app_name FROM app_usage WHERE category = $1 ORDER BY app_name',
-        [categoryName]
-      )
+  async getRecentlyUsedCategories(limit = 10) {
+    return dbConnection.executeWithRetry(async () => {
+      const { AppUsage } = require('./models') // Import here to avoid circular dependency
 
-      return result.rows.map((row) => row.app_name)
-    } catch (error) {
-      console.error('Error getting apps with category:', error)
-      throw error
-    }
+      const recentCategories = await AppUsage.aggregate([
+        {
+          $group: {
+            _id: '$category',
+            lastUsed: { $max: '$updatedAt' },
+            usageCount: { $sum: 1 }
+          }
+        },
+        {
+          $sort: { lastUsed: -1 }
+        },
+        {
+          $limit: limit
+        },
+        {
+          $project: {
+            category: '$_id',
+            lastUsed: 1,
+            usageCount: 1,
+            _id: 0
+          }
+        }
+      ])
+
+      return recentCategories
+    })
+  }
+
+  // New Mongoose-specific methods for enhanced functionality
+  async getCategoryWithUsageStats(categoryName) {
+    return dbConnection.executeWithRetry(async () => {
+      const { AppUsage } = require('./models')
+
+      const [category, usageStats] = await Promise.all([
+        Category.findOne({ name: categoryName }).lean(),
+        AppUsage.aggregate([
+          { $match: { category: categoryName } },
+          {
+            $group: {
+              _id: null,
+              totalTime: { $sum: '$timeSpent' },
+              totalSessions: { $sum: 1 },
+              uniqueApps: { $addToSet: '$appName' },
+              firstUsed: { $min: '$date' },
+              lastUsed: { $max: '$date' }
+            }
+          }
+        ])
+      ])
+
+      return {
+        category,
+        stats: usageStats[0] || {
+          totalTime: 0,
+          totalSessions: 0,
+          uniqueApps: [],
+          firstUsed: null,
+          lastUsed: null
+        }
+      }
+    })
+  }
+
+  async validateCategoryExists(categoryName) {
+    return dbConnection.executeWithRetry(async () => {
+      const exists = await Category.exists({ name: categoryName })
+      return !!exists
+    })
+  }
+
+  async getCategoriesWithCounts() {
+    return dbConnection.executeWithRetry(async () => {
+      const result = await Category.aggregate([
+        {
+          $lookup: {
+            from: 'appUsage',
+            localField: 'name',
+            foreignField: 'category',
+            as: 'usage'
+          }
+        },
+        {
+          $project: {
+            name: 1,
+            type: 1,
+            usageCount: { $size: '$usage' },
+            totalTime: { $sum: '$usage.timeSpent' }
+          }
+        },
+        {
+          $sort: { type: 1, name: 1 }
+        }
+      ])
+
+      return result
+    })
+  }
+
+  async exportCategories() {
+    return dbConnection.executeWithRetry(async () => {
+      const [categories, customMappings] = await Promise.all([
+        Category.find({}).lean(),
+        CustomCategoryMapping.find({}).lean()
+      ])
+
+      return {
+        categories: categories,
+        customMappings: customMappings,
+        exportDate: new Date(),
+        version: '1.0'
+      }
+    })
+  }
+
+  async importCategories(importData) {
+    return dbConnection.executeWithRetry(async () => {
+      if (!importData.categories || !Array.isArray(importData.categories)) {
+        throw new Error('Invalid import data format')
+      }
+
+      // Use transactions for data integrity
+      const session = await dbConnection.startTransaction()
+
+      try {
+        // Clear existing data (optional - could be made configurable)
+        await Category.deleteMany({}, { session })
+        await CustomCategoryMapping.deleteMany({}, { session })
+
+        // Import categories
+        if (importData.categories.length > 0) {
+          await Category.insertMany(importData.categories, { session })
+        }
+
+        // Import custom mappings
+        if (importData.customMappings && importData.customMappings.length > 0) {
+          await CustomCategoryMapping.insertMany(importData.customMappings, { session })
+        }
+
+        await dbConnection.commitTransaction(session)
+
+        return {
+          success: true,
+          categoriesImported: importData.categories.length,
+          mappingsImported: importData.customMappings ? importData.customMappings.length : 0
+        }
+      } catch (error) {
+        await dbConnection.abortTransaction(session)
+        throw error
+      }
+    })
   }
 }
 

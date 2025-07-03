@@ -12,13 +12,11 @@ const { exec, spawn } = require('child_process')
 const path = require('path')
 const fs = require('fs')
 import icon from '../../resources/icon.png?asset'
-import { join } from 'path'
 import { is } from '@electron-toolkit/utils'
 
 const { dbConnection } = require('./database/connection')
 const appUsageService = require('./database/appUsageService')
 const categoriesService = require('./database/categoriesService')
-const migrationService = require('./database/migrationService')
 
 let mainWindow = null
 let popupWindow = null
@@ -124,16 +122,14 @@ function createPopUp() {
 app.whenReady().then(async () => {
   try {
     await dbConnection.connect()
-    await migrationService.runFullMigration()
-    console.log('✅ Database initialized and migration completed')
+    console.log('✅ MongoDB Atlas connected and initialized successfully')
   } catch (error) {
-    console.error('❌ Failed to initialize database:', error.message)
+    console.error('❌ Failed to connect to MongoDB Atlas:', error.message)
     console.log('📋 The app will continue to run, but database features will be unavailable.')
-    console.log('💡 To enable PostgreSQL features:')
-    console.log('   1. Install PostgreSQL')
-    console.log('   2. Create a database named "focusbook"')
-    console.log('   3. Update the .env file with your database credentials')
-    console.log('   4. Run: node migrate.js')
+    console.log('💡 To enable MongoDB Atlas features:')
+    console.log('   1. Create a MongoDB Atlas cluster')
+    console.log('   2. Update the .env file with your MongoDB Atlas connection string')
+    console.log('   3. Restart the application')
   }
 
   createWindow()
