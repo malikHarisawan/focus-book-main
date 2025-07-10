@@ -1,4 +1,5 @@
 const { dbConnection } = require('./connection')
+const { AppUsage } = require('./models')
 
 class AppUsageService {
   async saveAppUsage(
@@ -11,364 +12,469 @@ class AppUsageService {
     domain = null,
     timestamps = []
   ) {
-    try {
-      const result = await dbConnection.transaction(async (client) => {
-        let appUsageId
+    return dbConnection.executeWithRetry(async () => {
+      const query = {
+        date: new Date(date),
+        appName: appName
+      }
 
-        const existingRecord = await client.query(
-          'SELECT id, time_spent FROM app_usage WHERE date = $1 AND hour = $2 AND app_name = $3',
-          [date, hour, appName]
-        )
+      if (hour !== null) {
+        query.hour = hour
+      }
 
-        if (existingRecord.rows.length > 0) {
-          const currentTimeSpent = existingRecord.rows[0].time_spent
-          const newTimeSpent = currentTimeSpent + timeSpent
+      const existingRecord = await AppUsage.findOne(query)
 
-          await client.query(
-            'UPDATE app_usage SET time_spent = $1, category = $2, description = $3, domain = $4, updated_at = CURRENT_TIMESTAMP WHERE id = $5',
-            [newTimeSpent, category, description, domain, existingRecord.rows[0].id]
-          )
+      if (existingRecord) {
+        // Update existing record - ADD time instead of overwriting
+        existingRecord.timeSpent += timeSpent
+        existingRecord.category = category
+        existingRecord.description = description
+        existingRecord.domain = domain
+        existingRecord.timestamps.push(...timestamps)
 
-          appUsageId = existingRecord.rows[0].id
-        } else {
-          const insertResult = await client.query(
-            'INSERT INTO app_usage (date, hour, app_name, time_spent, category, description, domain) VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING id',
-            [date, hour, appName, timeSpent, category, description, domain]
-          )
+        await existingRecord.save()
+        return existingRecord._id
+      } else {
+        // Insert new record
+        const newRecord = new AppUsage({
+          date: new Date(date),
+          hour: hour,
+          appName: appName,
+          timeSpent: timeSpent,
+          category: category,
+          description: description,
+          domain: domain,
+          timestamps: timestamps || []
+        })
 
-          appUsageId = insertResult.rows[0].id
-        }
-
-        if (timestamps && timestamps.length > 0) {
-          for (const timestamp of timestamps) {
-            await client.query(
-              'INSERT INTO timestamps (app_usage_id, start_time, duration) VALUES ($1, $2, $3)',
-              [appUsageId, timestamp.start, timestamp.duration]
-            )
-          }
-        }
-
-        return appUsageId
-      })
-
-      return result
-    } catch (error) {
-      console.error('Error saving app usage:', error)
-      throw error
-    }
+        const savedRecord = await newRecord.save()
+        return savedRecord._id
+      }
+    })
   }
 
   async getAppUsageData(startDate = null, endDate = null) {
-    try {
-      let query = `
-        SELECT 
-          au.date,
-          au.hour,
-          au.app_name,
-          au.time_spent,
-          au.category,
-          au.description,
-          au.domain,
-          au.created_at,
-          au.updated_at,
-          json_agg(
-            json_build_object(
-              'start', t.start_time,
-              'duration', t.duration
-            ) ORDER BY t.start_time
-          ) FILTER (WHERE t.id IS NOT NULL) as timestamps
-        FROM app_usage au
-        LEFT JOIN timestamps t ON au.id = t.app_usage_id
-      `
+    return dbConnection.executeWithRetry(async () => {
+      const results = await AppUsage.findByDateRange(startDate, endDate)
 
-      const params = []
-
-      if (startDate && endDate) {
-        query += ' WHERE au.date BETWEEN $1 AND $2'
-        params.push(startDate, endDate)
-      } else if (startDate) {
-        query += ' WHERE au.date >= $1'
-        params.push(startDate)
-      } else if (endDate) {
-        query += ' WHERE au.date <= $1'
-        params.push(endDate)
-      }
-
-      query += ' GROUP BY au.id ORDER BY au.date DESC, au.hour DESC'
-
-      const result = await dbConnection.query(query, params)
-
+      // Transform Mongoose data to match expected format
       const formattedData = {}
 
-      result.rows.forEach((row) => {
-        const dateStr = row.date.toISOString().split('T')[0]
+      results.forEach((record) => {
+        // Manually format date and hour since .lean() removes virtual fields
+        const dateStr = record.date.toISOString().split('T')[0]
+        const hourKey =
+          record.hour !== null && record.hour !== undefined
+            ? `${record.hour.toString().padStart(2, '0')}:00`
+            : null
 
         if (!formattedData[dateStr]) {
           formattedData[dateStr] = { apps: {} }
         }
 
-        if (row.hour !== null) {
-          const hourKey = row.hour.toString().padStart(2, '0') + ':00'
+        if (hourKey) {
           if (!formattedData[dateStr][hourKey]) {
             formattedData[dateStr][hourKey] = {}
           }
 
-          formattedData[dateStr][hourKey][row.app_name] = {
-            time: row.time_spent,
-            category: row.category,
-            description: row.description,
-            domain: row.domain,
-            timestamps: row.timestamps || []
+          formattedData[dateStr][hourKey][record.appName] = {
+            time: record.timeSpent,
+            category: record.category,
+            description: record.description,
+            domain: record.domain,
+            timestamps: record.timestamps || []
           }
         } else {
-          formattedData[dateStr].apps[row.app_name] = {
-            time: row.time_spent,
-            category: row.category,
-            description: row.description,
-            domain: row.domain,
-            timestamps: row.timestamps || []
+          formattedData[dateStr].apps[record.appName] = {
+            time: record.timeSpent,
+            category: record.category,
+            description: record.description,
+            domain: record.domain,
+            timestamps: record.timestamps || []
           }
         }
       })
 
       return formattedData
-    } catch (error) {
-      console.error('Error getting app usage data:', error)
-      throw error
-    }
+    })
   }
 
   async getAppUsageForDate(date) {
-    try {
-      const result = await dbConnection.query(
-        `SELECT 
-          au.hour,
-          au.app_name,
-          au.time_spent,
-          au.category,
-          au.description,
-          au.domain,
-          json_agg(
-            json_build_object(
-              'start', t.start_time,
-              'duration', t.duration
-            ) ORDER BY t.start_time
-          ) FILTER (WHERE t.id IS NOT NULL) as timestamps
-        FROM app_usage au
-        LEFT JOIN timestamps t ON au.id = t.app_usage_id
-        WHERE au.date = $1
-        GROUP BY au.id
-        ORDER BY au.hour DESC`,
-        [date]
-      )
+    return dbConnection.executeWithRetry(async () => {
+      const results = await AppUsage.find({ date: new Date(date) })
+        .sort({ hour: -1 })
+        .lean()
 
       const dateData = { apps: {} }
 
-      result.rows.forEach((row) => {
-        if (row.hour !== null) {
-          const hourKey = row.hour.toString().padStart(2, '0') + ':00'
+      results.forEach((record) => {
+        if (record.hour !== null && record.hour !== undefined) {
+          const hourKey = record.hour.toString().padStart(2, '0') + ':00'
           if (!dateData[hourKey]) {
             dateData[hourKey] = {}
           }
 
-          dateData[hourKey][row.app_name] = {
-            time: row.time_spent,
-            category: row.category,
-            description: row.description,
-            domain: row.domain,
-            timestamps: row.timestamps || []
+          dateData[hourKey][record.appName] = {
+            time: record.timeSpent,
+            category: record.category,
+            description: record.description,
+            domain: record.domain,
+            timestamps: record.timestamps || []
           }
         } else {
-          dateData.apps[row.app_name] = {
-            time: row.time_spent,
-            category: row.category,
-            description: row.description,
-            domain: row.domain,
-            timestamps: row.timestamps || []
+          dateData.apps[record.appName] = {
+            time: record.timeSpent,
+            category: record.category,
+            description: record.description,
+            domain: record.domain,
+            timestamps: record.timestamps || []
           }
         }
       })
 
       return dateData
-    } catch (error) {
-      console.error('Error getting app usage for date:', error)
-      throw error
-    }
+    })
   }
 
   async bulkUpdateAppUsageData(appUsageData) {
-    try {
-      await dbConnection.transaction(async (client) => {
-        for (const [dateStr, dayData] of Object.entries(appUsageData)) {
-          const date = new Date(dateStr)
+    return dbConnection.executeWithRetry(async () => {
+      const bulkOps = []
 
-          if (dayData.apps) {
-            for (const [appName, appData] of Object.entries(dayData.apps)) {
-              await this.saveAppUsageInTransaction(
-                client,
-                date,
-                null,
-                appName,
-                appData.time,
-                appData.category,
-                appData.description,
-                appData.domain,
-                appData.timestamps
-              )
+      for (const [dateStr, dayData] of Object.entries(appUsageData)) {
+        const date = new Date(dateStr)
+
+        // Process daily apps data
+        if (dayData.apps) {
+          for (const [appName, appData] of Object.entries(dayData.apps)) {
+            const filter = {
+              date: date,
+              appName: appName,
+              hour: { $exists: false }
             }
-          }
 
-          for (const [key, value] of Object.entries(dayData)) {
-            if (key !== 'apps' && key.match(/^\d{2}:\d{2}$/)) {
-              const hour = parseInt(key.split(':')[0])
-
-              for (const [appName, appData] of Object.entries(value)) {
-                await this.saveAppUsageInTransaction(
-                  client,
-                  date,
-                  hour,
-                  appName,
-                  appData.time,
-                  appData.category,
-                  appData.description,
-                  appData.domain,
-                  appData.timestamps
-                )
+            const update = {
+              $set: {
+                timeSpent: appData.time,
+                category: appData.category,
+                description: appData.description,
+                domain: appData.domain,
+                timestamps: appData.timestamps || []
               }
             }
+
+            const options = { upsert: true }
+
+            bulkOps.push({
+              updateOne: {
+                filter: filter,
+                update: update,
+                upsert: options.upsert
+              }
+            })
           }
         }
-      })
 
-      return true
-    } catch (error) {
-      console.error('Error bulk updating app usage data:', error)
-      throw error
-    }
-  }
+        // Process hourly data
+        for (const [key, value] of Object.entries(dayData)) {
+          if (key !== 'apps' && key.match(/^\d{2}:\d{2}$/)) {
+            const hour = parseInt(key.split(':')[0])
 
-  async saveAppUsageInTransaction(
-    client,
-    date,
-    hour,
-    appName,
-    timeSpent,
-    category,
-    description = null,
-    domain = null,
-    timestamps = []
-  ) {
-    try {
-      let appUsageId
+            for (const [appName, appData] of Object.entries(value)) {
+              const filter = {
+                date: date,
+                hour: hour,
+                appName: appName
+              }
 
-      const existingRecord = await client.query(
-        'SELECT id, time_spent FROM app_usage WHERE date = $1 AND ($2::INTEGER IS NULL AND hour IS NULL OR hour = $2) AND app_name = $3',
-        [date, hour, appName]
-      )
+              const update = {
+                $set: {
+                  timeSpent: appData.time,
+                  category: appData.category,
+                  description: appData.description,
+                  domain: appData.domain,
+                  timestamps: appData.timestamps || []
+                }
+              }
 
-      if (existingRecord.rows.length > 0) {
-        const currentTimeSpent = existingRecord.rows[0].time_spent
-        const newTimeSpent = currentTimeSpent + timeSpent
-
-        await client.query(
-          'UPDATE app_usage SET time_spent = $1, category = $2, description = $3, domain = $4, updated_at = CURRENT_TIMESTAMP WHERE id = $5',
-          [newTimeSpent, category, description, domain, existingRecord.rows[0].id]
-        )
-
-        appUsageId = existingRecord.rows[0].id
-
-        await client.query('DELETE FROM timestamps WHERE app_usage_id = $1', [appUsageId])
-      } else {
-        const insertResult = await client.query(
-          'INSERT INTO app_usage (date, hour, app_name, time_spent, category, description, domain) VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING id',
-          [date, hour, appName, timeSpent, category, description, domain]
-        )
-
-        appUsageId = insertResult.rows[0].id
-      }
-
-      if (timestamps && timestamps.length > 0) {
-        for (const timestamp of timestamps) {
-          await client.query(
-            'INSERT INTO timestamps (app_usage_id, start_time, duration) VALUES ($1, $2, $3)',
-            [appUsageId, new Date(timestamp.start), timestamp.duration]
-          )
+              bulkOps.push({
+                updateOne: {
+                  filter: filter,
+                  update: update,
+                  upsert: true
+                }
+              })
+            }
+          }
         }
       }
 
-      return appUsageId
-    } catch (error) {
-      console.error('Error saving app usage in transaction:', error)
-      throw error
-    }
+      if (bulkOps.length > 0) {
+        const result = await AppUsage.bulkWrite(bulkOps, { ordered: false })
+        console.log(
+          `Bulk update completed: ${result.modifiedCount} updated, ${result.upsertedCount} inserted`
+        )
+        return true
+      }
+
+      return true
+    })
   }
 
   async deleteAppUsageData(date, appName = null, hour = null) {
-    try {
-      let query = 'DELETE FROM app_usage WHERE date = $1'
-      const params = [date]
+    return dbConnection.executeWithRetry(async () => {
+      let query = { date: new Date(date) }
 
       if (appName) {
-        query += ' AND app_name = $2'
-        params.push(appName)
+        query.appName = appName
 
         if (hour !== null) {
-          query += ' AND hour = $3'
-          params.push(hour)
+          query.hour = hour
         }
       }
 
-      const result = await dbConnection.query(query, params)
-      return result.rowCount
-    } catch (error) {
-      console.error('Error deleting app usage data:', error)
-      throw error
-    }
+      const result = await AppUsage.deleteMany(query)
+      return result.deletedCount
+    })
   }
 
   async getAppUsageStats(startDate, endDate) {
-    try {
-      const result = await dbConnection.query(
-        `SELECT 
-          category,
-          SUM(time_spent) as total_time,
-          COUNT(DISTINCT app_name) as app_count,
-          COUNT(*) as session_count
-        FROM app_usage 
-        WHERE date BETWEEN $1 AND $2
-        GROUP BY category
-        ORDER BY total_time DESC`,
-        [startDate, endDate]
-      )
+    return dbConnection.executeWithRetry(async () => {
+      const pipeline = [
+        {
+          $match: {
+            date: {
+              $gte: new Date(startDate),
+              $lte: new Date(endDate)
+            }
+          }
+        },
+        {
+          $group: {
+            _id: '$category',
+            totalTime: { $sum: '$timeSpent' },
+            appCount: { $addToSet: '$appName' },
+            sessionCount: { $sum: 1 }
+          }
+        },
+        {
+          $project: {
+            category: '$_id',
+            total_time: '$totalTime',
+            app_count: { $size: '$appCount' },
+            session_count: '$sessionCount',
+            _id: 0
+          }
+        },
+        {
+          $sort: { total_time: -1 }
+        }
+      ]
 
-      return result.rows
-    } catch (error) {
-      console.error('Error getting app usage stats:', error)
-      throw error
-    }
+      const results = await AppUsage.aggregate(pipeline)
+      return results
+    })
   }
 
   async getTopApps(startDate, endDate, limit = 10) {
-    try {
-      const result = await dbConnection.query(
-        `SELECT 
-          app_name,
-          category,
-          SUM(time_spent) as total_time,
-          COUNT(*) as session_count
-        FROM app_usage 
-        WHERE date BETWEEN $1 AND $2
-        GROUP BY app_name, category
-        ORDER BY total_time DESC
-        LIMIT $3`,
-        [startDate, endDate, limit]
+    return dbConnection.executeWithRetry(async () => {
+      const pipeline = [
+        {
+          $match: {
+            date: {
+              $gte: new Date(startDate),
+              $lte: new Date(endDate)
+            }
+          }
+        },
+        {
+          $group: {
+            _id: {
+              appName: '$appName',
+              category: '$category'
+            },
+            totalTime: { $sum: '$timeSpent' },
+            sessionCount: { $sum: 1 }
+          }
+        },
+        {
+          $project: {
+            app_name: '$_id.appName',
+            category: '$_id.category',
+            total_time: '$totalTime',
+            session_count: '$sessionCount',
+            _id: 0
+          }
+        },
+        {
+          $sort: { total_time: -1 }
+        },
+        {
+          $limit: limit
+        }
+      ]
+
+      const results = await AppUsage.aggregate(pipeline)
+      return results
+    })
+  }
+
+  async getDailyStats(date) {
+    return dbConnection.executeWithRetry(async () => {
+      const pipeline = [
+        {
+          $match: {
+            date: new Date(date)
+          }
+        },
+        {
+          $group: {
+            _id: '$category',
+            totalTime: { $sum: '$timeSpent' },
+            apps: { $addToSet: '$appName' }
+          }
+        },
+        {
+          $project: {
+            category: '$_id',
+            totalTime: 1,
+            appCount: { $size: '$apps' },
+            _id: 0
+          }
+        },
+        {
+          $sort: { totalTime: -1 }
+        }
+      ]
+
+      const results = await AppUsage.aggregate(pipeline)
+      return results
+    })
+  }
+
+  async getHourlyBreakdown(date) {
+    return dbConnection.executeWithRetry(async () => {
+      const results = await AppUsage.find({
+        date: new Date(date),
+        hour: { $exists: true, $ne: null }
+      })
+        .sort({ hour: 1 })
+        .lean()
+
+      const hourlyData = {}
+
+      results.forEach((record) => {
+        const hour = record.hour
+        if (!hourlyData[hour]) {
+          hourlyData[hour] = {
+            totalTime: 0,
+            apps: {},
+            categories: {}
+          }
+        }
+
+        hourlyData[hour].totalTime += record.timeSpent
+        hourlyData[hour].apps[record.appName] = record.timeSpent
+
+        if (!hourlyData[hour].categories[record.category]) {
+          hourlyData[hour].categories[record.category] = 0
+        }
+        hourlyData[hour].categories[record.category] += record.timeSpent
+      })
+
+      return hourlyData
+    })
+  }
+
+  // New Mongoose-specific methods for better functionality
+  async updateAppCategory(appName, date, newCategory) {
+    return dbConnection.executeWithRetry(async () => {
+      const result = await AppUsage.updateMany(
+        {
+          appName: appName,
+          date: new Date(date)
+        },
+        {
+          $set: { category: newCategory }
+        }
       )
 
-      return result.rows
-    } catch (error) {
-      console.error('Error getting top apps:', error)
-      throw error
-    }
+      return result.modifiedCount
+    })
+  }
+
+  async getAppUsageByCategory(category, startDate, endDate) {
+    return dbConnection.executeWithRetry(async () => {
+      const query = { category: category }
+
+      if (startDate && endDate) {
+        query.date = {
+          $gte: new Date(startDate),
+          $lte: new Date(endDate)
+        }
+      }
+
+      const results = await AppUsage.find(query).sort({ date: -1, hour: -1 }).lean()
+
+      return results
+    })
+  }
+
+  async getProductivityTrend(days = 7) {
+    return dbConnection.executeWithRetry(async () => {
+      const endDate = new Date()
+      const startDate = new Date(endDate.getTime() - days * 24 * 60 * 60 * 1000)
+
+      const pipeline = [
+        {
+          $match: {
+            date: {
+              $gte: startDate,
+              $lte: endDate
+            }
+          }
+        },
+        {
+          $group: {
+            _id: {
+              date: { $dateToString: { format: '%Y-%m-%d', date: '$date' } },
+              category: '$category'
+            },
+            totalTime: { $sum: '$timeSpent' }
+          }
+        },
+        {
+          $group: {
+            _id: '$_id.date',
+            categories: {
+              $push: {
+                category: '$_id.category',
+                time: '$totalTime'
+              }
+            }
+          }
+        },
+        {
+          $sort: { _id: 1 }
+        }
+      ]
+
+      const results = await AppUsage.aggregate(pipeline)
+      return results
+    })
+  }
+
+  async cleanupOldData(daysToKeep = 90) {
+    return dbConnection.executeWithRetry(async () => {
+      const cutoffDate = new Date()
+      cutoffDate.setDate(cutoffDate.getDate() - daysToKeep)
+
+      const result = await AppUsage.deleteMany({
+        date: { $lt: cutoffDate }
+      })
+
+      console.log(`Cleaned up ${result.deletedCount} old records older than ${daysToKeep} days`)
+      return result.deletedCount
+    })
   }
 }
 

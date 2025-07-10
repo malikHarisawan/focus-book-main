@@ -119,9 +119,14 @@ async function getProcessDetails(pid) {
 }
 
 async function getCurrentState(threshold) {
-  const state = await ipcRenderer.invoke('idle-state', threshold)
-  console.log('state', state)
-  return state
+  try {
+    const state = await ipcRenderer.invoke('idle-state', threshold)
+    console.log(`System state: ${state} (threshold: ${threshold}s)`)
+    return state
+  } catch (error) {
+    console.error('Error getting system state:', error)
+    return 'unknown'
+  }
 }
 let previousWindowClass = null
 let previousWindowName = null
@@ -130,7 +135,13 @@ let hasAppSwitched = false
 async function updateAppUsage() {
   try {
     const state = await getCurrentState(120)
-    if (state == 'idle' || state == 'locked') return
+    if (state == 'idle' || state == 'locked' || state == 'unknown') {
+      // Reset tracking variables when system is idle/locked/unknown to prevent false data recording
+      console.log(`System is ${state}, resetting tracking variables`)
+      lastActiveApp = null
+      lastUpdateTime = Date.now()
+      return
+    }
     console.log('State ===>> ', state)
     const currentWindow = await getActiveWindow()
     if (!isValidWindow(currentWindow)) {
@@ -218,7 +229,28 @@ async function updateUsageData(currentWindow, hasAppSwitched) {
   const currentTime = Date.now()
   if (lastActiveApp && lastActiveApp.windowClass) {
     const timeSpent = currentTime - lastUpdateTime
-    if (timeSpent > 1000 * 10) {
+    
+    // Skip recording if the time gap is too large (likely a wake from sleep/idle)
+    const maxAllowedGap = 15 * 60 * 1000 // 15 minutes
+    if (timeSpent > maxAllowedGap) {
+      console.warn(`⚠️ Skipping recording due to large time gap: ${Math.round(timeSpent/60000)}min for ${lastActiveApp.windowClass} - likely system was sleeping/idle`)
+      return
+    }
+    
+    // Prevent recording excessive time gaps (likely due to missed idle states)
+    // Maximum recordable time is 10 minutes per interval
+    const maxRecordableTime = 10 * 60 * 1000 // 10 minutes
+    const actualTimeSpent = Math.min(timeSpent, maxRecordableTime)
+    
+    if (actualTimeSpent > 1000 * 10) {
+      if (timeSpent > maxRecordableTime) {
+        console.warn(`⚠️ Large time gap detected: ${timeSpent}ms (${Math.round(timeSpent/60000)}min) - capped to ${actualTimeSpent}ms (${Math.round(actualTimeSpent/60000)}min) for ${lastActiveApp.windowClass}`)
+      } else {
+        console.log(`Recording ${actualTimeSpent}ms for ${lastActiveApp.windowClass}`)
+      }
+      
+      // Use actualTimeSpent instead of timeSpent for recording
+      const recordTime = actualTimeSpent
       const formattedDate = getFormattedDate()
       const formattedHour = getFormattedHour()
 
@@ -246,7 +278,7 @@ async function updateUsageData(currentWindow, hasAppSwitched) {
           lastActiveApp.windowName,
           appDescription.description,
           active_url,
-          timeSpent,
+          recordTime,
           formattedHour,
           hasAppSwitched
         )
@@ -255,7 +287,7 @@ async function updateUsageData(currentWindow, hasAppSwitched) {
           formattedDate,
           appClass,
           appDescription.description,
-          timeSpent,
+          recordTime,
           formattedHour,
           hasAppSwitched
         )

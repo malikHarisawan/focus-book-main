@@ -6,8 +6,9 @@ import { Badge } from '../ui/badge'
 import { Button } from '../ui/button'
 import { MetricCard } from './metric-card'
 import { TrendingDown, TrendingUp, Calendar } from '../shared/icons'
-import ProductiveAreaChart from './ProductiveAreaChart '
+import ProductiveAreaChart from './ProductiveAreaChart'
 import StatCard from './StatCard'
+import SmartDatePicker from '../shared/smart-date-picker'
 import { useDate } from '../../context/DateContext'
 import {
   processUsageChartData,
@@ -25,6 +26,8 @@ export default function ProductivityOverview() {
   const [focusTime, setFocusTime] = useState(0)
   const [totalTime, setTotalTime] = useState('')
   const [apps, setApps] = useState([])
+  const [rawData, setRawData] = useState(null)
+  const [currentZoomLevel, setCurrentZoomLevel] = useState('hour')
   const { selectedDate, handleDateChange } = useDate()
   const [productivityScore, setProductivityScore] = useState(85)
   const [streakDays, setStreakDays] = useState(5)
@@ -49,12 +52,13 @@ export default function ProductivityOverview() {
   }
   const loadAndProcessData = async () => {
     const jsonData = await window.activeWindow.getAppUsageStats()
+    setRawData(jsonData)
     const appsData = formatAppsData(jsonData, selectedDate)
     setApps(appsData)
     const processedChartData = processUsageChartData(jsonData, selectedDate, view)
     setChartData(processedChartData)
 
-    const processedProductiveChartData = processProductiveChartData(jsonData, selectedDate, view)
+    const processedProductiveChartData = processProductiveChartData(jsonData, selectedDate, 'hour')
     console.log('Area Chart data', processedProductiveChartData)
     setProductiveData(processedProductiveChartData)
 
@@ -98,22 +102,14 @@ export default function ProductivityOverview() {
             <Activity className="mr-2 h-5 w-5 text-cyan-500" />
             Productivity Overview
           </CardTitle>
-          <div className="flex items-center space-x-2">
-            <div className="relative inline-flex items-center bg-slate-800/50 text-cyan-400 border border-cyan-500/50 text-xs px-2 py-1 rounded-md">
-              <input
-                type="date"
-                value={selectedDate}
-                onChange={handleDate}
-                className="bg-transparent text-cyan-400 outline-none text-xs"
-              />
-
-              <Calendar className="absolute right-2 w-4 h-4 text-cyan-400 pointer-events-none" />
-            </div>
+          <div className="flex items-center space-x-3">
+            <SmartDatePicker zoomLevel={currentZoomLevel} onDateChange={loadAndProcessData} />
             <Button
               onClick={loadAndProcessData}
               variant="ghost"
               size="icon"
               className="h-8 w-8 text-slate-400"
+              title="Refresh data"
             >
               <RefreshCw className="h-4 w-4" />
             </Button>
@@ -189,7 +185,12 @@ export default function ProductivityOverview() {
 
             <TabsContent value="categories" className="mt-0">
               <div className="h-full w-full relative bg-slate-800/30 rounded-lg border border-slate-700/50 overflow-hidden">
-                <ProductiveAreaChart data={productiveData} />
+                <ProductiveAreaChart
+                  data={productiveData}
+                  rawData={rawData}
+                  selectedDate={selectedDate}
+                  onZoomLevelChange={setCurrentZoomLevel}
+                />
               </div>
             </TabsContent>
             <TabsContent value="applications" className=" mt-0">

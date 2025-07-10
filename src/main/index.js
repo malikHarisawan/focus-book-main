@@ -12,13 +12,10 @@ const { exec, spawn } = require('child_process')
 const path = require('path')
 const fs = require('fs')
 import icon from '../../resources/icon.png?asset'
-import { join } from 'path'
 import { is } from '@electron-toolkit/utils'
 
-const { dbConnection } = require('./database/connection')
-const appUsageService = require('./database/appUsageService')
-const categoriesService = require('./database/categoriesService')
-const migrationService = require('./database/migrationService')
+const { hybridConnection } = require('./database/hybridConnection')
+// const backgroundSyncService = require('./database/backgroundSyncService') // Commented out for simplified architecture
 
 let mainWindow = null
 let popupWindow = null
@@ -123,17 +120,18 @@ function createPopUp() {
 
 app.whenReady().then(async () => {
   try {
-    await dbConnection.connect()
-    await migrationService.runFullMigration()
-    console.log('✅ Database initialized and migration completed')
+    await hybridConnection.connect()
+    console.log('✅ NeDB database system initialized successfully')
+
+    // Simplified to use only NeDB (local storage)
+    console.log('📱 Local storage mode: Using NeDB')
+
+    // Background sync service commented out for simplified architecture
+    // backgroundSyncService.start()
+    // console.log('🔄 Background sync service started')
   } catch (error) {
-    console.error('❌ Failed to initialize database:', error.message)
-    console.log('📋 The app will continue to run, but database features will be unavailable.')
-    console.log('💡 To enable PostgreSQL features:')
-    console.log('   1. Install PostgreSQL')
-    console.log('   2. Create a database named "focusbook"')
-    console.log('   3. Update the .env file with your database credentials')
-    console.log('   4. Run: node migrate.js')
+    console.error('❌ Failed to initialize database system:', error.message)
+    console.log('📋 The app will continue to run with reduced functionality.')
   }
 
   createWindow()
@@ -148,6 +146,7 @@ app.whenReady().then(async () => {
 
   ipcMain.on('save-categories', async (event, data) => {
     try {
+      const categoriesService = hybridConnection.getCategoriesService()
       return await categoriesService.saveCategories(data)
     } catch (error) {
       console.error('Error saving categories:', error)
@@ -157,6 +156,7 @@ app.whenReady().then(async () => {
 
   ipcMain.handle('load-categories', async (event) => {
     try {
+      const categoriesService = hybridConnection.getCategoriesService()
       return await categoriesService.getCategoriesForSettings()
     } catch (error) {
       console.error('Error loading categories:', error)
@@ -166,6 +166,7 @@ app.whenReady().then(async () => {
 
   ipcMain.handle('load-data', async () => {
     try {
+      const appUsageService = hybridConnection.getAppUsageService()
       return await appUsageService.getAppUsageData()
     } catch (error) {
       console.error('Error loading data:', error)
@@ -175,6 +176,7 @@ app.whenReady().then(async () => {
 
   ipcMain.handle('save-data', async (event, appUsageData) => {
     try {
+      const appUsageService = hybridConnection.getAppUsageService()
       return await appUsageService.bulkUpdateAppUsageData(appUsageData)
     } catch (error) {
       console.error('Error saving data:', error)
@@ -183,13 +185,38 @@ app.whenReady().then(async () => {
   })
 
   ipcMain.handle('idle-state', async (event, idleThreshold) => {
-    let state = powerMonitor.getSystemIdleState(idleThreshold)
-    console.log(`[${new Date().toLocaleTimeString()}] State: ${state}`)
-    return state
+    try {
+      let state = powerMonitor.getSystemIdleState(idleThreshold)
+      console.log(`[${new Date().toLocaleTimeString()}] System state: ${state} (threshold: ${idleThreshold}s)`)
+      
+      // Additional check for system sleep/wake
+      if (state === 'active') {
+        // Check if system was recently woken up by looking at uptime gaps
+        // This is a basic check - more sophisticated detection could be added
+        const currentTime = Date.now()
+        if (!global.lastActiveCheck) {
+          global.lastActiveCheck = currentTime
+        }
+        
+        const timeSinceLastCheck = currentTime - global.lastActiveCheck
+        global.lastActiveCheck = currentTime
+        
+        // If more than 10 minutes have passed since last check, system might have been sleeping
+        if (timeSinceLastCheck > 10 * 60 * 1000) {
+          console.log(`⚠️ Large time gap detected in idle checks: ${Math.round(timeSinceLastCheck/60000)}min - system may have been sleeping`)
+        }
+      }
+      
+      return state
+    } catch (error) {
+      console.error('Error getting system idle state:', error)
+      return 'unknown'
+    }
   })
 
   ipcMain.handle('load-custom-categories', async () => {
     try {
+      const categoriesService = hybridConnection.getCategoriesService()
       return await categoriesService.getCustomCategoryMappings()
     } catch (error) {
       console.error('Error loading custom categories:', error)
@@ -199,12 +226,81 @@ app.whenReady().then(async () => {
 
   ipcMain.handle('save-custom-categories', async (event, mappings) => {
     try {
+      const categoriesService = hybridConnection.getCategoriesService()
       return await categoriesService.saveCustomCategoryMappings(mappings)
     } catch (error) {
       console.error('Error saving custom categories:', error)
       return false
     }
   })
+
+  // Sync functionality commented out for simplified architecture
+  // ipcMain.handle('get-storage-stats', async () => {
+  //   try {
+  //     return await backgroundSyncService.getStorageStats()
+  //   } catch (error) {
+  //     console.error('Error getting storage stats:', error)
+  //     return { error: error.message }
+  //   }
+  // })
+
+  // ipcMain.handle('get-sync-status', async () => {
+  //   try {
+  //     return backgroundSyncService.getSyncStatus()
+  //   } catch (error) {
+  //     console.error('Error getting sync status:', error)
+  //     return { error: error.message }
+  //   }
+  // })
+
+  // ipcMain.handle('force-sync-to-mongo', async () => {
+  //   try {
+  //     return await backgroundSyncService.forcePushToMongo()
+  //   } catch (error) {
+  //     console.error('Error forcing sync to MongoDB:', error)
+  //     return false
+  //   }
+  // })
+
+  // ipcMain.handle('force-sync-from-mongo', async () => {
+  //   try {
+  //     return await backgroundSyncService.forcePullFromMongo()
+  //   } catch (error) {
+  //     console.error('Error forcing sync from MongoDB:', error)
+  //     return false
+  //   }
+  // })
+
+  ipcMain.handle('get-connection-mode', async () => {
+    try {
+      return {
+        mode: hybridConnection.getStorageType(),
+        isOnline: false, // Always offline in simplified architecture
+        isOffline: true  // Always offline in simplified architecture
+      }
+    } catch (error) {
+      console.error('Error getting connection mode:', error)
+      return { error: error.message }
+    }
+  })
+
+  // ipcMain.handle('export-local-data', async () => {
+  //   try {
+  //     return await backgroundSyncService.exportLocalData()
+  //   } catch (error) {
+  //     console.error('Error exporting local data:', error)
+  //     throw error
+  //   }
+  // })
+
+  // ipcMain.handle('import-local-data', async (event, data) => {
+  //   try {
+  //     return await backgroundSyncService.importLocalData(data)
+  //   } catch (error) {
+  //     console.error('Error importing local data:', error)
+  //     throw error
+  //   }
+  // })
 
   tray = new Tray(icon)
   const trayMenu = Menu.buildFromTemplate([
@@ -213,7 +309,7 @@ app.whenReady().then(async () => {
       label: 'Quit',
       click: () => {
         app.isQuiting = true
-        cleanup()
+        cleanupWithDb()
         app.quit()
       }
     }
@@ -259,8 +355,16 @@ function cleanup() {
     tray = null
   }
 
-  // Disconnect from database
-  dbConnection.disconnect().catch((err) => {
+  // Stop background sync service
+  try {
+    backgroundSyncService.stop()
+    console.log('🔄 Background sync service stopped')
+  } catch (err) {
+    console.error('Error stopping background sync service:', err)
+  }
+
+  // Disconnect from hybrid database system
+  hybridConnection.disconnect().catch((err) => {
     console.error('Error disconnecting from database:', err)
   })
 }
@@ -277,7 +381,7 @@ app.on('window-all-closed', (e) => {
 })
 
 app.on('before-quit', () => {
-  cleanup()
+  cleanupWithDb()
 })
 
 ipcMain.on('stay-focused', (event, data) => {
@@ -390,3 +494,24 @@ ipcMain.on('end-focus', (event, isFocused) => {
     }
   }
 })
+
+// Updated cleanup function with database connection handling
+async function cleanupWithDb() {
+  console.log('🔄 Starting cleanup...')
+  isCleaningUp = true
+  
+  clearAppTimers()
+  
+  try {
+    // Close database connection
+    await hybridConnection.disconnect()
+    console.log('✅ Database connection closed')
+  } catch (error) {
+    console.error('Error during cleanup:', error)
+  }
+  
+  // Call original cleanup
+  cleanup()
+  
+  console.log('✅ Cleanup completed')
+}

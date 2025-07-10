@@ -104,7 +104,7 @@ export const processUsageChartData = (jsonData, date, viewType = 'day') => {
 
     const weekData = []
     const dateObj = new Date(date)
-    const dayNames = ['S', 'M', 'T', 'W', 'T', 'F', 'S']
+    const dayNames = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']
 
     for (let i = 0; i < 7; i++) {
       const currentDate = new Date(dateObj)
@@ -142,7 +142,7 @@ export const processUsageChartData = (jsonData, date, viewType = 'day') => {
 }
 
 export const processProductiveChartData = (jsonData, date, viewType = 'day') => {
-  if (viewType === 'day') {
+  if (viewType === 'hour') {
     if (!jsonData || !jsonData[date]) {
       return []
     }
@@ -180,10 +180,45 @@ export const processProductiveChartData = (jsonData, date, viewType = 'day') => 
     }
 
     return hourlyData
-  } else {
+  } else if (viewType === 'day') {
+    if (!jsonData || !jsonData[date]) {
+      return []
+    }
+    const fullDayData = []
+
+    for (let i = 0; i < 24; i++) {
+      fullDayData.push({
+        day: i === 0 ? '12AM' : i === 12 ? '12PM' : i < 12 ? `${i}AM` : `${i - 12}PM`,
+        productive: 0,
+        unproductive: 0
+      })
+    }
+
+    for (const [hourKey, hourData] of Object.entries(jsonData[date])) {
+      if (hourKey === 'apps') continue
+
+      const hour = parseInt(hourKey.split(':')[0])
+      if (isNaN(hour) || hour < 0 || hour > 23) continue
+
+      for (const app of Object.values(hourData)) {
+        if (!app.category || !app.time) continue
+
+        const seconds = app.time / 1000
+        const isProductive = getProductivity(app.category)
+
+        if (isProductive == 'Productive') {
+          fullDayData[hour].productive += seconds
+        } else {
+          fullDayData[hour].unproductive += seconds
+        }
+      }
+    }
+
+    return fullDayData
+  } else if (viewType === 'week') {
     const weekData = []
     const dateObj = new Date(date)
-    const dayNames = ['S', 'M', 'T', 'W', 'T', 'F', 'S']
+    const dayNames = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']
 
     for (let i = 0; i < 7; i++) {
       const currentDate = new Date(dateObj)
@@ -215,6 +250,42 @@ export const processProductiveChartData = (jsonData, date, viewType = 'day') => 
     }
 
     return weekData
+  } else if (viewType === 'month') {
+    const monthData = []
+    const dateObj = new Date(date)
+    const year = dateObj.getFullYear()
+    const month = dateObj.getMonth()
+    const daysInMonth = new Date(year, month + 1, 0).getDate()
+
+    for (let day = 1; day <= daysInMonth; day++) {
+      const currentDate = new Date(year, month, day)
+      const formattedDate = currentDate.toISOString().split('T')[0]
+
+      const dayData = {
+        day: day.toString(),
+        productive: 0,
+        unproductive: 0
+      }
+
+      if (jsonData[formattedDate] && jsonData[formattedDate].apps) {
+        for (const app of Object.values(jsonData[formattedDate].apps)) {
+          if (!app.category || !app.time) continue
+
+          const seconds = app.time / 1000
+          const isProductive = getProductivity(app.category)
+
+          if (isProductive == 'Productive') {
+            dayData.productive += seconds
+          } else {
+            dayData.unproductive += seconds
+          }
+        }
+      }
+
+      monthData.push(dayData)
+    }
+
+    return monthData
   }
 }
 
