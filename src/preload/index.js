@@ -1,9 +1,7 @@
 const { contextBridge, ipcRenderer } = require('electron')
 const activeWindows = require('electron-active-window')
 const { spawn } = require('child_process')
-import { json } from 'stream/consumers'
 import APP_CATEGORIES from './categories'
-import { time } from 'console'
 const { exec } = require('child_process')
 const util = require('util')
 const execPromise = util.promisify(exec)
@@ -119,9 +117,14 @@ async function getProcessDetails(pid) {
 }
 
 async function getCurrentState(threshold) {
-  const state = await ipcRenderer.invoke('idle-state', threshold)
-  console.log('state', state)
-  return state
+  try {
+    const state = await ipcRenderer.invoke('idle-state', threshold)
+    console.log(`System state: ${state} (threshold: ${threshold}s)`)
+    return state
+  } catch (error) {
+    console.error('Error getting system state:', error)
+    return 'unknown'
+  }
 }
 let previousWindowClass = null
 let previousWindowName = null
@@ -130,7 +133,13 @@ let hasAppSwitched = false
 async function updateAppUsage() {
   try {
     const state = await getCurrentState(120)
-    if (state == 'idle' || state == 'locked') return
+    if (state == 'idle' || state == 'locked' || state == 'unknown') {
+      // Reset tracking variables when system is idle/locked/unknown to prevent false data recording
+      console.log(`System is ${state}, resetting tracking variables`)
+      lastActiveApp = null
+      lastUpdateTime = Date.now()
+      return
+    }
     console.log('State ===>> ', state)
     const currentWindow = await getActiveWindow()
     if (!isValidWindow(currentWindow)) {
@@ -179,17 +188,57 @@ async function updateAppUsage() {
     console.error('Error updating app usage:', error)
   }
 }
-function startFocusSession(isFocused) {
-  console.log('Focus started')
-  isFocusSessionActive = true
-  focusSessionStartTime = Date.now()
-  ipcRenderer.send('start-focus', isFocused)
+async function startFocusSession(isFocused) {
+  console.log('Focus started - starting actual focus session')
+  
+  if (!isFocusSessionActive) {
+    try {
+      // Start an actual focus session via IPC
+      const sessionData = {
+        type: 'pomodoro',
+        duration: 25 * 60 * 1000, // 25 minutes in milliseconds
+        isAutoStarted: true
+      }
+      
+      const session = await ipcRenderer.invoke('start-focus-session', sessionData)
+      
+      if (session && !session.error) {
+        isFocusSessionActive = true
+        focusSessionStartTime = Date.now()
+        console.log('Auto-started focus session:', session._id)
+        
+        // Send UI update
+        ipcRenderer.send('start-focus', isFocused)
+      } else {
+        console.error('Failed to start focus session:', session?.error)
+      }
+    } catch (error) {
+      console.error('Error starting auto focus session:', error)
+    }
+  }
 }
-function endFocusSession(isFocused) {
-  isFocusSessionActive = false
-  ipcRenderer.send('end-focus', isFocused)
-  const focusTime = Date.now() - focusSessionStartTime
-  totalFocusTime += focusTime
+async function endFocusSession(isFocused) {
+  if (isFocusSessionActive) {
+    try {
+      // End the current focus session in the database
+      const currentSession = await ipcRenderer.invoke('get-current-focus-session')
+      
+      if (currentSession && !currentSession.error) {
+        await ipcRenderer.invoke('stop-focus-session', currentSession._id)
+        console.log('Auto-ended focus session:', currentSession._id)
+      }
+      
+      isFocusSessionActive = false
+      ipcRenderer.send('end-focus', isFocused)
+      
+      const focusTime = Date.now() - focusSessionStartTime
+      totalFocusTime += focusTime
+    } catch (error) {
+      console.error('Error ending auto focus session:', error)
+      isFocusSessionActive = false
+      ipcRenderer.send('end-focus', isFocused)
+    }
+  }
 }
 
 async function getActiveWindow() {
@@ -218,7 +267,32 @@ async function updateUsageData(currentWindow, hasAppSwitched) {
   const currentTime = Date.now()
   if (lastActiveApp && lastActiveApp.windowClass) {
     const timeSpent = currentTime - lastUpdateTime
-    if (timeSpent > 1000 * 10) {
+
+    // Skip recording if the time gap is too large (likely a wake from sleep/idle)
+    const maxAllowedGap = 15 * 60 * 1000 // 15 minutes
+    if (timeSpent > maxAllowedGap) {
+      console.warn(
+        `⚠️ Skipping recording due to large time gap: ${Math.round(timeSpent / 60000)}min for ${lastActiveApp.windowClass} - likely system was sleeping/idle`
+      )
+      return
+    }
+
+    // Prevent recording excessive time gaps (likely due to missed idle states)
+    // Maximum recordable time is 10 minutes per interval
+    const maxRecordableTime = 10 * 60 * 1000 // 10 minutes
+    const actualTimeSpent = Math.min(timeSpent, maxRecordableTime)
+
+    if (actualTimeSpent > 1000 * 10) {
+      if (timeSpent > maxRecordableTime) {
+        console.warn(
+          `⚠️ Large time gap detected: ${timeSpent}ms (${Math.round(timeSpent / 60000)}min) - capped to ${actualTimeSpent}ms (${Math.round(actualTimeSpent / 60000)}min) for ${lastActiveApp.windowClass}`
+        )
+      } else {
+        console.log(`Recording ${actualTimeSpent}ms for ${lastActiveApp.windowClass}`)
+      }
+
+      // Use actualTimeSpent instead of timeSpent for recording
+      const recordTime = actualTimeSpent
       const formattedDate = getFormattedDate()
       const formattedHour = getFormattedHour()
 
@@ -246,7 +320,7 @@ async function updateUsageData(currentWindow, hasAppSwitched) {
           lastActiveApp.windowName,
           appDescription.description,
           active_url,
-          timeSpent,
+          recordTime,
           formattedHour,
           hasAppSwitched
         )
@@ -255,7 +329,7 @@ async function updateUsageData(currentWindow, hasAppSwitched) {
           formattedDate,
           appClass,
           appDescription.description,
-          timeSpent,
+          recordTime,
           formattedHour,
           hasAppSwitched
         )
@@ -476,7 +550,7 @@ async function sendPopupMessage(currentWindow) {
     }
     ipcRenderer.send('show-popup-message', active_url, pid)
   } else {
-    ipcRenderer.send('show-popup-message', currentWindow.windowClass)
+    ipcRenderer.send('show-popup-message', currentWindow.windowClass, currentWindow.windowPid)
   }
 }
 
@@ -638,7 +712,27 @@ contextBridge.exposeInMainWorld('electronAPI', {
     if (validChannels.includes(channel)) {
       ipcRenderer.send(channel, data)
     }
-  }
+  },
+  // Focus Session API
+  startFocusSession: (sessionData) => ipcRenderer.invoke('start-focus-session', sessionData),
+  stopFocusSession: (sessionId) => ipcRenderer.invoke('stop-focus-session', sessionId),
+  pauseFocusSession: (sessionId) => ipcRenderer.invoke('pause-focus-session', sessionId),
+  resumeFocusSession: (sessionId) => ipcRenderer.invoke('resume-focus-session', sessionId),
+  cancelFocusSession: (sessionId) => ipcRenderer.invoke('cancel-focus-session', sessionId),
+  getCurrentFocusSession: () => ipcRenderer.invoke('get-current-focus-session'),
+  getFocusSessionStats: () => ipcRenderer.invoke('get-focus-session-stats'),
+  getFocusSessionsByDate: (startDate, endDate) =>
+    ipcRenderer.invoke('get-focus-sessions-by-date', startDate, endDate),
+  addFocusSessionInterruption: (sessionId, reason, appName) =>
+    ipcRenderer.invoke('add-focus-session-interruption', sessionId, reason, appName),
+  rateFocusSession: (sessionId, productivity, notes) =>
+    ipcRenderer.invoke('rate-focus-session', sessionId, productivity, notes),
+  showNotification: (options) => ipcRenderer.invoke('show-notification', options),
+  // Popup analytics and controls
+  getPopupStats: () => ipcRenderer.invoke('get-popup-stats'),
+  updatePopupPreferences: (preferences) =>
+    ipcRenderer.invoke('update-popup-preferences', preferences),
+  cleanupPopupDismissals: () => ipcRenderer.invoke('cleanup-popup-dismissals')
 })
 
 contextBridge.exposeInMainWorld('activeWindow', {
