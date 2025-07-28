@@ -26,7 +26,7 @@
         border-radius: 12px;
         box-shadow: 0 10px 30px rgba(0, 0, 0, 0.7);
         text-align: center;
-        max-width: 360px;
+        max-width: 400px;
         width: 100%;
         z-index: 2;
       }
@@ -92,6 +92,35 @@
         opacity: 1;
         cursor: pointer;
       }
+
+      .session-info {
+        background: #28283e;
+        padding: 15px;
+        border-radius: 8px;
+        margin: 20px 0;
+        font-size: 14px;
+        color: #b5b5c3;
+      }
+
+      .session-timer {
+        font-size: 20px;
+        font-weight: bold;
+        color: #4a90e2;
+        margin: 10px 0;
+      }
+
+      .session-type {
+        color: #ffffff;
+        font-weight: bold;
+        text-transform: capitalize;
+      }
+
+      .interruption-note {
+        font-size: 12px;
+        color: #888;
+        margin-top: 10px;
+        font-style: italic;
+      }
     </style>
   </head>
 
@@ -99,6 +128,14 @@
     <div class="main">
       <div class="popup">
         <h2>Getting Distracted?</h2>
+
+        <div class="session-info" id="session-info" style="display: none">
+          <div>Current Focus Session:</div>
+          <div class="session-type" id="session-type">Focus</div>
+          <div class="session-timer" id="session-timer">25:00</div>
+          <div class="interruption-note">This interruption will be recorded</div>
+        </div>
+
         <div class="button-container">
           <button id="stay-focused">Stay Focused</button>
           <button id="reminder" disabled>Take a Break</button>
@@ -109,6 +146,79 @@
     <script>
       const reminderButton = document.getElementById('reminder')
       const dismiss = document.getElementById('dismiss')
+      const sessionInfo = document.getElementById('session-info')
+      const sessionType = document.getElementById('session-type')
+      const sessionTimer = document.getElementById('session-timer')
+
+      let currentSession = null
+      let sessionUpdateInterval = null
+
+      // Load current session on popup load
+      async function loadCurrentSession() {
+        try {
+          if (window.electronAPI && window.electronAPI.getCurrentFocusSession) {
+            currentSession = await window.electronAPI.getCurrentFocusSession()
+            if (
+              currentSession &&
+              (currentSession.status === 'active' || currentSession.status === 'paused')
+            ) {
+              displaySessionInfo()
+              startSessionTimer()
+            }
+          }
+        } catch (error) {
+          console.error('Error loading session:', error)
+        }
+      }
+
+      function displaySessionInfo() {
+        if (currentSession) {
+          sessionInfo.style.display = 'block'
+          sessionType.textContent = currentSession.type.replace(/([A-Z])/g, ' $1').trim()
+          updateSessionTimer()
+        }
+      }
+
+      function updateSessionTimer() {
+        if (currentSession) {
+          const elapsed = Date.now() - new Date(currentSession.startTime).getTime()
+          const remaining = currentSession.plannedDuration - elapsed
+          const timeLeft = Math.max(0, Math.floor(remaining / 1000))
+
+          const mins = Math.floor(timeLeft / 60)
+          const secs = timeLeft % 60
+          sessionTimer.textContent = `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`
+        }
+      }
+
+      function startSessionTimer() {
+        if (sessionUpdateInterval) {
+          clearInterval(sessionUpdateInterval)
+        }
+
+        sessionUpdateInterval = setInterval(() => {
+          updateSessionTimer()
+        }, 1000)
+      }
+
+      // Record interruption when showing popup
+      async function recordInterruption(appName) {
+        if (
+          currentSession &&
+          window.electronAPI &&
+          window.electronAPI.addFocusSessionInterruption
+        ) {
+          try {
+            await window.electronAPI.addFocusSessionInterruption(
+              currentSession._id,
+              'Application switch',
+              appName
+            )
+          } catch (error) {
+            console.error('Error recording interruption:', error)
+          }
+        }
+      }
 
       document.getElementById('stay-focused').addEventListener('click', () => {
         console.log('stay-focus')
@@ -135,6 +245,18 @@
       dismiss.addEventListener('click', () => {
         console.log('dismess clicked')
         window.electronAPI.sendToMain('dismiss')
+      })
+
+      // Load session info when popup opens
+      window.addEventListener('load', () => {
+        loadCurrentSession()
+      })
+
+      // Clean up intervals when popup closes
+      window.addEventListener('beforeunload', () => {
+        if (sessionUpdateInterval) {
+          clearInterval(sessionUpdateInterval)
+        }
       })
     </script>
   </body>

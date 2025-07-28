@@ -104,7 +104,7 @@ export const processUsageChartData = (jsonData, date, viewType = 'day') => {
 
     const weekData = []
     const dateObj = new Date(date)
-    const dayNames = ['S', 'M', 'T', 'W', 'T', 'F', 'S']
+    const dayNames = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']
 
     for (let i = 0; i < 7; i++) {
       const currentDate = new Date(dateObj)
@@ -142,7 +142,7 @@ export const processUsageChartData = (jsonData, date, viewType = 'day') => {
 }
 
 export const processProductiveChartData = (jsonData, date, viewType = 'day') => {
-  if (viewType === 'day') {
+  if (viewType === 'hour') {
     if (!jsonData || !jsonData[date]) {
       return []
     }
@@ -180,10 +180,45 @@ export const processProductiveChartData = (jsonData, date, viewType = 'day') => 
     }
 
     return hourlyData
-  } else {
+  } else if (viewType === 'day') {
+    if (!jsonData || !jsonData[date]) {
+      return []
+    }
+    const fullDayData = []
+
+    for (let i = 0; i < 24; i++) {
+      fullDayData.push({
+        day: i === 0 ? '12AM' : i === 12 ? '12PM' : i < 12 ? `${i}AM` : `${i - 12}PM`,
+        productive: 0,
+        unproductive: 0
+      })
+    }
+
+    for (const [hourKey, hourData] of Object.entries(jsonData[date])) {
+      if (hourKey === 'apps') continue
+
+      const hour = parseInt(hourKey.split(':')[0])
+      if (isNaN(hour) || hour < 0 || hour > 23) continue
+
+      for (const app of Object.values(hourData)) {
+        if (!app.category || !app.time) continue
+
+        const seconds = app.time / 1000
+        const isProductive = getProductivity(app.category)
+
+        if (isProductive == 'Productive') {
+          fullDayData[hour].productive += seconds
+        } else {
+          fullDayData[hour].unproductive += seconds
+        }
+      }
+    }
+
+    return fullDayData
+  } else if (viewType === 'week') {
     const weekData = []
     const dateObj = new Date(date)
-    const dayNames = ['S', 'M', 'T', 'W', 'T', 'F', 'S']
+    const dayNames = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']
 
     for (let i = 0; i < 7; i++) {
       const currentDate = new Date(dateObj)
@@ -215,23 +250,60 @@ export const processProductiveChartData = (jsonData, date, viewType = 'day') => 
     }
 
     return weekData
+  } else if (viewType === 'month') {
+    const monthData = []
+    const dateObj = new Date(date)
+    const year = dateObj.getFullYear()
+    const month = dateObj.getMonth()
+    const daysInMonth = new Date(year, month + 1, 0).getDate()
+
+    for (let day = 1; day <= daysInMonth; day++) {
+      const currentDate = new Date(year, month, day)
+      const formattedDate = currentDate.toISOString().split('T')[0]
+
+      const dayData = {
+        day: day.toString(),
+        productive: 0,
+        unproductive: 0
+      }
+
+      if (jsonData[formattedDate] && jsonData[formattedDate].apps) {
+        for (const app of Object.values(jsonData[formattedDate].apps)) {
+          if (!app.category || !app.time) continue
+
+          const seconds = app.time / 1000
+          const isProductive = getProductivity(app.category)
+
+          if (isProductive == 'Productive') {
+            dayData.productive += seconds
+          } else {
+            dayData.unproductive += seconds
+          }
+        }
+      }
+
+      monthData.push(dayData)
+    }
+
+    return monthData
   }
 }
 
 export const processMostUsedApps = (jsonData, date) => {
-  if (!jsonData || !jsonData[date] || !jsonData[date].apps) {
+  if (!jsonData || !jsonData[date]) {
     return []
   }
 
   const appTimeMap = {}
 
-  for (const [name, data] of Object.entries(jsonData[date].apps)) {
-    const key = data.domain || data.description
-    const productivity = getProductivity(data.category)
+  // Use daily aggregated apps data if available (this should be the pre-aggregated total)
+  // Only fall back to hourly aggregation if daily data is missing
+  if (jsonData[date].apps && Object.keys(jsonData[date].apps).length > 0) {
+    // Process daily aggregated apps data (this is already the total for the day)
+    for (const [name, data] of Object.entries(jsonData[date].apps)) {
+      const key = data.domain || data.description || name
+      const productivity = getProductivity(data.category)
 
-    if (appTimeMap[key]) {
-      appTimeMap[key].time += data.time
-    } else {
       appTimeMap[key] = {
         name,
         time: data.time,
@@ -239,6 +311,32 @@ export const processMostUsedApps = (jsonData, date) => {
         domain: data.domain,
         description: data.description,
         productivity: productivity
+      }
+    }
+  } else {
+    // Fallback: Process hourly data if daily aggregated data is not available
+    for (const [hourKey, hourData] of Object.entries(jsonData[date])) {
+      // Skip the 'apps' key and only process time-formatted keys
+      if (hourKey === 'apps' || !hourKey.match(/^\d{2}:\d{2}$/)) {
+        continue
+      }
+
+      for (const [name, data] of Object.entries(hourData)) {
+        const key = data.domain || data.description || name
+        const productivity = getProductivity(data.category)
+
+        if (appTimeMap[key]) {
+          appTimeMap[key].time += data.time
+        } else {
+          appTimeMap[key] = {
+            name,
+            time: data.time,
+            category: data.category,
+            domain: data.domain,
+            description: data.description,
+            productivity: productivity
+          }
+        }
       }
     }
   }
@@ -352,4 +450,160 @@ export const getCategoryBreakdown = (jsonData, date) => {
       time: formatTime(data.time),
       color: data.color
     }))
+}
+
+/**
+ * Extract apps from selected time range with detailed usage information
+ * @param {Object} rawData - Raw usage data
+ * @param {string} selectedDate - Currently selected date
+ * @param {Object} selectedRange - Selected range with startIndex and endIndex
+ * @param {Array} chartData - Processed chart data for the current view
+ * @param {string} zoomLevel - Current zoom level (hour, day, week, month)
+ * @returns {Array} Array of apps with their usage details for the selected range
+ */
+export const getAppsForSelectedRange = (
+  rawData,
+  selectedDate,
+  selectedRange,
+  chartData,
+  
+  zoomLevel
+) => {
+  if (!rawData || !selectedDate || !selectedRange || !chartData || chartData.length === 0) {
+    return []
+  }
+
+  const { startIndex, endIndex } = selectedRange
+  const appUsageMap = new Map()
+
+  try {
+    if (zoomLevel === 'hour' || zoomLevel === 'day') {
+      // For hour/day view, extract apps from specific hours
+      if (!rawData[selectedDate]) return []
+
+      const selectedHours = chartData.slice(startIndex, endIndex + 1)
+
+      for (const hourData of selectedHours) {
+        const hourKey = hourData.day
+
+        // Convert display format back to hour format for lookup
+        let hour24Format
+        if (hourKey.includes('AM') || hourKey.includes('PM')) {
+          const hourNum = parseInt(hourKey.replace(/[AP]M/, ''))
+          if (hourKey.includes('AM')) {
+            hour24Format = hourNum === 12 ? 0 : hourNum
+          } else {
+            hour24Format = hourNum === 12 ? 12 : hourNum + 12
+          }
+        } else {
+          hour24Format = parseInt(hourKey)
+        }
+
+        const hourString = `${hour24Format}:00`
+        const hourlyData = rawData[selectedDate][hourString]
+
+        if (hourlyData) {
+          for (const [appKey, appData] of Object.entries(hourlyData)) {
+            const appName = appData.domain || appData.description || appKey
+            const existingApp = appUsageMap.get(appName)
+
+            if (existingApp) {
+              existingApp.timeSpentSeconds += Math.floor(appData.time / 1000)
+            } else {
+              appUsageMap.set(appName, {
+                name: appName,
+                key: appKey,
+                category: appData.category,
+                domain: appData.domain,
+                description: appData.description,
+                timeSpentSeconds: Math.floor(appData.time / 1000),
+                productivity: getProductivity(appData.category)
+              })
+            }
+          }
+        }
+      }
+    } else if (zoomLevel === 'week') {
+      // For week view, extract apps from specific days
+      const selectedDays = chartData.slice(startIndex, endIndex + 1)
+      const dateObj = new Date(selectedDate)
+      const dayNames = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']
+
+      for (const dayData of selectedDays) {
+        const dayIndex = dayNames.indexOf(dayData.day)
+        if (dayIndex === -1) continue
+
+        const currentDate = new Date(dateObj)
+        currentDate.setDate(dateObj.getDate() - dateObj.getDay() + dayIndex)
+        const formattedDate = currentDate.toISOString().split('T')[0]
+
+        if (rawData[formattedDate] && rawData[formattedDate].apps) {
+          for (const [appKey, appData] of Object.entries(rawData[formattedDate].apps)) {
+            const appName = appData.domain || appData.description || appKey
+            const existingApp = appUsageMap.get(appName)
+
+            if (existingApp) {
+              existingApp.timeSpentSeconds += Math.floor(appData.time / 1000)
+            } else {
+              appUsageMap.set(appName, {
+                name: appName,
+                key: appKey,
+                category: appData.category,
+                domain: appData.domain,
+                description: appData.description,
+                timeSpentSeconds: Math.floor(appData.time / 1000),
+                productivity: getProductivity(appData.category)
+              })
+            }
+          }
+        }
+      }
+    } else if (zoomLevel === 'month') {
+      // For month view, extract apps from specific days
+      const selectedDays = chartData.slice(startIndex, endIndex + 1)
+      const dateObj = new Date(selectedDate)
+      const year = dateObj.getFullYear()
+      const month = dateObj.getMonth()
+
+      for (const dayData of selectedDays) {
+        const dayNum = parseInt(dayData.day)
+        if (isNaN(dayNum)) continue
+
+        const currentDate = new Date(year, month, dayNum)
+        const formattedDate = currentDate.toISOString().split('T')[0]
+
+        if (rawData[formattedDate] && rawData[formattedDate].apps) {
+          for (const [appKey, appData] of Object.entries(rawData[formattedDate].apps)) {
+            const appName = appData.domain || appData.description || appKey
+            const existingApp = appUsageMap.get(appName)
+
+            if (existingApp) {
+              existingApp.timeSpentSeconds += Math.floor(appData.time / 1000)
+            } else {
+              appUsageMap.set(appName, {
+                name: appName,
+                key: appKey,
+                category: appData.category,
+                domain: appData.domain,
+                description: appData.description,
+                timeSpentSeconds: Math.floor(appData.time / 1000),
+                productivity: getProductivity(appData.category)
+              })
+            }
+          }
+        }
+      }
+    }
+
+    // Convert to array and sort by time spent
+    const result = Array.from(appUsageMap.values())
+      .filter((app) => app.timeSpentSeconds > 0)
+      .sort((a, b) => b.timeSpentSeconds - a.timeSpentSeconds)
+
+    console.log('Extracted apps for selected range:', result)
+    return result
+  } catch (error) {
+    console.error('Error extracting apps for selected range:', error)
+    return []
+  }
 }

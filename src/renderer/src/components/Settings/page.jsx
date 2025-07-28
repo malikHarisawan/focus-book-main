@@ -16,7 +16,8 @@ import {
   RefreshCw,
   Trash2,
   Download,
-  Upload
+  Upload,
+  Bot
 } from 'lucide-react'
 const allCategories = [
   'Code',
@@ -45,6 +46,9 @@ export default function SettingsPage() {
   const [distractedCategories, setdistractedCategories] = useState([])
   const [newProCategory, setNewProCategory] = useState('')
   const [newDisCategory, setNewDisCategory] = useState('')
+  const [openaiApiKey, setOpenaiApiKey] = useState('')
+  const [isApiKeyValid, setIsApiKeyValid] = useState(false)
+  const [aiServiceStatus, setAiServiceStatus] = useState({ isRunning: false, port: null, error: null })
 
   useEffect(() => {
     const fetchCategories = async () => {
@@ -55,6 +59,28 @@ export default function SettingsPage() {
       }
     }
     fetchCategories()
+
+    // Load saved API key
+    const savedApiKey = localStorage.getItem('openai_api_key')
+    if (savedApiKey) {
+      setOpenaiApiKey(savedApiKey)
+    }
+
+    // Check AI service status periodically
+    const checkAiServiceStatus = async () => {
+      try {
+        const status = await window.electronAPI.getAiServiceStatus()
+        setAiServiceStatus(status)
+      } catch (error) {
+        console.error('Error checking AI service status:', error)
+        setAiServiceStatus({ isRunning: false, port: null, error: error.message })
+      }
+    }
+
+    checkAiServiceStatus()
+    const statusInterval = setInterval(checkAiServiceStatus, 5000) // Check every 5 seconds in settings
+
+    return () => clearInterval(statusInterval)
   }, [])
   function loadproCategories() {
     if (
@@ -103,6 +129,7 @@ export default function SettingsPage() {
                   { id: 'appearance', label: 'Appearance', icon: Palette },
                   { id: 'notifications', label: 'Notifications', icon: Bell },
                   { id: 'Categories Management', label: 'Categories Management', icon: Lock },
+                  { id: 'ai', label: 'AI Assistant', icon: Bot },
                   { id: 'data', label: 'Data Management', icon: Database },
                   { id: 'integrations', label: 'Integrations', icon: Globe },
                   { id: 'preferences', label: 'Preferences', icon: Sliders }
@@ -626,6 +653,127 @@ export default function SettingsPage() {
                         className="bg-cyan-600 hover:bg-cyan-700 text-white px-4 py-2 rounded-r-md transition-colors"
                       >
                         Add
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* AI Assistant Settings */}
+            {activeTab === 'ai' && (
+              <div className="space-y-6 animate-fadeIn">
+                <h3 className="text-lg font-medium text-slate-200 border-b border-slate-700/50 pb-2">
+                  AI Assistant Configuration
+                </h3>
+
+                <div className="space-y-6">
+                  {/* OpenAI API Key */}
+                  <div className="bg-slate-800/50 border border-slate-700 rounded-lg p-4">
+                    <h4 className="text-md font-medium text-slate-300 mb-2 flex items-center">
+                      <Bot className="h-4 w-4 mr-2 text-cyan-500" />
+                      OpenAI API Configuration
+                    </h4>
+                    <p className="text-slate-400 text-sm mb-4">
+                      Configure your OpenAI API key to enable AI-powered insights and analysis of your productivity data.
+                    </p>
+                    
+                    <div className="space-y-4">
+                      <div>
+                        <label className="block text-sm font-medium text-slate-300 mb-2">
+                          API Key
+                        </label>
+                        <div className="flex gap-2">
+                          <input
+                            type="password"
+                            value={openaiApiKey}
+                            onChange={(e) => setOpenaiApiKey(e.target.value)}
+                            placeholder="Enter your OpenAI API key (sk-...)"
+                            className="flex-1 px-3 py-2 bg-slate-900/50 border border-slate-700 rounded-md text-slate-200 placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-cyan-500"
+                          />
+                          <button
+                            onClick={async () => {
+                              try {
+                                // Test API key by restarting service with new key
+                                await window.electronAPI.restartAiService()
+                                setIsApiKeyValid(true)
+                              } catch (error) {
+                                setIsApiKeyValid(false)
+                              }
+                            }}
+                            className="bg-cyan-600 hover:bg-cyan-700 text-white px-4 py-2 rounded-md transition-colors"
+                          >
+                            Test
+                          </button>
+                        </div>
+                        {isApiKeyValid && (
+                          <p className="text-green-400 text-sm mt-2">✓ API key is valid</p>
+                        )}
+                      </div>
+
+                      <div className="bg-slate-900/50 border border-slate-700 rounded-md p-3">
+                        <h5 className="text-sm font-medium text-slate-300 mb-2">How to get an API key:</h5>
+                        <ol className="text-sm text-slate-400 space-y-1">
+                          <li>1. Visit <a href="https://platform.openai.com/api-keys" className="text-cyan-400 hover:underline" target="_blank" rel="noopener noreferrer">OpenAI API Keys</a></li>
+                          <li>2. Sign in to your OpenAI account</li>
+                          <li>3. Click "Create new secret key"</li>
+                          <li>4. Copy the key and paste it above</li>
+                        </ol>
+                      </div>
+
+                      <button
+                        onClick={async () => {
+                          // Save API key (you would implement this in the main process)
+                          localStorage.setItem('openai_api_key', openaiApiKey)
+                          try {
+                            await window.electronAPI.restartAiService()
+                          } catch (error) {
+                            console.error('Error restarting AI service:', error)
+                          }
+                        }}
+                        className="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-md transition-colors flex items-center"
+                      >
+                        <Save className="h-4 w-4 mr-2" />
+                        Save Configuration
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* Service Status */}
+                  <div className="bg-slate-800/50 border border-slate-700 rounded-lg p-4">
+                    <h4 className="text-md font-medium text-slate-300 mb-2 flex items-center">
+                      <RefreshCw className="h-4 w-4 mr-2 text-cyan-500" />
+                      Service Status
+                    </h4>
+                    <div className="space-y-3">
+                      <div className="flex items-center justify-between">
+                        <span className="text-sm text-slate-400">AI Service</span>
+                        <div className="flex items-center gap-2">
+                          <div className={`w-2 h-2 rounded-full ${aiServiceStatus.isRunning ? 'bg-green-500' : 'bg-red-500'}`}></div>
+                          <span className="text-sm text-slate-300">
+                            {aiServiceStatus.isRunning ? `Running (Port ${aiServiceStatus.port})` : 'Offline'}
+                          </span>
+                        </div>
+                      </div>
+                      
+                      {aiServiceStatus.error && (
+                        <div className="bg-red-900/30 border border-red-700/50 rounded-md p-3">
+                          <p className="text-red-400 text-sm">Error: {aiServiceStatus.error}</p>
+                        </div>
+                      )}
+                      
+                      <button
+                        onClick={async () => {
+                          try {
+                            await window.electronAPI.restartAiService()
+                          } catch (error) {
+                            console.error('Error restarting AI service:', error)
+                          }
+                        }}
+                        className="bg-slate-700 hover:bg-slate-600 text-white px-4 py-2 rounded-md transition-colors flex items-center text-sm"
+                      >
+                        <RefreshCw className="h-4 w-4 mr-2" />
+                        Restart Service
                       </button>
                     </div>
                   </div>

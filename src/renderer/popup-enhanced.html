@@ -1,0 +1,884 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Focus Assistant</title>
+    <style>
+      /* CSS Variables for theming */
+      :root {
+        --bg-primary: #0f0f0f;
+        --bg-secondary: #1a1a1a;
+        --bg-card: #2a2a2a;
+        --bg-accent: #3a3a3a;
+        --text-primary: #ffffff;
+        --text-secondary: #cccccc;
+        --text-muted: #888888;
+        --color-focus: #3b82f6;
+        --color-break: #10b981;
+        --color-warning: #f59e0b;
+        --color-danger: #ef4444;
+        --color-success: #22c55e;
+        --border-radius: 12px;
+        --animation-fast: 0.2s;
+        --animation-normal: 0.3s;
+        --animation-slow: 0.5s;
+      }
+
+      * {
+        margin: 0;
+        padding: 0;
+        box-sizing: border-box;
+      }
+
+      body {
+        margin: 0;
+        padding: 0;
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        height: 100vh;
+        background: linear-gradient(135deg, var(--bg-primary) 0%, #1a1a2e 100%);
+        color: var(--text-primary);
+        font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+        overflow: hidden;
+        user-select: none;
+      }
+
+      .popup-container {
+        background: var(--bg-card);
+        border-radius: var(--border-radius);
+        box-shadow: 0 20px 60px rgba(0, 0, 0, 0.8);
+        padding: 32px;
+        max-width: 480px;
+        width: 90%;
+        text-align: center;
+        position: relative;
+        animation: slideIn var(--animation-normal) ease-out;
+        border: 1px solid rgba(255, 255, 255, 0.1);
+      }
+
+      @keyframes slideIn {
+        from {
+          opacity: 0;
+          transform: translateY(-30px) scale(0.95);
+        }
+        to {
+          opacity: 1;
+          transform: translateY(0) scale(1);
+        }
+      }
+
+      .popup-header {
+        margin-bottom: 24px;
+      }
+
+      .popup-icon {
+        width: 64px;
+        height: 64px;
+        margin: 0 auto 16px;
+        background: linear-gradient(135deg, var(--color-focus), #6366f1);
+        border-radius: 50%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 28px;
+        animation: pulse 2s infinite;
+      }
+
+      @keyframes pulse {
+        0%,
+        100% {
+          transform: scale(1);
+        }
+        50% {
+          transform: scale(1.05);
+        }
+      }
+
+      .popup-title {
+        font-size: 24px;
+        font-weight: 700;
+        margin-bottom: 8px;
+        background: linear-gradient(135deg, var(--text-primary), var(--text-secondary));
+        -webkit-background-clip: text;
+        -webkit-text-fill-color: transparent;
+        background-clip: text;
+      }
+
+      .popup-subtitle {
+        font-size: 16px;
+        color: var(--text-secondary);
+        margin-bottom: 20px;
+      }
+
+      .session-info {
+        background: var(--bg-accent);
+        border-radius: 8px;
+        padding: 16px;
+        margin: 20px 0;
+        border-left: 4px solid var(--color-focus);
+      }
+
+      .session-status {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 8px;
+        margin-bottom: 12px;
+      }
+
+      .status-indicator {
+        width: 8px;
+        height: 8px;
+        border-radius: 50%;
+        background: var(--color-success);
+        animation: blink 2s infinite;
+      }
+
+      @keyframes blink {
+        0%,
+        50% {
+          opacity: 1;
+        }
+        51%,
+        100% {
+          opacity: 0.3;
+        }
+      }
+
+      .session-timer {
+        font-size: 32px;
+        font-weight: 700;
+        font-family: 'SF Mono', 'Monaco', 'Consolas', monospace;
+        color: var(--color-focus);
+        margin: 8px 0;
+        text-shadow: 0 0 20px rgba(59, 130, 246, 0.3);
+      }
+
+      .session-type {
+        color: var(--text-secondary);
+        font-size: 14px;
+        text-transform: uppercase;
+        letter-spacing: 1px;
+        font-weight: 600;
+      }
+
+      .distraction-info {
+        background: rgba(239, 68, 68, 0.1);
+        border: 1px solid rgba(239, 68, 68, 0.3);
+        border-radius: 8px;
+        padding: 12px;
+        margin: 16px 0;
+      }
+
+      .distraction-app {
+        font-weight: 600;
+        color: var(--color-danger);
+        margin-bottom: 4px;
+      }
+
+      .distraction-message {
+        font-size: 14px;
+        color: var(--text-muted);
+      }
+
+      .progress-section {
+        margin: 24px 0;
+      }
+
+      .progress-ring {
+        position: relative;
+        width: 120px;
+        height: 120px;
+        margin: 0 auto 16px;
+      }
+
+      .progress-ring svg {
+        width: 100%;
+        height: 100%;
+        transform: rotate(-90deg);
+      }
+
+      .progress-ring-bg {
+        fill: none;
+        stroke: var(--bg-accent);
+        stroke-width: 8;
+      }
+
+      .progress-ring-fill {
+        fill: none;
+        stroke: var(--color-focus);
+        stroke-width: 8;
+        stroke-linecap: round;
+        stroke-dasharray: 314;
+        stroke-dashoffset: 314;
+        transition: stroke-dashoffset var(--animation-slow) ease;
+      }
+
+      .progress-text {
+        position: absolute;
+        top: 50%;
+        left: 50%;
+        transform: translate(-50%, -50%);
+        font-size: 18px;
+        font-weight: 700;
+      }
+
+      .stats-grid {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 16px;
+        margin: 20px 0;
+      }
+
+      .stat-item {
+        background: var(--bg-accent);
+        border-radius: 8px;
+        padding: 12px;
+        text-align: center;
+      }
+
+      .stat-value {
+        font-size: 20px;
+        font-weight: 700;
+        color: var(--color-focus);
+      }
+
+      .stat-label {
+        font-size: 12px;
+        color: var(--text-muted);
+        margin-top: 4px;
+      }
+
+      .actions {
+        display: flex;
+        gap: 12px;
+        margin-top: 32px;
+        flex-wrap: wrap;
+        justify-content: center;
+      }
+
+      .btn {
+        padding: 12px 24px;
+        border: none;
+        border-radius: 8px;
+        font-size: 16px;
+        font-weight: 600;
+        cursor: pointer;
+        transition: all var(--animation-fast) ease;
+        position: relative;
+        overflow: hidden;
+        min-width: 120px;
+        flex: 1;
+        max-width: 200px;
+      }
+
+      .btn::before {
+        content: '';
+        position: absolute;
+        top: 0;
+        left: -100%;
+        width: 100%;
+        height: 100%;
+        background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.1), transparent);
+        transition: left var(--animation-normal) ease;
+      }
+
+      .btn:hover::before {
+        left: 100%;
+      }
+
+      .btn-primary {
+        background: linear-gradient(135deg, var(--color-focus), #6366f1);
+        color: white;
+        box-shadow: 0 4px 16px rgba(59, 130, 246, 0.3);
+      }
+
+      .btn-primary:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 6px 20px rgba(59, 130, 246, 0.4);
+      }
+
+      .btn-secondary {
+        background: var(--bg-accent);
+        color: var(--text-primary);
+        border: 1px solid rgba(255, 255, 255, 0.1);
+      }
+
+      .btn-secondary:hover {
+        background: var(--bg-primary);
+        transform: translateY(-1px);
+      }
+
+      .btn-warning {
+        background: linear-gradient(135deg, var(--color-warning), #f97316);
+        color: white;
+        box-shadow: 0 4px 16px rgba(245, 158, 11, 0.3);
+      }
+
+      .btn-warning:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 6px 20px rgba(245, 158, 11, 0.4);
+      }
+
+      .btn:disabled {
+        opacity: 0.5;
+        cursor: not-allowed;
+        transform: none !important;
+      }
+
+      .countdown-overlay {
+        position: absolute;
+        top: 0;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        background: rgba(0, 0, 0, 0.7);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        border-radius: var(--border-radius);
+        opacity: 0;
+        pointer-events: none;
+        transition: opacity var(--animation-normal) ease;
+      }
+
+      .countdown-overlay.active {
+        opacity: 1;
+        pointer-events: all;
+      }
+
+      .countdown-circle {
+        width: 80px;
+        height: 80px;
+        border-radius: 50%;
+        background: var(--color-warning);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 32px;
+        font-weight: 700;
+        color: white;
+        animation: countdownPulse 1s infinite;
+      }
+
+      @keyframes countdownPulse {
+        0%,
+        100% {
+          transform: scale(1);
+        }
+        50% {
+          transform: scale(1.1);
+        }
+      }
+
+      .keyboard-hint {
+        position: absolute;
+        bottom: 16px;
+        left: 50%;
+        transform: translateX(-50%);
+        font-size: 12px;
+        color: var(--text-muted);
+        background: var(--bg-primary);
+        padding: 8px 12px;
+        border-radius: 6px;
+        border: 1px solid rgba(255, 255, 255, 0.1);
+      }
+
+      .breathing-exercise {
+        display: none;
+        flex-direction: column;
+        align-items: center;
+        gap: 16px;
+      }
+
+      .breathing-circle {
+        width: 100px;
+        height: 100px;
+        border-radius: 50%;
+        background: linear-gradient(135deg, var(--color-focus), var(--color-break));
+        opacity: 0.8;
+        animation: breathe 4s infinite ease-in-out;
+      }
+
+      @keyframes breathe {
+        0%,
+        100% {
+          transform: scale(1);
+        }
+        50% {
+          transform: scale(1.2);
+        }
+      }
+
+      .breathing-text {
+        font-size: 18px;
+        font-weight: 600;
+        color: var(--text-secondary);
+      }
+
+      /* Responsive design */
+      @media (max-width: 520px) {
+        .popup-container {
+          padding: 24px;
+          width: 95%;
+        }
+
+        .actions {
+          flex-direction: column;
+        }
+
+        .btn {
+          max-width: none;
+        }
+
+        .stats-grid {
+          grid-template-columns: 1fr;
+        }
+      }
+
+      /* High contrast mode */
+      @media (prefers-contrast: high) {
+        :root {
+          --bg-primary: #000000;
+          --bg-secondary: #111111;
+          --bg-card: #222222;
+          --text-primary: #ffffff;
+          --text-secondary: #ffffff;
+        }
+      }
+
+      /* Reduced motion */
+      @media (prefers-reduced-motion: reduce) {
+        *,
+        *::before,
+        *::after {
+          animation-duration: 0.01ms !important;
+          animation-iteration-count: 1 !important;
+          transition-duration: 0.01ms !important;
+        }
+      }
+    </style>
+  </head>
+
+  <body>
+    <div class="popup-container">
+      <div class="popup-header">
+        <div class="popup-icon">🎯</div>
+        <h1 class="popup-title">Stay Focused</h1>
+        <p class="popup-subtitle" id="dynamic-message">
+          You're getting distracted. Let's get back on track!
+        </p>
+      </div>
+
+      <!-- Session Information -->
+      <div class="session-info" id="session-info" style="display: none">
+        <div class="session-status">
+          <div class="status-indicator"></div>
+          <span id="session-status-text">Focus Session Active</span>
+        </div>
+        <div class="session-timer" id="session-timer">25:00</div>
+        <div class="session-type" id="session-type">Focus Session</div>
+      </div>
+
+      <!-- Distraction Information -->
+      <div class="distraction-info" id="distraction-info">
+        <div class="distraction-app" id="distraction-app">Unknown App</div>
+        <div class="distraction-message">This app might interrupt your focus flow</div>
+      </div>
+
+      <!-- Progress Ring -->
+      <div class="progress-section" id="progress-section" style="display: none">
+        <div class="progress-ring">
+          <svg viewBox="0 0 120 120">
+            <circle class="progress-ring-bg" cx="60" cy="60" r="50"></circle>
+            <circle class="progress-ring-fill" cx="60" cy="60" r="50" id="progress-circle"></circle>
+          </svg>
+          <div class="progress-text" id="progress-text">75%</div>
+        </div>
+      </div>
+
+      <!-- Stats Grid -->
+      <div class="stats-grid" id="stats-grid" style="display: none">
+        <div class="stat-item">
+          <div class="stat-value" id="interruptions-today">0</div>
+          <div class="stat-label">Interruptions Today</div>
+        </div>
+        <div class="stat-item">
+          <div class="stat-value" id="focus-streak">0</div>
+          <div class="stat-label">Focus Streak</div>
+        </div>
+      </div>
+
+      <!-- Breathing Exercise -->
+      <div class="breathing-exercise" id="breathing-exercise">
+        <div class="breathing-circle"></div>
+        <div class="breathing-text" id="breathing-text">Breathe in...</div>
+      </div>
+
+      <!-- Quick Session Controls -->
+      <div class="session-controls" id="session-controls" style="display: none">
+        <div style="display: flex; gap: 8px; justify-content: center; margin-bottom: 16px">
+          <button
+            class="btn btn-secondary"
+            id="pause-session"
+            style="min-width: 80px; font-size: 14px"
+          >
+            Pause
+          </button>
+          <button
+            class="btn btn-secondary"
+            id="end-session"
+            style="min-width: 80px; font-size: 14px"
+          >
+            End Session
+          </button>
+        </div>
+      </div>
+
+      <!-- Action Buttons -->
+      <div class="actions">
+        <button class="btn btn-primary" id="stay-focused" tabindex="1">Stay Focused</button>
+        <button class="btn btn-warning" id="take-break" disabled tabindex="2">
+          Take Break (5s)
+        </button>
+        <button class="btn btn-secondary" id="not-distraction" tabindex="3">
+          Not a Distraction
+        </button>
+      </div>
+
+      <!-- Countdown Overlay -->
+      <div class="countdown-overlay" id="countdown-overlay">
+        <div class="countdown-circle" id="countdown-number">5</div>
+      </div>
+
+      <!-- Keyboard Hints -->
+      <div class="keyboard-hint">
+        Press 1, 2, or 3 • ESC to close • Space for breathing exercise
+      </div>
+    </div>
+
+    <script>
+      // Enhanced popup functionality
+      class EnhancedPopup {
+        constructor() {
+          this.currentSession = null
+          this.sessionUpdateInterval = null
+          this.motivationalMessages = [
+            "You're in the zone! Stay focused.",
+            'Great momentum! Keep it going.',
+            'Focus is your superpower.',
+            "You've got this! Stay on track.",
+            'Deep work leads to great results.'
+          ]
+          this.breakMessages = [
+            'Time for a quick break!',
+            'Rest and recharge.',
+            'Take a moment to breathe.',
+            'Short breaks boost productivity.',
+            'Refresh your mind.'
+          ]
+          this.init()
+        }
+
+        async init() {
+          this.setupEventListeners()
+          this.setupKeyboardShortcuts()
+          await this.loadSessionData()
+          this.updateDynamicContent()
+          this.startBreakCountdown()
+        }
+
+        setupEventListeners() {
+          document.getElementById('stay-focused').addEventListener('click', () => {
+            this.handleStayFocused()
+          })
+
+          document.getElementById('take-break').addEventListener('click', () => {
+            this.handleTakeBreak()
+          })
+
+          document.getElementById('not-distraction').addEventListener('click', () => {
+            this.handleNotDistraction()
+          })
+
+          // Session control buttons
+          document.getElementById('pause-session').addEventListener('click', () => {
+            this.handlePauseSession()
+          })
+
+          document.getElementById('end-session').addEventListener('click', () => {
+            this.handleEndSession()
+          })
+        }
+
+        setupKeyboardShortcuts() {
+          document.addEventListener('keydown', (e) => {
+            switch (e.key) {
+              case '1':
+                this.handleStayFocused()
+                break
+              case '2':
+                if (!document.getElementById('take-break').disabled) {
+                  this.handleTakeBreak()
+                }
+                break
+              case '3':
+                this.handleNotDistraction()
+                break
+              case 'Escape':
+                this.handleStayFocused()
+                break
+              case ' ':
+                e.preventDefault()
+                this.toggleBreathingExercise()
+                break
+            }
+          })
+        }
+
+        async loadSessionData() {
+          try {
+            if (window.electronAPI && window.electronAPI.getCurrentFocusSession) {
+              this.currentSession = await window.electronAPI.getCurrentFocusSession()
+              if (
+                this.currentSession &&
+                (this.currentSession.status === 'active' || this.currentSession.status === 'paused')
+              ) {
+                this.displaySessionInfo()
+                this.startSessionTimer()
+                this.loadSessionStats()
+              }
+            }
+          } catch (error) {
+            console.error('Error loading session:', error)
+          }
+        }
+
+        displaySessionInfo() {
+          if (this.currentSession) {
+            document.getElementById('session-info').style.display = 'block'
+            document.getElementById('progress-section').style.display = 'block'
+            document.getElementById('stats-grid').style.display = 'grid'
+            document.getElementById('session-controls').style.display = 'block'
+
+            const sessionType = this.currentSession.type.replace(/([A-Z])/g, ' $1').trim()
+            document.getElementById('session-type').textContent = sessionType
+            document.getElementById('session-status-text').textContent =
+              this.currentSession.status === 'active' ? 'Focus Session Active' : 'Session Paused'
+
+            // Update session control buttons
+            const pauseBtn = document.getElementById('pause-session')
+            if (this.currentSession.status === 'active') {
+              pauseBtn.textContent = 'Pause'
+            } else {
+              pauseBtn.textContent = 'Resume'
+            }
+
+            this.updateSessionTimer()
+            this.updateProgressRing()
+          }
+        }
+
+        updateSessionTimer() {
+          if (this.currentSession) {
+            const elapsed = Date.now() - new Date(this.currentSession.startTime).getTime()
+            const remaining = this.currentSession.plannedDuration - elapsed
+            const timeLeft = Math.max(0, Math.floor(remaining / 1000))
+
+            const mins = Math.floor(timeLeft / 60)
+            const secs = timeLeft % 60
+            document.getElementById('session-timer').textContent =
+              `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`
+          }
+        }
+
+        updateProgressRing() {
+          if (this.currentSession) {
+            const elapsed = Date.now() - new Date(this.currentSession.startTime).getTime()
+            const progress = Math.min(100, (elapsed / this.currentSession.plannedDuration) * 100)
+
+            const circumference = 314
+            const offset = circumference - (progress / 100) * circumference
+
+            document.getElementById('progress-circle').style.strokeDashoffset = offset
+            document.getElementById('progress-text').textContent = `${Math.round(progress)}%`
+          }
+        }
+
+        startSessionTimer() {
+          if (this.sessionUpdateInterval) {
+            clearInterval(this.sessionUpdateInterval)
+          }
+
+          this.sessionUpdateInterval = setInterval(() => {
+            this.updateSessionTimer()
+            this.updateProgressRing()
+          }, 1000)
+        }
+
+        async loadSessionStats() {
+          try {
+            if (window.electronAPI && window.electronAPI.getFocusSessionStats) {
+              const sessionStats = await window.electronAPI.getFocusSessionStats()
+              const popupStats = await window.electronAPI.getPopupStats()
+
+              // Update session stats
+              const totalSessions = sessionStats.reduce((sum, stat) => sum + stat.totalSessions, 0)
+              document.getElementById('focus-streak').textContent = totalSessions
+
+              // Update popup analytics
+              document.getElementById('interruptions-today').textContent =
+                popupStats.totalShown || 0
+            }
+          } catch (error) {
+            console.error('Error loading stats:', error)
+          }
+        }
+
+        updateDynamicContent() {
+          const messages =
+            this.currentSession && this.currentSession.type === 'focus'
+              ? this.motivationalMessages
+              : this.breakMessages
+
+          const randomMessage = messages[Math.floor(Math.random() * messages.length)]
+          document.getElementById('dynamic-message').textContent = randomMessage
+
+          // Update distraction info
+          document.getElementById('distraction-app').textContent = 'Distracting App'
+        }
+
+        startBreakCountdown() {
+          let timeLeft = 5
+          const breakButton = document.getElementById('take-break')
+
+          const countdown = setInterval(() => {
+            if (timeLeft <= 0) {
+              clearInterval(countdown)
+              breakButton.disabled = false
+              breakButton.textContent = 'Take Break'
+            } else {
+              breakButton.textContent = `Take Break (${timeLeft}s)`
+              timeLeft--
+            }
+          }, 1000)
+        }
+
+        async recordInterruption() {
+          if (
+            this.currentSession &&
+            window.electronAPI &&
+            window.electronAPI.addFocusSessionInterruption
+          ) {
+            try {
+              await window.electronAPI.addFocusSessionInterruption(
+                this.currentSession._id,
+                'Popup interaction',
+                'Unknown App'
+              )
+            } catch (error) {
+              console.error('Error recording interruption:', error)
+            }
+          }
+        }
+
+        handleStayFocused() {
+          this.recordInterruption()
+          console.log('stay-focus')
+          window.electronAPI.sendToMain('stay-focused')
+        }
+
+        handleTakeBreak() {
+          this.recordInterruption()
+          console.log('take break')
+          window.electronAPI.sendToMain('cooldown')
+        }
+
+        handleNotDistraction() {
+          console.log('not a distraction')
+          window.electronAPI.sendToMain('dismiss')
+        }
+
+        async handlePauseSession() {
+          if (!this.currentSession) return
+
+          try {
+            if (this.currentSession.status === 'active') {
+              await window.electronAPI.pauseFocusSession(this.currentSession._id)
+              this.currentSession.status = 'paused'
+            } else {
+              await window.electronAPI.resumeFocusSession(this.currentSession._id)
+              this.currentSession.status = 'active'
+            }
+            this.displaySessionInfo()
+          } catch (error) {
+            console.error('Error toggling session pause:', error)
+          }
+        }
+
+        async handleEndSession() {
+          if (!this.currentSession) return
+
+          try {
+            await window.electronAPI.stopFocusSession(this.currentSession._id)
+            this.currentSession = null
+            document.getElementById('session-info').style.display = 'none'
+            document.getElementById('progress-section').style.display = 'none'
+            document.getElementById('stats-grid').style.display = 'none'
+            document.getElementById('session-controls').style.display = 'none'
+
+            // Show success message
+            document.getElementById('dynamic-message').textContent = 'Session ended successfully!'
+          } catch (error) {
+            console.error('Error ending session:', error)
+          }
+        }
+
+        toggleBreathingExercise() {
+          const exercise = document.getElementById('breathing-exercise')
+          const isVisible = exercise.style.display === 'flex'
+
+          if (isVisible) {
+            exercise.style.display = 'none'
+          } else {
+            exercise.style.display = 'flex'
+            this.startBreathingExercise()
+          }
+        }
+
+        startBreathingExercise() {
+          const breathingText = document.getElementById('breathing-text')
+          let phase = 0 // 0: breathe in, 1: hold, 2: breathe out, 3: hold
+          const phases = ['Breathe in...', 'Hold...', 'Breathe out...', 'Hold...']
+          const durations = [4000, 1000, 4000, 1000] // milliseconds
+
+          const cycle = () => {
+            breathingText.textContent = phases[phase]
+            setTimeout(() => {
+              phase = (phase + 1) % 4
+              cycle()
+            }, durations[phase])
+          }
+
+          cycle()
+        }
+
+        cleanup() {
+          if (this.sessionUpdateInterval) {
+            clearInterval(this.sessionUpdateInterval)
+          }
+        }
+      }
+
+      // Initialize enhanced popup
+      const popup = new EnhancedPopup()
+
+      // Cleanup on window close
+      window.addEventListener('beforeunload', () => {
+        popup.cleanup()
+      })
+    </script>
+  </body>
+</html>

@@ -1,0 +1,30 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(node:*)",
+      "Bash(sudo systemctl status:*)",
+      "Bash(dpkg:*)",
+      "Bash(npm run dev:*)",
+      "Bash(npm uninstall:*)",
+      "Bash(rm:*)",
+      "Bash(npm run format:*)",
+      "Bash(npm install:*)",
+      "Bash(npm run lint)",
+      "Bash(npx eslint:*)",
+      "Bash(grep:*)",
+      "Bash(rg:*)",
+      "Bash(pkill:*)",
+      "Bash(npm run lint:*)",
+      "Bash(ls:*)",
+      "Bash(where python)",
+      "Bash(C:Python313python.exe -m pip install fastapi uvicorn)",
+      "Bash(\"C:\\Python313\\python.exe\" -m pip install fastapi uvicorn)",
+      "Bash(\"C:\\Python313\\python.exe\" -m pip install langchain langchain-openai langchain-core mcp)",
+      "Bash(source:*)",
+      "Bash(pip install:*)",
+      "Bash(python:*)",
+      "Bash(taskkill:*)"
+    ],
+    "deny": []
+  }
+}

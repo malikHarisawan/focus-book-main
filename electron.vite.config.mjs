@@ -24,6 +24,39 @@ export default defineConfig({
             console.error(`Database source directory not found: ${srcDir}`)
           }
         }
+      },
+      {
+        name: 'copy-main-files',
+        closeBundle() {
+          const srcMainDir = resolve('src/main')
+          const outMainDir = resolve('out/main')
+
+          if (!existsSync(outMainDir)) {
+            mkdirSync(outMainDir, { recursive: true })
+          }
+
+          // Copy popupManager.js specifically
+          const popupManagerSrc = resolve(srcMainDir, 'popupManager.js')
+          const popupManagerDest = resolve(outMainDir, 'popupManager.js')
+
+          if (existsSync(popupManagerSrc)) {
+            copyFileSync(popupManagerSrc, popupManagerDest)
+            console.log(`Copied ${popupManagerSrc} to ${popupManagerDest}`)
+          } else {
+            console.error(`PopupManager file not found: ${popupManagerSrc}`)
+          }
+
+          // Copy aiServiceManager.js specifically
+          const aiServiceManagerSrc = resolve(srcMainDir, 'aiServiceManager.js')
+          const aiServiceManagerDest = resolve(outMainDir, 'aiServiceManager.js')
+
+          if (existsSync(aiServiceManagerSrc)) {
+            copyFileSync(aiServiceManagerSrc, aiServiceManagerDest)
+            console.log(`Copied ${aiServiceManagerSrc} to ${aiServiceManagerDest}`)
+          } else {
+            console.error(`AI Service Manager file not found: ${aiServiceManagerSrc}`)
+          }
+        }
       }
     ]
   },
@@ -48,14 +81,24 @@ export default defineConfig({
             mkdirSync(outDir, { recursive: true })
           }
 
-          const sourceFile = resolve(srcDir, 'popup.html')
-          const targetFile = resolve(outDir, 'popup.html')
+          // Copy popup.html
+          const popupFile = resolve(srcDir, 'popup.html')
+          const popupTarget = resolve(outDir, 'popup.html')
 
-          if (existsSync(sourceFile)) {
-            copyFileSync(sourceFile, targetFile)
-            console.log(`Copied ${sourceFile} to ${targetFile}`)
+          if (existsSync(popupFile)) {
+            copyFileSync(popupFile, popupTarget)
+            console.log(`Copied ${popupFile} to ${popupTarget}`)
+          }
+
+          // Copy popup-enhanced.html
+          const enhancedPopupFile = resolve(srcDir, 'popup-enhanced.html')
+          const enhancedPopupTarget = resolve(outDir, 'popup-enhanced.html')
+
+          if (existsSync(enhancedPopupFile)) {
+            copyFileSync(enhancedPopupFile, enhancedPopupTarget)
+            console.log(`Copied ${enhancedPopupFile} to ${enhancedPopupTarget}`)
           } else {
-            console.error(`Source file not found: ${sourceFile}`)
+            console.error(`Enhanced popup file not found: ${enhancedPopupFile}`)
           }
         }
       }
