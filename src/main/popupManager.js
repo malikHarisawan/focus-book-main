@@ -48,6 +48,13 @@ class PopupManager {
   shouldShowPopup(appName, currentSession) {
     const now = Date.now()
 
+    // Validate app name first
+    if (!appName || typeof appName !== 'string' || appName.trim() === '' || 
+        appName === 'undefined' || appName === 'null') {
+      console.log('Popup blocked: Invalid or undefined app name:', appName)
+      return false
+    }
+
     // Check minimum interval
     if (now - this.lastPopupTime < this.userPreferences.minInterval * this.adaptiveMultiplier) {
       console.log('Popup blocked: Too soon since last popup')
@@ -106,6 +113,13 @@ class PopupManager {
   }
 
   recordPopupShown(appName) {
+    // Validate app name before recording
+    if (!appName || typeof appName !== 'string' || appName.trim() === '' || 
+        appName === 'undefined' || appName === 'null') {
+      console.log('Warning: Attempted to record popup for invalid app name:', appName)
+      return
+    }
+
     const now = Date.now()
     this.lastPopupTime = now
     this.consecutivePopups++
@@ -125,6 +139,13 @@ class PopupManager {
   }
 
   recordUserAction(action, appName) {
+    // Validate app name before recording action
+    if (!appName || typeof appName !== 'string' || appName.trim() === '' || 
+        appName === 'undefined' || appName === 'null') {
+      console.log('Warning: Attempted to record action for invalid app name:', appName, 'action:', action)
+      return
+    }
+
     const now = Date.now()
 
     this.popupHistory.push({

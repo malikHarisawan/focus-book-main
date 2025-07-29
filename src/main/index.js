@@ -149,6 +149,12 @@ app.whenReady().then(async () => {
     if (isCleaningUp) return
 
     try {
+      // Validate app name before proceeding
+      if (!appName || appName.trim() === '' || appName === 'undefined' || appName === 'null') {
+        console.log('Popup blocked: Invalid or undefined app name:', appName)
+        return
+      }
+
       // Get current focus session
       const currentSession = focusSessionService.getCurrentSession()
 

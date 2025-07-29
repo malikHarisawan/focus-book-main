@@ -544,15 +544,35 @@ async function handlePopup(appIdentifier, currentWindow, isDismissed) {
 }
 
 async function sendPopupMessage(currentWindow) {
+  // Validate currentWindow before proceeding
+  if (!currentWindow || !currentWindow.windowClass) {
+    console.log('Popup blocked: Invalid or undefined window information')
+    return
+  }
+
   if (currentWindow.windowClass === 'chrome.exe' || currentWindow.windowClass === 'brave.exe') {
     const pid = await getChromePid(currentWindow)
     if (pid) {
       const chromeTabInfo = await getActiveChromeTab(pid)
       active_url = String(chromeTabInfo.active_app)
     }
+    
+    // Validate active_url before sending
+    if (!active_url || active_url === 'undefined' || active_url === 'null' || active_url.trim() === '') {
+      console.log('Popup blocked: Invalid or undefined browser tab information')
+      return
+    }
+    
     ipcRenderer.send('show-popup-message', active_url, pid)
   } else {
-    ipcRenderer.send('show-popup-message', currentWindow.windowClass, currentWindow.windowPid)
+    // Validate windowClass before sending
+    const appName = currentWindow.windowClass
+    if (!appName || appName === 'undefined' || appName === 'null' || appName.trim() === '') {
+      console.log('Popup blocked: Invalid or undefined application name:', appName)
+      return
+    }
+    
+    ipcRenderer.send('show-popup-message', appName, currentWindow.windowPid)
   }
 }
 
