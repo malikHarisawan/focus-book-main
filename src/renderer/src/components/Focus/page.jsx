@@ -3,7 +3,7 @@ import FocusTimer from './FocusTimer'
 
 const FocusPage = () => {
   return (
-    <div className="min-h-screen bg-background">
+    <div className="w-full">
       <FocusTimer />
     </div>
   )

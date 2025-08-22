@@ -29,7 +29,7 @@ export function MainLayout({ children }) {
   }, [])
 
   return (
-    <div className="dark min-h-screen bg-gradient-to-br from-black to-slate-900 text-slate-100 relative overflow-hidden">
+    <div className="dark min-h-screen bg-gradient-to-br from-black to-slate-900 text-slate-100 relative">
       {/* Loading overlay */}
       {isLoading && (
         <div className="absolute inset-0 bg-black/80 flex items-center justify-center z-50">
@@ -48,11 +48,11 @@ export function MainLayout({ children }) {
         </div>
       )}
 
-      <div className="container mx-auto p-4 relative z-10">
+      <div className="container mx-auto p-2 sm:p-4 relative z-10">
         {/* Main content */}
-        <div className="grid grid-cols-12 gap-6">
+        <div className="grid grid-cols-12 gap-2 sm:gap-4 lg:gap-6">
           {/* Sidebar */}
-          <div className="col-span-12 md:col-span-3 lg:col-span-2">
+          <div className="col-span-12 md:col-span-4 lg:col-span-3 xl:col-span-2">
             <Sidebar
               productivityScore={productivityScore}
               dailyGoalProgress={dailyGoalProgress}
@@ -61,7 +61,9 @@ export function MainLayout({ children }) {
           </div>
 
           {/* Page content */}
-          <div className="col-span-12 md:col-span-9 lg:col-span-10">{children}</div>
+          <div className="col-span-12 md:col-span-8 lg:col-span-9 xl:col-span-10">
+            {children}
+          </div>
         </div>
       </div>
     </div>

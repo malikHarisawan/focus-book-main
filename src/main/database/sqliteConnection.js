@@ -3,7 +3,7 @@
  *
  * This class implements the DatabaseAdapter interface using SQLite3, a lightweight
  * but powerful SQL database engine. SQLite provides better performance, ACID
- * compliance, and proper relational database features compared to NeDB.
+ * compliance, and proper relational database features.
  *
  * Key Features:
  * - Local file-based relational database
@@ -128,6 +128,9 @@ class SQLiteConnection extends DatabaseAdapter {
         console.warn(`Statement: ${statement.substring(0, 100)}...`)
       }
     }
+
+    // Run schema migrations to add missing columns to existing databases
+    await this.runSchemaMigrations()
   }
   
   parseSchemaStatements(schema) {
@@ -180,6 +183,54 @@ class SQLiteConnection extends DatabaseAdapter {
     }
     
     return statements.filter(stmt => stmt.length > 0)
+  }
+
+  async runSchemaMigrations() {
+    console.log('🔄 Running database schema migrations...')
+    
+    try {
+      // Check if updated_at column exists in focus_session_interruptions table
+      const interruptionsInfo = await this.all("PRAGMA table_info(focus_session_interruptions)")
+      const hasUpdatedAtColumn = interruptionsInfo.some(col => col.name === 'updated_at')
+      
+      if (!hasUpdatedAtColumn) {
+        console.log('Adding updated_at column to focus_session_interruptions table...')
+        await this.run('ALTER TABLE focus_session_interruptions ADD COLUMN updated_at DATETIME DEFAULT CURRENT_TIMESTAMP')
+        
+        // Create trigger for updated_at column
+        await this.run(`
+          CREATE TRIGGER IF NOT EXISTS update_focus_session_interruptions_updated_at 
+              AFTER UPDATE ON focus_session_interruptions 
+              FOR EACH ROW
+              WHEN NEW.updated_at = OLD.updated_at
+              BEGIN
+                  UPDATE focus_session_interruptions SET updated_at = CURRENT_TIMESTAMP WHERE id = NEW.id;
+              END;
+        `)
+        console.log('✅ Added updated_at column to focus_session_interruptions')
+      }
+      
+      // Check if paused_at column exists in focus_sessions table
+      const sessionsInfo = await this.all("PRAGMA table_info(focus_sessions)")
+      const hasPausedAtColumn = sessionsInfo.some(col => col.name === 'paused_at')
+      const hasPausedDurationColumn = sessionsInfo.some(col => col.name === 'paused_duration')
+      
+      if (!hasPausedAtColumn) {
+        console.log('Adding paused_at column to focus_sessions table...')
+        await this.run('ALTER TABLE focus_sessions ADD COLUMN paused_at DATETIME')
+        console.log('✅ Added paused_at column to focus_sessions')
+      }
+      
+      if (!hasPausedDurationColumn) {
+        console.log('Adding paused_duration column to focus_sessions table...')
+        await this.run('ALTER TABLE focus_sessions ADD COLUMN paused_duration INTEGER DEFAULT 0')
+        console.log('✅ Added paused_duration column to focus_sessions')
+      }
+      
+      console.log('✅ Schema migrations completed successfully')
+    } catch (error) {
+      console.warn('Schema migration warning:', error.message)
+    }
   }
 
   async disconnect() {
@@ -542,6 +593,8 @@ class SQLiteConnection extends DatabaseAdapter {
         'endTime': 'end_time',
         'plannedDuration': 'planned_duration',
         'actualDuration': 'actual_duration',
+        'pausedDuration': 'paused_duration',
+        'pausedAt': 'paused_at',
         '_id': 'id'
       },
       'focus_session_interruptions': {

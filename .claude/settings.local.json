@@ -24,7 +24,8 @@
       "Bash(pip install:*)",
       "Bash(python:*)",
       "Bash(taskkill:*)",
-      "Bash(git add:*)"
+      "Bash(git add:*)",
+      "Bash(\"D:\\CODE\\focus-book-main\\AI_agent\\venv\\Scripts\\python.exe\" start_service.py \"C:\\Users\\malik\\AppData\\Roaming\\focusbook\\focusbook.db\" \"\" 8005)"
     ],
     "deny": []
   }

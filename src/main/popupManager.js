@@ -68,15 +68,8 @@ class PopupManager {
       return false
     }
 
-    // Respect focus time (don't interrupt early in session)
-    if (this.userPreferences.respectFocusTime && currentSession) {
-      const sessionAge = now - new Date(currentSession.startTime).getTime()
-      if (sessionAge < 5 * 60 * 1000) {
-        // First 5 minutes
-        console.log('Popup blocked: Respecting early focus time')
-        return false
-      }
-    }
+    // During focus sessions, popups should be more aggressive to maintain focus
+    // Remove the early focus time restriction as popups are essential for focus maintenance
 
     // Check consecutive popup limit
     if (this.consecutivePopups >= this.userPreferences.maxConsecutive) {

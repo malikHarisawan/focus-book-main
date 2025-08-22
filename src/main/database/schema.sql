@@ -60,6 +60,8 @@ CREATE TABLE IF NOT EXISTS focus_sessions (
     planned_duration INTEGER NOT NULL, -- duration in milliseconds
     actual_duration INTEGER, -- duration in milliseconds
     status TEXT NOT NULL CHECK (status IN ('active', 'paused', 'completed', 'cancelled')) DEFAULT 'active',
+    paused_at DATETIME, -- timestamp when session was paused
+    paused_duration INTEGER DEFAULT 0, -- total time paused in milliseconds
     notes TEXT,
     productivity INTEGER CHECK (productivity >= 1 AND productivity <= 5),
     date TEXT NOT NULL, -- SQLite doesn't have DATE type, use TEXT with ISO format
@@ -75,6 +77,7 @@ CREATE TABLE IF NOT EXISTS focus_session_interruptions (
     reason TEXT,
     app_name TEXT,
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY (focus_session_id) REFERENCES focus_sessions(id) ON DELETE CASCADE
 );
 
@@ -125,4 +128,12 @@ CREATE TRIGGER IF NOT EXISTS update_focus_sessions_updated_at
     WHEN NEW.updated_at = OLD.updated_at
     BEGIN
         UPDATE focus_sessions SET updated_at = CURRENT_TIMESTAMP WHERE id = NEW.id;
+    END;
+
+CREATE TRIGGER IF NOT EXISTS update_focus_session_interruptions_updated_at 
+    AFTER UPDATE ON focus_session_interruptions 
+    FOR EACH ROW
+    WHEN NEW.updated_at = OLD.updated_at
+    BEGIN
+        UPDATE focus_session_interruptions SET updated_at = CURRENT_TIMESTAMP WHERE id = NEW.id;
     END;

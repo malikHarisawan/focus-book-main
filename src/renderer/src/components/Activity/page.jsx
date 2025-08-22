@@ -549,7 +549,7 @@ function AppTimelineChart({ date }) {
             })}
           </div>
           {/* Timeline grid */}
-          <div className="flex-1 border-t border-l border-slate-700/30 relative overflow-y-auto">
+          <div className="flex-1 border-t border-l border-slate-700/30 relative overflow-y-auto custom-scrollbar">
             {' '}
             {/* Vertical grid lines - 24 hour markers with emphasis on 4-hour marks */}
             <div className="absolute inset-0 flex pointer-events-none">

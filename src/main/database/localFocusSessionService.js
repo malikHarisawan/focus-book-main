@@ -93,14 +93,21 @@ class LocalFocusSessionService {
         throw new Error('Session not found')
       }
 
-      await this.db.update('focus_sessions', { _id: sessionId }, { $set: { status: 'paused' } })
+      const pauseTime = new Date().toISOString()
+      await this.db.update('focus_sessions', { _id: sessionId }, { 
+        $set: { 
+          status: 'paused',
+          paused_at: pauseTime
+        } 
+      })
 
       // Update current session if it's the same
       if (this.currentSession && this.currentSession._id === sessionId) {
         this.currentSession.status = 'paused'
+        this.currentSession.paused_at = pauseTime
       }
 
-      return { ...session, status: 'paused' }
+      return { ...session, status: 'paused', paused_at: pauseTime }
     } catch (error) {
       console.error('Error pausing focus session:', error)
       throw error
@@ -114,14 +121,31 @@ class LocalFocusSessionService {
         throw new Error('Session not found')
       }
 
-      await this.db.update('focus_sessions', { _id: sessionId }, { $set: { status: 'active' } })
+      const resumeTime = new Date()
+      let pausedDuration = session.paused_duration || 0
+      
+      // Calculate additional pause duration if session was paused
+      if (session.paused_at) {
+        const additionalPause = resumeTime.getTime() - new Date(session.paused_at).getTime()
+        pausedDuration += additionalPause
+      }
+
+      await this.db.update('focus_sessions', { _id: sessionId }, { 
+        $set: { 
+          status: 'active',
+          paused_duration: pausedDuration,
+          paused_at: null
+        } 
+      })
 
       // Update current session if it's the same
       if (this.currentSession && this.currentSession._id === sessionId) {
         this.currentSession.status = 'active'
+        this.currentSession.paused_duration = pausedDuration
+        this.currentSession.paused_at = null
       }
 
-      return { ...session, status: 'active' }
+      return { ...session, status: 'active', paused_duration: pausedDuration }
     } catch (error) {
       console.error('Error resuming focus session:', error)
       throw error
@@ -360,13 +384,53 @@ class LocalFocusSessionService {
       )
 
       if (sessions.length > 0) {
-        this.currentSession = sessions[0]
+        const session = sessions[0]
+        
+        // Check if session has been running too long (more than planned duration + 1 hour)
+        // This handles cases where the app was closed unexpectedly
+        const sessionStart = new Date(session.start_time).getTime()
+        const now = Date.now()
+        const maxDuration = (session.planned_duration || 25 * 60 * 1000) + (60 * 60 * 1000) // planned + 1 hour buffer
+        const actualElapsed = now - sessionStart - (session.paused_duration || 0)
+        
+        if (actualElapsed > maxDuration && session.status === 'active') {
+          // Auto-complete sessions that have been running too long
+          console.log('Auto-completing stale session that ran too long')
+          await this.endSession(session._id, 'completed', session.planned_duration)
+          this.currentSession = null
+          return null
+        }
+        
+        this.currentSession = session
+        
+        // For paused sessions, check if they've been paused for more than 24 hours
+        if (session.status === 'paused' && session.paused_at) {
+          const pausedFor = now - new Date(session.paused_at).getTime()
+          const maxPauseTime = 24 * 60 * 60 * 1000 // 24 hours
+          
+          if (pausedFor > maxPauseTime) {
+            console.log('Auto-cancelling session paused for too long')
+            await this.endSession(session._id, 'cancelled')
+            this.currentSession = null
+            return null
+          }
+        }
       }
 
       return this.currentSession
     } catch (error) {
       console.error('Error loading current session:', error)
       return null
+    }
+  }
+  
+  async initializeService() {
+    try {
+      // Load any existing current session on startup
+      await this.loadCurrentSession()
+      console.log('Focus session service initialized', this.currentSession ? 'with active session' : 'without active session')
+    } catch (error) {
+      console.error('Error initializing focus session service:', error)
     }
   }
 }

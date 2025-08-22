@@ -49,13 +49,17 @@
         background: var(--bg-card);
         border-radius: var(--border-radius);
         box-shadow: 0 20px 60px rgba(0, 0, 0, 0.8);
-        padding: 32px;
-        max-width: 480px;
-        width: 90%;
+        padding: 24px;
+        width: 420px;
+        min-height: auto;
+        max-height: 80vh;
         text-align: center;
         position: relative;
         animation: slideIn var(--animation-normal) ease-out;
-        border: 1px solid rgba(255, 255, 255, 0.1);
+        border: 2px solid rgba(255, 255, 255, 0.15);
+        display: flex;
+        flex-direction: column;
+        gap: 20px;
       }
 
       @keyframes slideIn {
@@ -70,19 +74,23 @@
       }
 
       .popup-header {
-        margin-bottom: 24px;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 8px;
+        margin-bottom: 0;
       }
 
       .popup-icon {
-        width: 64px;
-        height: 64px;
-        margin: 0 auto 16px;
+        width: 48px;
+        height: 48px;
+        margin: 0;
         background: linear-gradient(135deg, var(--color-focus), #6366f1);
         border-radius: 50%;
         display: flex;
         align-items: center;
         justify-content: center;
-        font-size: 28px;
+        font-size: 24px;
         animation: pulse 2s infinite;
       }
 
@@ -99,7 +107,7 @@
       .popup-title {
         font-size: 24px;
         font-weight: 700;
-        margin-bottom: 8px;
+        margin: 0;
         background: linear-gradient(135deg, var(--text-primary), var(--text-secondary));
         -webkit-background-clip: text;
         -webkit-text-fill-color: transparent;
@@ -109,15 +117,18 @@
       .popup-subtitle {
         font-size: 16px;
         color: var(--text-secondary);
-        margin-bottom: 20px;
+        margin: 0;
       }
 
       .session-info {
         background: var(--bg-accent);
         border-radius: 8px;
         padding: 16px;
-        margin: 20px 0;
+        margin: 0;
         border-left: 4px solid var(--color-focus);
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
       }
 
       .session-status {
@@ -125,7 +136,7 @@
         align-items: center;
         justify-content: center;
         gap: 8px;
-        margin-bottom: 12px;
+        margin: 0;
       }
 
       .status-indicator {
@@ -152,7 +163,7 @@
         font-weight: 700;
         font-family: 'SF Mono', 'Monaco', 'Consolas', monospace;
         color: var(--color-focus);
-        margin: 8px 0;
+        margin: 0;
         text-shadow: 0 0 20px rgba(59, 130, 246, 0.3);
       }
 
@@ -169,7 +180,7 @@
         border: 1px solid rgba(239, 68, 68, 0.3);
         border-radius: 8px;
         padding: 12px;
-        margin: 16px 0;
+        margin: 0;
       }
 
       .distraction-app {
@@ -183,84 +194,40 @@
         color: var(--text-muted);
       }
 
-      .progress-section {
-        margin: 24px 0;
-      }
 
-      .progress-ring {
-        position: relative;
-        width: 120px;
-        height: 120px;
-        margin: 0 auto 16px;
-      }
-
-      .progress-ring svg {
-        width: 100%;
-        height: 100%;
-        transform: rotate(-90deg);
-      }
-
-      .progress-ring-bg {
-        fill: none;
-        stroke: var(--bg-accent);
-        stroke-width: 8;
-      }
-
-      .progress-ring-fill {
-        fill: none;
-        stroke: var(--color-focus);
-        stroke-width: 8;
-        stroke-linecap: round;
-        stroke-dasharray: 314;
-        stroke-dashoffset: 314;
-        transition: stroke-dashoffset var(--animation-slow) ease;
-      }
-
-      .progress-text {
-        position: absolute;
-        top: 50%;
-        left: 50%;
-        transform: translate(-50%, -50%);
-        font-size: 18px;
-        font-weight: 700;
-      }
-
-      .stats-grid {
-        display: grid;
-        grid-template-columns: 1fr 1fr;
-        gap: 16px;
-        margin: 20px 0;
-      }
-
-      .stat-item {
-        background: var(--bg-accent);
-        border-radius: 8px;
-        padding: 12px;
-        text-align: center;
-      }
-
-      .stat-value {
-        font-size: 20px;
-        font-weight: 700;
-        color: var(--color-focus);
-      }
-
-      .stat-label {
-        font-size: 12px;
-        color: var(--text-muted);
-        margin-top: 4px;
-      }
 
       .actions {
         display: flex;
+        flex-direction: column;
         gap: 12px;
-        margin-top: 32px;
-        flex-wrap: wrap;
+        margin: 0;
+        align-items: stretch;
+      }
+
+      .primary-actions {
+        display: flex;
+        gap: 12px;
+      }
+
+      .secondary-actions {
+        display: flex;
+        gap: 8px;
         justify-content: center;
       }
 
+      .primary-actions .btn {
+        flex: 1;
+      }
+
+      .secondary-actions .btn {
+        flex: 1;
+        max-width: 140px;
+        font-size: 14px;
+        padding: 10px 16px;
+      }
+
       .btn {
-        padding: 12px 24px;
+        padding: 14px 24px;
         border: none;
         border-radius: 8px;
         font-size: 16px;
@@ -269,9 +236,8 @@
         transition: all var(--animation-fast) ease;
         position: relative;
         overflow: hidden;
-        min-width: 120px;
-        flex: 1;
-        max-width: 200px;
+        width: 100%;
+        text-align: center;
       }
 
       .btn::before {
@@ -374,16 +340,14 @@
       }
 
       .keyboard-hint {
-        position: absolute;
-        bottom: 16px;
-        left: 50%;
-        transform: translateX(-50%);
         font-size: 12px;
         color: var(--text-muted);
         background: var(--bg-primary);
         padding: 8px 12px;
         border-radius: 6px;
         border: 1px solid rgba(255, 255, 255, 0.1);
+        text-align: center;
+        margin: 0;
       }
 
       .breathing-exercise {
@@ -421,20 +385,29 @@
       /* Responsive design */
       @media (max-width: 520px) {
         .popup-container {
-          padding: 24px;
+          padding: 20px;
           width: 95%;
+          margin: 20px;
         }
 
-        .actions {
+        .primary-actions {
           flex-direction: column;
         }
 
-        .btn {
+        .secondary-actions {
+          flex-direction: column;
+        }
+
+        .secondary-actions .btn {
           max-width: none;
         }
 
-        .stats-grid {
-          grid-template-columns: 1fr;
+        .popup-title {
+          font-size: 20px;
+        }
+
+        .session-timer {
+          font-size: 28px;
         }
       }
 
@@ -484,32 +457,9 @@
 
       <!-- Distraction Information -->
       <div class="distraction-info" id="distraction-info">
-        <div class="distraction-app" id="distraction-app">Unknown App</div>
         <div class="distraction-message">This app might interrupt your focus flow</div>
       </div>
 
-      <!-- Progress Ring -->
-      <div class="progress-section" id="progress-section" style="display: none">
-        <div class="progress-ring">
-          <svg viewBox="0 0 120 120">
-            <circle class="progress-ring-bg" cx="60" cy="60" r="50"></circle>
-            <circle class="progress-ring-fill" cx="60" cy="60" r="50" id="progress-circle"></circle>
-          </svg>
-          <div class="progress-text" id="progress-text">75%</div>
-        </div>
-      </div>
-
-      <!-- Stats Grid -->
-      <div class="stats-grid" id="stats-grid" style="display: none">
-        <div class="stat-item">
-          <div class="stat-value" id="interruptions-today">0</div>
-          <div class="stat-label">Interruptions Today</div>
-        </div>
-        <div class="stat-item">
-          <div class="stat-value" id="focus-streak">0</div>
-          <div class="stat-label">Focus Streak</div>
-        </div>
-      </div>
 
       <!-- Breathing Exercise -->
       <div class="breathing-exercise" id="breathing-exercise">
@@ -517,35 +467,32 @@
         <div class="breathing-text" id="breathing-text">Breathe in...</div>
       </div>
 
-      <!-- Quick Session Controls -->
-      <div class="session-controls" id="session-controls" style="display: none">
-        <div style="display: flex; gap: 8px; justify-content: center; margin-bottom: 16px">
-          <button
-            class="btn btn-secondary"
-            id="pause-session"
-            style="min-width: 80px; font-size: 14px"
-          >
+      <!-- Action Buttons -->
+      <div class="actions">
+        <!-- Primary Actions -->
+        <div class="primary-actions">
+          <button class="btn btn-primary" id="stay-focused" tabindex="1">Stay Focused</button>
+          <button class="btn btn-warning" id="take-break" disabled tabindex="2">
+            Take Break (5s)
+          </button>
+        </div>
+        
+        <!-- Secondary Actions -->
+        <div class="secondary-actions">
+          <button class="btn btn-secondary" id="not-distraction" tabindex="3">
+            Not a Distraction
+          </button>
+        </div>
+        
+        <!-- Session Controls -->
+        <div class="secondary-actions" id="session-controls" style="display: none;">
+          <button class="btn btn-secondary" id="pause-session">
             Pause
           </button>
-          <button
-            class="btn btn-secondary"
-            id="end-session"
-            style="min-width: 80px; font-size: 14px"
-          >
+          <button class="btn btn-secondary" id="end-session">
             End Session
           </button>
         </div>
-      </div>
-
-      <!-- Action Buttons -->
-      <div class="actions">
-        <button class="btn btn-primary" id="stay-focused" tabindex="1">Stay Focused</button>
-        <button class="btn btn-warning" id="take-break" disabled tabindex="2">
-          Take Break (5s)
-        </button>
-        <button class="btn btn-secondary" id="not-distraction" tabindex="3">
-          Not a Distraction
-        </button>
       </div>
 
       <!-- Countdown Overlay -->
@@ -648,7 +595,6 @@
               ) {
                 this.displaySessionInfo()
                 this.startSessionTimer()
-                this.loadSessionStats()
               }
             }
           } catch (error) {
@@ -659,8 +605,9 @@
         displaySessionInfo() {
           if (this.currentSession) {
             document.getElementById('session-info').style.display = 'block'
-            document.getElementById('progress-section').style.display = 'block'
-            document.getElementById('stats-grid').style.display = 'grid'
+            // Keep progress ring and stats hidden to reduce popup height
+            // document.getElementById('progress-section').style.display = 'block'
+            // document.getElementById('stats-grid').style.display = 'grid'
             document.getElementById('session-controls').style.display = 'block'
 
             const sessionType = this.currentSession.type.replace(/([A-Z])/g, ' $1').trim()
@@ -683,29 +630,28 @@
 
         updateSessionTimer() {
           if (this.currentSession) {
-            const elapsed = Date.now() - new Date(this.currentSession.startTime).getTime()
-            const remaining = this.currentSession.plannedDuration - elapsed
+            // Use proper field names and add fallbacks
+            const startTime = this.currentSession.start_time || this.currentSession.startTime
+            const plannedDuration = this.currentSession.planned_duration || this.currentSession.plannedDuration || (25 * 60 * 1000)
+            
+            if (!startTime) {
+              document.getElementById('session-timer').textContent = '25:00'
+              return
+            }
+            
+            const elapsed = Date.now() - new Date(startTime).getTime()
+            const remaining = plannedDuration - elapsed
             const timeLeft = Math.max(0, Math.floor(remaining / 1000))
 
             const mins = Math.floor(timeLeft / 60)
             const secs = timeLeft % 60
             document.getElementById('session-timer').textContent =
               `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`
+          } else {
+            document.getElementById('session-timer').textContent = '25:00'
           }
         }
 
-        updateProgressRing() {
-          if (this.currentSession) {
-            const elapsed = Date.now() - new Date(this.currentSession.startTime).getTime()
-            const progress = Math.min(100, (elapsed / this.currentSession.plannedDuration) * 100)
-
-            const circumference = 314
-            const offset = circumference - (progress / 100) * circumference
-
-            document.getElementById('progress-circle').style.strokeDashoffset = offset
-            document.getElementById('progress-text').textContent = `${Math.round(progress)}%`
-          }
-        }
 
         startSessionTimer() {
           if (this.sessionUpdateInterval) {
@@ -714,28 +660,9 @@
 
           this.sessionUpdateInterval = setInterval(() => {
             this.updateSessionTimer()
-            this.updateProgressRing()
           }, 1000)
         }
 
-        async loadSessionStats() {
-          try {
-            if (window.electronAPI && window.electronAPI.getFocusSessionStats) {
-              const sessionStats = await window.electronAPI.getFocusSessionStats()
-              const popupStats = await window.electronAPI.getPopupStats()
-
-              // Update session stats
-              const totalSessions = sessionStats.reduce((sum, stat) => sum + stat.totalSessions, 0)
-              document.getElementById('focus-streak').textContent = totalSessions
-
-              // Update popup analytics
-              document.getElementById('interruptions-today').textContent =
-                popupStats.totalShown || 0
-            }
-          } catch (error) {
-            console.error('Error loading stats:', error)
-          }
-        }
 
         updateDynamicContent() {
           const messages =
@@ -766,32 +693,13 @@
           }, 1000)
         }
 
-        async recordInterruption() {
-          if (
-            this.currentSession &&
-            window.electronAPI &&
-            window.electronAPI.addFocusSessionInterruption
-          ) {
-            try {
-              await window.electronAPI.addFocusSessionInterruption(
-                this.currentSession._id,
-                'Popup interaction',
-                'Unknown App'
-              )
-            } catch (error) {
-              console.error('Error recording interruption:', error)
-            }
-          }
-        }
 
         handleStayFocused() {
-          this.recordInterruption()
           console.log('stay-focus')
           window.electronAPI.sendToMain('stay-focused')
         }
 
         handleTakeBreak() {
-          this.recordInterruption()
           console.log('take break')
           window.electronAPI.sendToMain('cooldown')
         }

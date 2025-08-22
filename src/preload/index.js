@@ -6,11 +6,14 @@ const { exec } = require('child_process')
 const util = require('util')
 const execPromise = util.promisify(exec)
 const path = require('path')
+const fs = require('fs')
+const PythonErrorRecovery = require('../main/pythonErrorRecovery')
 let appUsageData = {}
 let lastActiveApp = null
 let lastUpdateTime = Date.now()
 let Distracted_List = ['Entertainment']
 let customCategoryMappings = {}
+let pythonErrorRecovery = new PythonErrorRecovery()
 
 
 // Initialize tracking data
@@ -21,6 +24,13 @@ let customCategoryMappings = {}
       lastActiveApp = currentWindow
       lastUpdateTime = Date.now()
       console.log('Initialized tracking with app:', currentWindow.windowClass)
+    }
+
+    // Check if there's already an active focus session on startup
+    const currentSession = await getCurrentSessionStatus()
+    if (currentSession && (currentSession.status === 'active' || currentSession.status === 'paused')) {
+      isFocusSessionActive = true
+      console.log('Found existing active/paused focus session on startup:', currentSession._id)
     }
   } catch (e) {
     console.error('Failed to initialize tracking:', e)
@@ -43,6 +53,21 @@ let isCoolDown = false
 let startDismisstime = 0
 let focusSessionStartTime = 0
 let totalFocusTime = 0
+
+// Productivity state tracking variables
+let isCurrentlyProductive = false
+let productivityStreakStart = null
+let productivityHistory = []
+let lastProductivityCheck = Date.now()
+let unproductiveStreakStart = null
+
+// Productivity configuration
+const PRODUCTIVITY_CONFIG = {
+  MIN_PRODUCTIVE_DURATION: 30 * 1000, // 30 seconds of productive activity before session start (reduced for testing)
+  MAX_UNPRODUCTIVE_INTERRUPTION: 2 * 60 * 1000, // 2 minutes of unproductive activity before session pause
+  PRODUCTIVITY_CHECK_INTERVAL: 30000, // 30 seconds
+  HISTORY_WINDOW: 10 * 60 * 1000, // 10 minutes of history to maintain
+}
 loadData()
 
 async function getActiveChromeTab(pid) {
@@ -51,34 +76,35 @@ async function getActiveChromeTab(pid) {
     return null
   }
 
-  return new Promise((resolve, reject) => {
-    const getURLScriptPath = path.join(__dirname, '../../scripts/get_active_url.py')
-    const pythonProcess = spawn('python', [getURLScriptPath, pid.toString()])
+  const getURLScriptPath = path.join(__dirname, '../../scripts/get_active_url.py')
+  const fallbackValue = { url: 'Browser Tab', title: 'Browser Tab' }
 
-    let output = ''
-    let error = ''
-
-    pythonProcess.stdout.on('data', (data) => {
-      output += data.toString()
-    })
-
-    pythonProcess.stderr.on('data', (data) => {
-      error += data.toString()
-    })
-
-    pythonProcess.on('close', (code) => {
-      if (code === 0) {
-        try {
-          const result = JSON.parse(output)
-          resolve(result)
-        } catch (parseError) {
-          reject(`Error parsing JSON: ${parseError.message}`)
-        }
-      } else {
-        reject(`Python process exited with code ${code}: ${error}`)
+  try {
+    const output = await pythonErrorRecovery.executePythonScript(
+      getURLScriptPath, 
+      [pid.toString()], 
+      {
+        timeout: 5000,
+        fallbackValue: fallbackValue,
+        retryCount: 2
       }
-    })
-  })
+    )
+
+    if (output === fallbackValue) {
+      return fallbackValue
+    }
+
+    try {
+      const result = JSON.parse(output)
+      return result
+    } catch (parseError) {
+      console.warn('Error parsing Python script output:', parseError.message)
+      return fallbackValue
+    }
+  } catch (error) {
+    console.warn('Python script execution failed:', error.message)
+    return fallbackValue
+  }
 }
 
 async function getAppDescription(executablePath) {
@@ -132,6 +158,81 @@ let previousWindowClass = null
 let previousWindowName = null
 let hasAppSwitched = false
 
+// Add productivity streak detection functions
+function updateProductivityState(isFocused) {
+  const currentTime = Date.now()
+  
+  // Update productivity history
+  productivityHistory.push({
+    timestamp: currentTime,
+    isProductive: isFocused
+  })
+  
+  // Clean old history entries
+  productivityHistory = productivityHistory.filter(
+    entry => currentTime - entry.timestamp <= PRODUCTIVITY_CONFIG.HISTORY_WINDOW
+  )
+  
+  // Update current productivity state
+  if (isFocused && !isCurrentlyProductive) {
+    // Starting productive streak
+    isCurrentlyProductive = true
+    productivityStreakStart = currentTime
+    unproductiveStreakStart = null
+    console.log('Starting productive streak')
+  } else if (!isFocused && isCurrentlyProductive) {
+    // Starting unproductive streak
+    isCurrentlyProductive = false
+    unproductiveStreakStart = currentTime
+    productivityStreakStart = null
+    console.log('Starting unproductive streak')
+  }
+  
+  lastProductivityCheck = currentTime
+}
+
+function getProductiveStreakDuration() {
+  if (!isCurrentlyProductive || !productivityStreakStart) {
+    return 0
+  }
+  return Date.now() - productivityStreakStart
+}
+
+function getUnproductiveStreakDuration() {
+  if (isCurrentlyProductive || !unproductiveStreakStart) {
+    return 0
+  }
+  return Date.now() - unproductiveStreakStart
+}
+
+function shouldStartFocusSession() {
+  if (!isCurrentlyProductive) {
+    return false
+  }
+  
+  const streakDuration = getProductiveStreakDuration()
+  return streakDuration >= PRODUCTIVITY_CONFIG.MIN_PRODUCTIVE_DURATION
+}
+
+function shouldPauseFocusSession() {
+  if (isCurrentlyProductive) {
+    return false
+  }
+  
+  const unproductiveStreak = getUnproductiveStreakDuration()
+  return unproductiveStreak >= PRODUCTIVITY_CONFIG.MAX_UNPRODUCTIVE_INTERRUPTION
+}
+
+async function getCurrentSessionStatus() {
+  try {
+    const currentSession = await ipcRenderer.invoke('get-current-focus-session')
+    return currentSession && !currentSession.error ? currentSession : null
+  } catch (error) {
+    console.error('Error getting current session status:', error)
+    return null
+  }
+}
+
 async function updateAppUsage() {
   try {
     const state = await getCurrentState(120)
@@ -140,6 +241,10 @@ async function updateAppUsage() {
       console.log(`System is ${state}, resetting tracking variables`)
       lastActiveApp = null
       lastUpdateTime = Date.now()
+      // Reset productivity state on idle
+      isCurrentlyProductive = false
+      productivityStreakStart = null
+      unproductiveStreakStart = null
       return
     }
     console.log('State ===>> ', state)
@@ -173,15 +278,43 @@ async function updateAppUsage() {
     const isFocused = !Distracted_List.includes(appIdentifier)
     let isDismissed = handleDismiss(appIdentifier)
 
-    if (isFocused) {
+    // Update productivity state tracking
+    updateProductivityState(isFocused)
+
+    // Handle focus session logic with productivity validation
+    if (isFocused && shouldStartFocusSession() && !isFocusSessionActive) {
+      console.log(`Starting focus session after ${getProductiveStreakDuration() / 1000}s of productive activity`)
       startFocusSession(isFocused)
     }
 
-    if (!isFocused && isFocusSessionActive) {
-      console.log('isFocusSessionActive', isFocusSessionActive)
-      handlePopup(appIdentifier, currentWindow, isDismissed)
-      endFocusSession(isFocused)
+    // Handle session state during active sessions
+    if (isFocusSessionActive) {
+      if (isFocused) {
+        // User returned to productive activity - check if session is paused
+        const currentSession = await getCurrentSessionStatus()
+        if (currentSession && currentSession.status === 'paused') {
+          console.log('Resuming paused focus session - user returned to productive activity')
+          resumeFocusSession()
+        }
+      } else {
+        // User switched to unproductive activity
+        console.log('isFocusSessionActive', isFocusSessionActive)
+        handlePopup(appIdentifier, currentWindow, isDismissed)
+        
+        // Check if we should pause the session due to extended unproductive activity
+        if (shouldPauseFocusSession()) {
+          console.log(`Pausing focus session after ${getUnproductiveStreakDuration() / 1000}s of unproductive activity`)
+          pauseFocusSession()
+        } else {
+          // For brief interruptions, add interruption tracking but don't end session
+          const currentSession = await getCurrentSessionStatus()
+          if (currentSession && currentSession._id) {
+            await ipcRenderer.invoke('add-focus-session-interruption', currentSession._id, 'brief_interruption', appIdentifier)
+          }
+        }
+      }
     }
+    
     previousWindowClass = currentAppClass
     previousWindowName = currentAppName
 
@@ -191,15 +324,22 @@ async function updateAppUsage() {
   }
 }
 async function startFocusSession(isFocused) {
-  console.log('Focus started - starting actual focus session')
+  console.log('Focus started - starting actual focus session with productivity validation')
 
   if (!isFocusSessionActive) {
     try {
+      // Validate productivity state before starting session
+      if (!shouldStartFocusSession()) {
+        console.log('Session start blocked: insufficient productive activity duration')
+        return
+      }
+
       // Start an actual focus session via IPC
       const sessionData = {
         type: 'focus',
         duration: 25 * 60 * 1000, // 25 minutes in milliseconds
-        isAutoStarted: true
+        isAutoStarted: true,
+        productivityStreakDuration: getProductiveStreakDuration()
       }
 
       const session = await ipcRenderer.invoke('start-focus-session', sessionData)
@@ -207,7 +347,7 @@ async function startFocusSession(isFocused) {
       if (session && !session.error) {
         isFocusSessionActive = true
         focusSessionStartTime = Date.now()
-        console.log('Auto-started focus session:', session._id)
+        console.log('Auto-started focus session:', session._id, 'after productive streak of', getProductiveStreakDuration() / 1000, 'seconds')
 
         // Send UI update
         ipcRenderer.send('start-focus', isFocused)
@@ -219,6 +359,46 @@ async function startFocusSession(isFocused) {
     }
   }
 }
+async function pauseFocusSession() {
+  if (isFocusSessionActive) {
+    try {
+      // Pause the current focus session in the database
+      const currentSession = await ipcRenderer.invoke('get-current-focus-session')
+
+      if (currentSession && !currentSession.error) {
+        await ipcRenderer.invoke('pause-focus-session', currentSession._id)
+        console.log('Auto-paused focus session due to unproductive activity:', currentSession._id)
+        
+        // Add interruption tracking
+        await ipcRenderer.invoke('add-focus-session-interruption', currentSession._id, 'unproductive_activity', 'Extended unproductive app usage')
+      }
+
+      // Don't set isFocusSessionActive to false - session is paused, not ended
+      ipcRenderer.send('pause-focus')
+    } catch (error) {
+      console.error('Error pausing auto focus session:', error)
+    }
+  }
+}
+
+async function resumeFocusSession() {
+  if (isFocusSessionActive) {
+    try {
+      // Resume the current focus session in the database
+      const currentSession = await ipcRenderer.invoke('get-current-focus-session')
+
+      if (currentSession && !currentSession.error && currentSession.status === 'paused') {
+        await ipcRenderer.invoke('resume-focus-session', currentSession._id)
+        console.log('Auto-resumed focus session after returning to productive activity:', currentSession._id)
+      }
+
+      ipcRenderer.send('resume-focus')
+    } catch (error) {
+      console.error('Error resuming auto focus session:', error)
+    }
+  }
+}
+
 async function endFocusSession(isFocused) {
   if (isFocusSessionActive) {
     try {
@@ -675,6 +855,24 @@ setInterval(() => {
   saveData().catch((err) => console.error('Error in saveData interval:', err))
 }, 60000)
 
+// Periodic focus session status sync - check every 10 seconds
+setInterval(async () => {
+  try {
+    const currentSession = await getCurrentSessionStatus()
+    const shouldBeActive = currentSession && (currentSession.status === 'active' || currentSession.status === 'paused')
+    
+    if (shouldBeActive && !isFocusSessionActive) {
+      isFocusSessionActive = true
+      console.log('Focus session detected - enabling popup system:', currentSession._id)
+    } else if (!shouldBeActive && isFocusSessionActive) {
+      isFocusSessionActive = false
+      console.log('Focus session ended - disabling popup system')
+    }
+  } catch (error) {
+    console.error('Error syncing focus session status:', error)
+  }
+}, 10000)
+
 async function loadCategories() {
   const data = await ipcRenderer.invoke('load-categories')
   console.log('ipcRenderer ', data)
@@ -764,7 +962,11 @@ contextBridge.exposeInMainWorld('electronAPI', {
   // AI Service API
   aiChat: (message) => ipcRenderer.invoke('ai-chat', message),
   getAiServiceStatus: () => ipcRenderer.invoke('ai-service-status'),
-  restartAiService: () => ipcRenderer.invoke('ai-service-restart')
+  restartAiService: () => ipcRenderer.invoke('ai-service-restart'),
+  resetAiMemory: () => ipcRenderer.invoke('ai-service-reset-memory'),
+  // Python Error Recovery API
+  getPythonStatus: () => ipcRenderer.invoke('get-python-status'),
+  resetPythonRecovery: () => ipcRenderer.invoke('reset-python-recovery'),
 })
 
 contextBridge.exposeInMainWorld('activeWindow', {
@@ -782,6 +984,12 @@ contextBridge.exposeInMainWorld('activeWindow', {
     })
     ipcRenderer.on('end-focus', (event, isFocused) => {
       callback('end', isFocused)
+    })
+    ipcRenderer.on('pause-focus', (event) => {
+      callback('pause')
+    })
+    ipcRenderer.on('resume-focus', (event) => {
+      callback('resume')
     })
   },
   loadCategories: () => loadCategories(),

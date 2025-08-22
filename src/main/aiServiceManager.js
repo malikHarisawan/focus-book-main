@@ -1,10 +1,36 @@
+/**
+ * AIServiceManager: manages the lifecycle of the local AI service process used by the Electron app.
+ *
+ * Responsibilities:
+ * - Find an open TCP port and start the AI service on it
+ * - Determine dev vs prod executable (Python venv vs bundled binary)
+ * - Wire environment variables (FOCUSBOOK_DB_PATH, OPENAI_API_KEY)
+ * - Probe health (/docs) and auto-restart on crashes or failed health checks
+ * - Expose a small HTTP client for /chat requests
+ *
+ * Notes:
+ * - Development mode assumes a Windows-style venv at AI_agent/venv/Scripts/python.exe
+ * - Production mode loads the packaged executable from process.resourcesPath/ai_service
+ * - Health checks run every 30s and can trigger a soft restart with limited retries
+ */
 const { spawn } = require('child_process')
 const path = require('path')
 const fs = require('fs')
 const { app } = require('electron')
 const net = require('net')
 
+/**
+ * @typedef {Object} ServiceStatus
+ * @property {boolean} isRunning - Whether the service process is considered running.
+ * @property {number|null} port - The TCP port the service is bound to, if running.
+ * @property {number} retryCount - Number of auto-restart attempts performed.
+ */
+
 class AIServiceManager {
+  /**
+   * Construct a new AIServiceManager.
+   * Initializes state for process tracking, ports, retries, and health check timer.
+   */
   constructor() {
     this.process = null
     this.port = null
@@ -17,6 +43,9 @@ class AIServiceManager {
 
   /**
    * Find an available port for the AI service
+   * @param {number} [startPort=8000] - Preferred starting port; will scan upward.
+   * @returns {Promise<number>} Resolves with a free port number.
+   * @throws If no port is available in the scan window.
    */
   async findAvailablePort(startPort = 8000) {
     const maxAttempts = 10
@@ -31,6 +60,11 @@ class AIServiceManager {
     throw new Error(`No available ports found in range ${startPort}-${startPort + maxAttempts - 1}`)
   }
 
+  /**
+   * Test whether a port can be bound locally.
+   * @param {number} port - The port to probe.
+   * @returns {Promise<boolean>} True if the port can be bound; otherwise false.
+   */
   async isPortAvailable(port) {
     return new Promise((resolve) => {
       const server = net.createServer()
@@ -45,13 +79,21 @@ class AIServiceManager {
 
   /**
    * Get the path to the AI service executable
+   *
+   * Development:
+   * - Uses Python from venv at AI_agent/venv/Scripts/python.exe and runs start_service.py
+   *
+   * Production:
+   * - Uses packaged executable under process.resourcesPath/ai_service
+   *
+   * @returns {{ command: string, args: string[] }} Executable command and argv.
    */
   getServiceExecutablePath() {
     const isDev = process.env.NODE_ENV === 'development'
     
     if (isDev) {
       // In development, use virtual environment Python
-      const venvPython = path.join(__dirname, '../../AI_agent/ai_env/Scripts/python.exe')
+      const venvPython = path.join(__dirname, '../../AI_agent/venv/Scripts/python.exe')
       
       return {
         command: venvPython,
@@ -75,14 +117,23 @@ class AIServiceManager {
 
   /**
    * Get the database path for the AI service
+   * @returns {string} Absolute path to the Electron userData SQLite database file.
    */
   getDatabasePath() {
     const userDataPath = app.getPath('userData')
-    return path.join(userDataPath, 'appUsage.db')
+    return path.join(userDataPath, 'focusbook.db')
   }
 
   /**
    * Start the AI service
+   * - Allocates a port, spawns the process, and performs initial health checks.
+   * - Sets OPENAI_API_KEY in the environment if provided or available in process.env.
+   *
+   * Concurrency safety: if a start is in progress, waits until it completes and returns the port.
+   *
+   * @param {string|null} [apiKey=null] - Optional API key to pass to the service; falls back to env.
+   * @returns {Promise<number>} Resolves with the port the service is (or will be) listening on.
+   * @throws If startup fails before spawning or port allocation fails.
    */
   async start(apiKey = null) {
     if (this.isStarting) {
@@ -219,6 +270,9 @@ class AIServiceManager {
 
   /**
    * Stop the AI service
+  * Attempts graceful termination (SIGTERM), then force-kills after a timeout.
+  * Clears periodic health checks and resets internal state.
+  * @returns {Promise<void>} Resolves when stop logic completes (not necessarily process exit).
    */
   async stop() {
     if (this.healthCheckInterval) {
@@ -249,6 +303,8 @@ class AIServiceManager {
 
   /**
    * Check if the AI service is healthy
+  * Performs a GET /docs against the local service with a short timeout.
+  * @returns {Promise<boolean>} True when HTTP 200 is returned; false otherwise.
    */
   async checkHealth() {
     if (!this.port) return false
@@ -277,6 +333,7 @@ class AIServiceManager {
 
   /**
    * Start periodic health checks
+  * Schedules a 30s interval to probe health; on failure, triggers restart handling.
    */
   startHealthCheck() {
     this.healthCheckInterval = setInterval(async () => {
@@ -290,6 +347,7 @@ class AIServiceManager {
 
   /**
    * Handle process exit and potential restart
+  * Clears health checks and auto-restarts up to maxRetries unless the app is quitting.
    */
   handleProcessExit() {
     if (this.healthCheckInterval) {
@@ -312,6 +370,7 @@ class AIServiceManager {
 
   /**
    * Get the current service status
+  * @returns {ServiceStatus} Snapshot of the manager's current state.
    */
   getStatus() {
     return {
@@ -323,6 +382,10 @@ class AIServiceManager {
 
   /**
    * Send a chat message to the AI service
+  * Performs an HTTP POST /chat with JSON body { message } and 30s timeout.
+  * @param {string} message - The user message to send to the AI service.
+  * @returns {Promise<any>} Resolves with the parsed JSON response from the service.
+  * @throws If the service isn't running, if the request fails, times out, or if parsing fails.
    */
   async sendMessage(message) {
     if (!this.isRunning || !this.port) {
@@ -380,6 +443,60 @@ class AIServiceManager {
       req.end()
     })
   }
+
+  async resetMemory() {
+    if (!this.isRunning || !this.port) {
+      throw new Error('AI service is not running')
+    }
+
+    return new Promise((resolve, reject) => {
+      const http = require('http')
+
+      const options = {
+        hostname: '127.0.0.1',
+        port: this.port,
+        path: '/reset',
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        timeout: 10000 // 10 second timeout for reset
+      }
+
+      const req = http.request(options, (res) => {
+        let responseData = ''
+
+        res.on('data', (chunk) => {
+          responseData += chunk
+        })
+
+        res.on('end', () => {
+          try {
+            if (res.statusCode !== 200) {
+              reject(new Error(`HTTP ${res.statusCode}: ${res.statusMessage}`))
+              return
+            }
+
+            const jsonResponse = JSON.parse(responseData)
+            resolve(jsonResponse)
+          } catch (error) {
+            reject(new Error(`Failed to parse response: ${error.message}`))
+          }
+        })
+      })
+
+      req.on('error', (error) => {
+        reject(new Error(`Reset request failed: ${error.message}`))
+      })
+
+      req.on('timeout', () => {
+        req.destroy()
+        reject(new Error('Reset request timeout'))
+      })
+
+      req.end()
+    })
+  } 
 }
 
 module.exports = AIServiceManager

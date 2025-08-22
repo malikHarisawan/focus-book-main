@@ -120,18 +120,18 @@ export default function ProductivityOverview() {
   return (
     <Card className="bg-slate-900/50 border-slate-700/50 backdrop-blur-sm overflow-hidden">
       <CardHeader className="border-b border-slate-700/50 pb-3">
-        <div className="flex items-center justify-between">
-          <CardTitle className="text-slate-100 flex items-center">
-            <Activity className="mr-2 h-5 w-5 text-cyan-500" />
-            Productivity Overview
+        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
+          <CardTitle className="text-slate-100 flex items-center text-base sm:text-lg">
+            <Activity className="mr-2 h-4 w-4 sm:h-5 sm:w-5 text-cyan-500 flex-shrink-0" />
+            <span className="truncate">Productivity Overview</span>
           </CardTitle>
-          <div className="flex items-center space-x-3">
+          <div className="flex items-center space-x-2 sm:space-x-3 w-full sm:w-auto">
             <SmartDatePicker zoomLevel={currentZoomLevel} onDateChange={loadAndProcessData} />
             <Button
               onClick={loadAndProcessData}
               variant="ghost"
               size="icon"
-              className="h-8 w-8 text-slate-400"
+              className="h-8 w-8 text-slate-400 flex-shrink-0"
               title="Refresh data"
             >
               <RefreshCw className="h-4 w-4" />
@@ -139,8 +139,8 @@ export default function ProductivityOverview() {
           </div>
         </div>
       </CardHeader>
-      <CardContent className="p-6">
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+      <CardContent className="p-3 sm:p-4 lg:p-6">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4 lg:gap-6">
           <StatCard
             title="Productive Time"
             value={`${Math.floor(productiveTime / 3600)}h ${Math.floor((productiveTime % 3600) / 60)}m`}
@@ -165,26 +165,26 @@ export default function ProductivityOverview() {
           /> */}
         </div>
 
-        <div className=" mt-8">
+        <div className="mt-6 sm:mt-8">
           <Tabs defaultValue="categories" className="w-full">
-            <div className="flex items-center justify-between mb-4">
-              <TabsList className="bg-slate-800/50 p-1">
+            <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between mb-4 gap-3">
+              <TabsList className="bg-slate-800/50 p-1 w-full sm:w-auto">
                 <TabsTrigger
                   value="categories"
-                  className="data-[state=active]:bg-slate-700 data-[state=active]:text-cyan-400"
+                  className="data-[state=active]:bg-slate-700 data-[state=active]:text-cyan-400 text-xs sm:text-sm"
                 >
                   Productivity
                 </TabsTrigger>
                 <TabsTrigger
                   value="applications"
-                  className="data-[state=active]:bg-slate-700 data-[state=active]:text-cyan-400"
+                  className="data-[state=active]:bg-slate-700 data-[state=active]:text-cyan-400 text-xs sm:text-sm"
                 >
                   Applications
                 </TabsTrigger>
 
                 <TabsTrigger
                   value="focus-sessions"
-                  className="data-[state=active]:bg-slate-700 data-[state=active]:text-cyan-400"
+                  className="data-[state=active]:bg-slate-700 data-[state=active]:text-cyan-400 text-xs sm:text-sm"
                 >
                   Focus Sessions
                 </TabsTrigger>
@@ -197,24 +197,27 @@ export default function ProductivityOverview() {
                 </TabsTrigger> */}
               </TabsList>
 
-              <div className="flex items-center space-x-2 text-xs text-slate-400">
+              <div className="flex items-center space-x-2 text-xs text-slate-400 w-full sm:w-auto justify-center sm:justify-end">
                 <div className="flex items-center">
                   <div className="h-2 w-2 rounded-full bg-green-500 mr-1"></div>
-                  Productive
+                  <span className="hidden sm:inline">Productive</span>
+                  <span className="sm:hidden">Prod</span>
                 </div>
                 <div className="flex items-center">
                   <div className="h-2 w-2 rounded-full bg-amber-500 mr-1"></div>
-                  Neutral
+                  <span className="hidden sm:inline">Neutral</span>
+                  <span className="sm:hidden">Neut</span>
                 </div>
                 <div className="flex items-center">
                   <div className="h-2 w-2 rounded-full bg-red-500 mr-1"></div>
-                  Distracting
+                  <span className="hidden sm:inline">Distracting</span>
+                  <span className="sm:hidden">Dist</span>
                 </div>
               </div>
             </div>
 
             <TabsContent value="categories" className="mt-0">
-              <div className="h-full w-full relative bg-slate-800/30 rounded-lg border border-slate-700/50 overflow-hidden">
+              <div className="h-64 sm:h-80 lg:h-96 w-full relative bg-slate-800/30 rounded-lg border border-slate-700/50 overflow-hidden">
                 <ProductiveAreaChart
                   data={productiveData}
                   rawData={rawData}
@@ -235,17 +238,17 @@ export default function ProductivityOverview() {
               />
 
             </TabsContent>
-            <TabsContent value="applications" className=" mt-0">
-              <div className="bg-slate-800/30 rounded-lg border border-slate-700/50 overflow-hidden">
-                <div className="grid grid-cols-12 text-xs text-slate-400 p-3 border-b border-slate-700/50 bg-slate-800/50">
-                  <div className="col-span-5">Application</div>
-                  <div className="col-span-2">Category</div>
-                  <div className="col-span-2">Time Spent</div>
-                  <div className="col-span-2">Productivity</div>
-                  <div className="col-span-1">Trend</div>
+            <TabsContent value="applications" className="mt-0">
+              <div className="bg-slate-800/30 rounded-lg border border-slate-700/50 overflow-hidden h-64 sm:h-80 lg:h-96 flex flex-col">
+                <div className="grid grid-cols-12 text-xs text-slate-400 p-2 sm:p-3 border-b border-slate-700/50 bg-slate-800/50 flex-shrink-0">
+                  <div className="col-span-4 sm:col-span-5">Application</div>
+                  <div className="col-span-2 hidden sm:block">Category</div>
+                  <div className="col-span-3 sm:col-span-2">Time Spent</div>
+                  <div className="col-span-3 sm:col-span-2">Productivity</div>
+                  <div className="col-span-2 sm:col-span-1">Trend</div>
                 </div>
 
-                <div className="divide-y divide-slate-700/30">
+                <div className="divide-y divide-slate-700/30 overflow-y-auto flex-1 custom-scrollbar">
                   {appsData.map((app) => (
                     <AppUsageRow
                       key={app.name}
@@ -265,7 +268,9 @@ export default function ProductivityOverview() {
             </TabsContent>
 
             <TabsContent value="focus-sessions" className="mt-0">
-              <FocusSessionChart />
+              <div className="h-64 sm:h-80 lg:h-96 w-full">
+                <FocusSessionChart />
+              </div>
             </TabsContent>
 
             <TabsContent value="timeline" className="mt-0">
@@ -309,16 +314,19 @@ function AppUsageRow({ name, category, timeSpent, productivity, trend }) {
   }
 
   return (
-    <div className="grid grid-cols-12 py-2 px-3 text-sm hover:bg-slate-800/50">
-      <div className="col-span-5 text-slate-300">{name}</div>
-      <div className="col-span-2 text-slate-400">{category}</div>
-      <div className="col-span-2 text-cyan-400">{timeSpent}</div>
-      <div className="col-span-2">
+    <div className="grid grid-cols-12 py-2 px-2 sm:px-3 text-xs sm:text-sm hover:bg-slate-800/50">
+      <div className="col-span-4 sm:col-span-5 text-slate-300 truncate pr-1">{name}</div>
+      <div className="col-span-2 text-slate-400 hidden sm:block truncate">{category}</div>
+      <div className="col-span-3 sm:col-span-2 text-cyan-400">{timeSpent}</div>
+      <div className="col-span-3 sm:col-span-2">
         <Badge variant="outline" className={`${getProductivityColor()} text-xs`}>
-          {productivity}
+          <span className="hidden sm:inline">{productivity}</span>
+          <span className="sm:hidden">
+            {productivity === 'Productive' ? 'P' : productivity === 'Neutral' ? 'N' : 'D'}
+          </span>
         </Badge>
       </div>
-      <div className="col-span-1 flex justify-center">{getTrendIcon()}</div>
+      <div className="col-span-2 sm:col-span-1 flex justify-center">{getTrendIcon()}</div>
     </div>
   )
 }

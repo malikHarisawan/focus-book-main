@@ -20,12 +20,14 @@ export function formatAppsData(rawData, date) {
 
   const apps = rawData[date]?.apps || {}
   for (const [key, value] of Object.entries(apps)) {
-    const name = value.domain || value.description || key
+    // Standardize app name resolution - same as Dashboard logic
+    const name = (value.domain || value.description || key).toLowerCase()
+    const displayName = value.domain || value.description || key
     const prevTime = appMap.get(name)?.timeSpentSeconds || 0
 
     appMap.set(name, {
       key: key,
-      name,
+      name: displayName, // Use original case for display
       category: value.category,
       timeSpentSeconds: prevTime + value.time
     })
@@ -301,16 +303,22 @@ export const processMostUsedApps = (jsonData, date) => {
   if (jsonData[date].apps && Object.keys(jsonData[date].apps).length > 0) {
     // Process daily aggregated apps data (this is already the total for the day)
     for (const [name, data] of Object.entries(jsonData[date].apps)) {
-      const key = data.domain || data.description || name
+      const displayName = data.domain || data.description || name
+      const key = displayName.toLowerCase() // Standardize key for grouping
       const productivity = getProductivity(data.category)
 
-      appTimeMap[key] = {
-        name,
-        time: data.time,
-        category: data.category,
-        domain: data.domain,
-        description: data.description,
-        productivity: productivity
+      if (appTimeMap[key]) {
+        // Aggregate time for apps with same normalized name
+        appTimeMap[key].time += data.time
+      } else {
+        appTimeMap[key] = {
+          name: displayName, // Keep original case for display
+          time: data.time,
+          category: data.category,
+          domain: data.domain,
+          description: data.description,
+          productivity: productivity
+        }
       }
     }
   } else {
@@ -322,14 +330,15 @@ export const processMostUsedApps = (jsonData, date) => {
       }
 
       for (const [name, data] of Object.entries(hourData)) {
-        const key = data.domain || data.description || name
+        const displayName = data.domain || data.description || name
+        const key = displayName.toLowerCase() // Standardize key for grouping
         const productivity = getProductivity(data.category)
 
         if (appTimeMap[key]) {
           appTimeMap[key].time += data.time
         } else {
           appTimeMap[key] = {
-            name,
+            name: displayName, // Keep original case for display
             time: data.time,
             category: data.category,
             domain: data.domain,
@@ -350,7 +359,7 @@ export const processMostUsedApps = (jsonData, date) => {
 
   return apps.length > 5
     ? apps.slice(0, 5).map((app) => ({
-        name: app.domain ? app.domain : app.description,
+        name: app.name, // Use the standardized display name
         time: formatTime(app.time),
         usagePercent: app.time / maxTime,
         icon: app.name.charAt(0).toUpperCase(),
@@ -358,7 +367,7 @@ export const processMostUsedApps = (jsonData, date) => {
         productivity: app.productivity
       }))
     : apps.map((app) => ({
-        name: app.domain ? app.domain : app.description,
+        name: app.name, // Use the standardized display name
         time: formatTime(app.time),
         usagePercent: app.time / maxTime,
         icon: app.name.charAt(0).toUpperCase(),

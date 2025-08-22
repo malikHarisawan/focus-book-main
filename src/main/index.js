@@ -8,6 +8,7 @@ const {
   Menu,
   globalShortcut
 } = require('electron')
+const { is } = require('@electron-toolkit/utils')
 const { exec, spawn } = require('child_process')
 const path = require('path')
 const fs = require('fs')
@@ -17,6 +18,7 @@ const { hybridConnection } = require('./database/hybridConnection')
 const focusSessionService = require('./database/focusSessionService')
 const PopupManager = require('./popupManager')
 const AIServiceManager = require('./aiServiceManager')
+const PythonErrorRecovery = require('./pythonErrorRecovery')
 // const backgroundSyncService = require('./database/backgroundSyncService') // Commented out for simplified architecture
 
 let mainWindow = null
@@ -30,15 +32,21 @@ let n_pid = null
 let isCleaningUp = false
 let popupManager = new PopupManager()
 let aiServiceManager = new AIServiceManager()
+let pythonErrorRecovery = new PythonErrorRecovery()
 
 function createWindow() {
   mainWindow = new BrowserWindow({
     width: 1200,
     height: 800,
+    minWidth: 900,
+    minHeight: 650,
     resizable: true,
+    maximizable: true,
+    minimizable: true,
+    closable: true,
     show: true,
-    Menu: false,
-    transparent: true,
+    autoHideMenuBar: true,
+    frame: true,
     webPreferences: {
       nodeIntegration: true,
       contextIsolation: true,
@@ -47,14 +55,14 @@ function createWindow() {
     }
   })
 
-  // if (is.dev && process.env['ELECTRON_RENDERER_URL']) {
-  //   mainWindow.loadURL(process.env['ELECTRON_RENDERER_URL'])
-  // } else {
+  if (is.dev && process.env['ELECTRON_RENDERER_URL']) {
+    mainWindow.loadURL(process.env['ELECTRON_RENDERER_URL'])
+  } else {
   //   console.log('running in prod')
     mainWindow.loadFile(path.join(__dirname, '../renderer/index.html'))
     console.log('main window loaded')
   
-
+  }
   mainWindow.on('close', (e) => {
     if (!app.isQuiting) {
       e.preventDefault()
@@ -129,6 +137,14 @@ app.whenReady().then(async () => {
     // Initialize data aggregation service
     // Data aggregation functionality is now handled directly by app usage service
     
+    // Initialize focus session service
+    try {
+      await focusSessionService.getLocalService().initializeService()
+      console.log('✅ Focus session service initialized successfully')
+    } catch (error) {
+      console.error('❌ Failed to initialize focus session service:', error.message)
+    }
+    
   } catch (error) {
     console.error('❌ Failed to initialize database system:', error.message)
     console.log('📋 The app will continue to run with reduced functionality.')
@@ -141,6 +157,20 @@ app.whenReady().then(async () => {
   } catch (error) {
     console.error('❌ Failed to start AI service:', error.message)
     console.log('📋 AI insights will not be available.')
+  }
+
+  // Initialize Python error recovery system
+  try {
+    await pythonErrorRecovery.checkPythonAvailability()
+    await pythonErrorRecovery.checkPythonDependencies()
+    const status = pythonErrorRecovery.getStatus()
+    if (status.pythonAvailable && !status.fallbackMode) {
+      console.log('✅ Python environment verified successfully')
+    } else {
+      console.log('⚠️ Python environment not available, using fallback mode for browser detection')
+    }
+  } catch (error) {
+    console.error('❌ Python error recovery initialization failed:', error.message)
   }
 
   createWindow()
@@ -418,6 +448,15 @@ app.whenReady().then(async () => {
     }
   })
 
+ipcMain.handle('ai-service-reset-memory', async () => {
+    try {
+      return await aiServiceManager.resetMemory()
+    } catch (error) {
+      console.error('Error resetting AI service memory:', error)
+      return { error: error.message }
+    }
+  })
+  
   ipcMain.handle('cancel-focus-session', async (event, sessionId) => {
     try {
       const currentSession = focusSessionService.getCurrentSession()
@@ -716,41 +755,85 @@ ipcMain.on('stay-focused', (event) => {
     if (app_name && (app_name.startsWith('http') || app_name.includes('.')) && n_pid) {
       // This is a URL/domain from Chrome/Brave - use Python script to close tab
       const closeScriptPath = path.join(__dirname, '../../scripts/closeTab.py')
-      const pythonProcess = spawn('python', [closeScriptPath, n_pid, app_name])
+      
+      // Check if Python script exists
+      if (!fs.existsSync(closeScriptPath)) {
+        console.warn('Python closeTab script not found, cannot close browser tab')
+        console.log('User requested to close distracting tab but script is unavailable')
+        return
+      }
 
-      pythonProcess.stdout.on('data', (data) => {
-        try {
-          const result = JSON.parse(data.toString())
-          if (result.success) {
-            console.log(`Successfully closed Chrome tab: ${result.closed_domain}`)
-          } else if (result.error) {
-            console.error(`Python script error: ${result.error}`)
-          } else {
-            console.log(`Tab not closed: ${result.reason}`)
+      try {
+        const pythonProcess = spawn('python', [closeScriptPath, n_pid, app_name])
+        
+        // Set timeout for Python process
+        const timeout = setTimeout(() => {
+          pythonProcess.kill('SIGKILL')
+          console.warn('Python closeTab script timeout')
+        }, 10000) // 10 second timeout
+
+        pythonProcess.stdout.on('data', (data) => {
+          clearTimeout(timeout)
+          try {
+            const result = JSON.parse(data.toString())
+            if (result.success) {
+              console.log(`Successfully closed Chrome tab: ${result.closed_domain}`)
+            } else if (result.error) {
+              console.warn(`Python script error: ${result.error}`)
+            } else {
+              console.log(`Tab not closed: ${result.reason}`)
+            }
+          } catch {
+            console.log('Python script output:', data.toString())
           }
-        } catch {
-          console.log('Python script output:', data.toString())
-        }
-      })
+        })
 
-      pythonProcess.stderr.on('data', (data) => {
-        console.error('Python script error:', data.toString())
-      })
+        pythonProcess.stderr.on('data', (data) => {
+          clearTimeout(timeout)
+          console.warn('Python script error:', data.toString())
+        })
+        
+        pythonProcess.on('error', (err) => {
+          clearTimeout(timeout)
+          console.warn('Failed to start Python closeTab process:', err.message)
+          console.log('User requested to close tab but Python execution failed')
+        })
+        
+        pythonProcess.on('close', (code) => {
+          clearTimeout(timeout)
+          if (code !== 0) {
+            console.warn(`Python closeTab script exited with code ${code}`)
+          }
+        })
+        
+      } catch (error) {
+        console.warn('Error executing Python closeTab script:', error.message)
+        console.log('User requested to close tab but script execution failed')
+      }
     } else if (app_name && app_name.endsWith('.exe')) {
       // This is a regular application - use taskkill
-      exec(`taskkill /IM ${app_name} /F`, (error, stdout, stderr) => {
-        if (error) {
-          console.error(`Error closing app: ${error.message}`)
-          return
-        }
-        if (stderr) {
-          console.error(`Error: ${stderr}`)
-          return
-        }
-        console.log(`Successfully closed application: ${app_name}`)
-      })
+      try {
+        exec(`taskkill /IM "${app_name}" /F`, { timeout: 5000 }, (error, stdout, stderr) => {
+          if (error) {
+            if (error.code === 128) {
+              console.log(`Application ${app_name} was not running or already closed`)
+            } else {
+              console.warn(`Error closing app ${app_name}: ${error.message}`)
+            }
+            return
+          }
+          if (stderr && !stderr.includes('SUCCESS')) {
+            console.warn(`Warning while closing ${app_name}: ${stderr}`)
+            return
+          }
+          console.log(`Successfully closed application: ${app_name}`)
+        })
+      } catch (error) {
+        console.warn(`Failed to execute taskkill for ${app_name}:`, error.message)
+      }
     } else {
-      console.warn(`Unable to close app: ${app_name} (invalid format or missing PID)`)
+      console.log(`App close requested but cannot determine closure method for: ${app_name} (invalid format or missing PID)`)
+      console.log('This may be a system process or already closed application')
     }
   }
 })
@@ -801,6 +884,17 @@ ipcMain.on('categoriesUpdated', (event, catTags) => {
   })
 })
 
+// Debug endpoint for Python error recovery status
+ipcMain.handle('get-python-status', () => {
+  return pythonErrorRecovery.getStatus()
+})
+
+// Manual reset for Python error recovery
+ipcMain.handle('reset-python-recovery', () => {
+  pythonErrorRecovery.reset()
+  return { success: true, message: 'Python error recovery system reset' }
+})
+
 ipcMain.on('start-focus', (event, isFocused) => {
   if (isCleaningUp) return
 
@@ -836,6 +930,56 @@ ipcMain.on('end-focus', (event, isFocused) => {
       mainWindow.webContents.send('end-focus', isFocused)
     } catch (error) {
       console.error('Error sending end-focus:', error)
+    }
+  }
+})
+
+ipcMain.on('pause-focus', (event) => {
+  if (isCleaningUp) return
+
+  // Don't clear timers completely, just pause them
+  if (timerInterval) {
+    clearInterval(timerInterval)
+    timerInterval = null
+  }
+
+  if (mainWindow && !mainWindow.isDestroyed()) {
+    try {
+      mainWindow.webContents.send('pause-focus')
+    } catch (error) {
+      console.error('Error sending pause-focus:', error)
+    }
+  }
+})
+
+ipcMain.on('resume-focus', (event) => {
+  if (isCleaningUp) return
+
+  // Resume the timer from where it left off
+  if (!timerInterval) {
+    timerInterval = setInterval(() => {
+      if (isCleaningUp || !mainWindow || mainWindow.isDestroyed()) {
+        clearAppTimers()
+        return
+      }
+
+      totalSeconds++
+      timeDisplay = totalSeconds
+
+      try {
+        mainWindow.webContents.send('start-focus', true, timeDisplay)
+      } catch (error) {
+        console.error('Error sending focus timer update:', error)
+        clearAppTimers()
+      }
+    }, 1500)
+  }
+
+  if (mainWindow && !mainWindow.isDestroyed()) {
+    try {
+      mainWindow.webContents.send('resume-focus')
+    } catch (error) {
+      console.error('Error sending resume-focus:', error)
     }
   }
 })

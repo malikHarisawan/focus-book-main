@@ -270,7 +270,7 @@ const AppUsageDetails = ({
             </div>
 
             {/* App List */}
-            <div className="divide-y divide-slate-700/30 max-h-80 overflow-y-auto">
+            <div className="divide-y divide-slate-700/30 max-h-80 overflow-y-auto custom-scrollbar">
               {sortedApps.map((app, index) => (
                 <div
                   key={`${app.name}-${index}`}
