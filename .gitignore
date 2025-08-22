@@ -41,3 +41,12 @@ venv/
 ENV/
 env.bak/
 venv.bak/
+
+# AI_agent specific ignores
+AI_agent/venv/
+AI_agent/build/
+AI_agent/dist/
+AI_agent/.langgraph_api/
+AI_agent/__pycache__/
+AI_agent/*.pyc
+AI_agent/*.spec
