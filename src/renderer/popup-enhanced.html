@@ -472,8 +472,8 @@
         <!-- Primary Actions -->
         <div class="primary-actions">
           <button class="btn btn-primary" id="stay-focused" tabindex="1">Stay Focused</button>
-          <button class="btn btn-warning" id="take-break" disabled tabindex="2">
-            Take Break (5s)
+          <button class="btn btn-warning" id="take-break" tabindex="2">
+            Take Break
           </button>
         </div>
         
@@ -534,7 +534,7 @@
           this.setupKeyboardShortcuts()
           await this.loadSessionData()
           this.updateDynamicContent()
-          this.startBreakCountdown()
+          this.startSessionMonitoring()
         }
 
         setupEventListeners() {
@@ -663,6 +663,28 @@
           }, 1000)
         }
 
+        startSessionMonitoring() {
+          // Check session status every 2 seconds to auto-close popup when session ends
+          this.sessionMonitorInterval = setInterval(async () => {
+            try {
+              if (window.electronAPI && window.electronAPI.getCurrentFocusSession) {
+                const session = await window.electronAPI.getCurrentFocusSession()
+                
+                // If session ended or was cancelled, close the popup
+                if (!session || (this.currentSession && session.status !== 'active' && session.status !== 'paused')) {
+                  console.log('Session ended, closing popup')
+                  window.electronAPI.sendToMain('dismiss') // Just close popup without closing apps
+                }
+                
+                // Update current session reference
+                this.currentSession = session
+              }
+            } catch (error) {
+              console.error('Error monitoring session:', error)
+            }
+          }, 2000)
+        }
+
 
         updateDynamicContent() {
           const messages =
@@ -677,21 +699,6 @@
           document.getElementById('distraction-app').textContent = 'Distracting App'
         }
 
-        startBreakCountdown() {
-          let timeLeft = 5
-          const breakButton = document.getElementById('take-break')
-
-          const countdown = setInterval(() => {
-            if (timeLeft <= 0) {
-              clearInterval(countdown)
-              breakButton.disabled = false
-              breakButton.textContent = 'Take Break'
-            } else {
-              breakButton.textContent = `Take Break (${timeLeft}s)`
-              timeLeft--
-            }
-          }, 1000)
-        }
 
 
         handleStayFocused() {
@@ -732,13 +739,15 @@
           try {
             await window.electronAPI.stopFocusSession(this.currentSession._id)
             this.currentSession = null
-            document.getElementById('session-info').style.display = 'none'
-            document.getElementById('progress-section').style.display = 'none'
-            document.getElementById('stats-grid').style.display = 'none'
-            document.getElementById('session-controls').style.display = 'none'
-
-            // Show success message
+            
+            // Show success message briefly then just close popup window
             document.getElementById('dynamic-message').textContent = 'Session ended successfully!'
+            
+            // Close popup after a short delay to show the success message
+            // Use dismiss action instead of stay-focused to avoid closing apps
+            setTimeout(() => {
+              window.electronAPI.sendToMain('dismiss')
+            }, 1000)
           } catch (error) {
             console.error('Error ending session:', error)
           }
@@ -776,6 +785,9 @@
         cleanup() {
           if (this.sessionUpdateInterval) {
             clearInterval(this.sessionUpdateInterval)
+          }
+          if (this.sessionMonitorInterval) {
+            clearInterval(this.sessionMonitorInterval)
           }
         }
       }

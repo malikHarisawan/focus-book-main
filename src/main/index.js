@@ -752,7 +752,7 @@ ipcMain.on('stay-focused', (event) => {
     popupWindow = null
 
     // Check if we're dealing with a Chrome/Brave browser tab (URL) vs regular application (.exe)
-    if (app_name && (app_name.startsWith('http') || app_name.includes('.')) && n_pid) {
+    if (app_name && (app_name.startsWith('http') || (app_name.includes('.') && !app_name.endsWith('.exe'))) && n_pid) {
       // This is a URL/domain from Chrome/Brave - use Python script to close tab
       const closeScriptPath = path.join(__dirname, '../../scripts/closeTab.py')
       

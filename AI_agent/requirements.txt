@@ -4,6 +4,7 @@ langgraph
 langchain-openai
 langchain-core
 langchain-mcp-adapters
+langchain_google_genai
 
 # OpenAI SDK
 openai
