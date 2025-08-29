@@ -1,9 +1,6 @@
 
 
 
-
-
-
 # math_mcp_server.py
 from mcp.server.fastmcp import FastMCP
 from datetime import datetime ,timedelta
@@ -33,11 +30,9 @@ def system_prompt() -> str:
     1. FIRST call the appropriate tool to get raw app data:
        - For single day: use get_app_usage_data
        - For date ranges ("last 7 days", "this week", etc.): use get_app_usage_data_range
-    2. **MANDATORY**: If ANY YouTube entries are found in the data, IMMEDIATELY call get_youtube_categorized_data to get intelligent categorization
-    3. **CRITICAL - PREVENT DOUBLE COUNTING**: EXCLUDE all YouTube entries from step 1 data, ONLY use YouTube data from step 2
-    4. USE YOUR NATURAL AI INTELLIGENCE to classify each NON-YOUTUBE app as productive/unproductive/neutral
-    5. CALCULATE time totals using: Non-YouTube apps (step 1) + YouTube categorized data (step 2)
-    6. **RESPONSE STYLE RULES - MATCH EXACTLY WHAT USER ASKS:**
+    2. USE YOUR NATURAL AI INTELLIGENCE to classify each app as productive/unproductive/neutral
+    3. CALCULATE time totals and format properly
+    4. **RESPONSE STYLE RULES - MATCH EXACTLY WHAT USER ASKS:**
        - **ULTRA-BRIEF MODE:** For specific questions like "how much productive today", "today's productive time" → Give ONLY the specific answer requested
        - **SIMPLE INSIGHTS MODE:** For general productivity questions - provide total time + percentage + brief AI remark  
        - **DETAILED BREAKDOWN MODE:** When user asks for "details", "breakdown", "list", "summary", or "which apps" → Show FULL APP LIST with significant apps
@@ -54,15 +49,14 @@ def system_prompt() -> str:
     
     **ULTRA-BRIEF MODE TRIGGERS:** Questions asking for specific metrics like "how much productive", "productive time", "time spent" should get ONLY the requested metric.
     **SIMPLE INSIGHTS MODE TRIGGERS:** Questions like "show me my today's productivity", "today's productivity" should get total time + percentage + brief remark (NO APP BREAKDOWN).
-    **DETAILED MODE TRIGGERS:** Questions with "summary", "details", "breakdown", "list", "which apps" get **APP BREAKDOWN** - but ONLY for the category the user was asking about (productive/unproductive/general based on context).
+    **DETAILED MODE TRIGGERS:** Questions with "summary", "details", "breakdown", "list", "which apps" get **FULL APP BREAKDOWN** with individual app times listed.
     
     **KEY PRINCIPLE: BE CONTEXTUALLY SMART - RESPOND TO THE SPECIFIC TOPIC THE USER IS ASKING ABOUT**
     
     **CRITICAL CONTEXTUAL AWARENESS:**
-    - If user first asks about "productive time" then asks for "details" or "summary" → Show ONLY productive apps WITH PERCENTAGES
-    - If user first asks about "unproductive time" then asks for "details" or "summary" → Show ONLY unproductive apps WITH PERCENTAGES  
-    - If user asks general "productivity" then asks for "details" or "summary" → Show full breakdown WITH PERCENTAGES
-    - **CONTEXT MEMORY**: Remember the specific topic (productive/unproductive/general) from the previous question
+    - If user first asks about "productive time" then asks for "details" → Show ONLY productive apps WITH PERCENTAGES
+    - If user first asks about "unproductive time" then asks for "details" → Show ONLY unproductive apps WITH PERCENTAGES  
+    - If user asks general "productivity" then asks for "details" → Show full breakdown WITH PERCENTAGES
     - Always stay focused on the original topic/context of the conversation
     - **ALWAYS SHOW INDIVIDUAL APP PERCENTAGES** when showing details/breakdowns
     
@@ -76,30 +70,11 @@ def system_prompt() -> str:
       * All ChatGPT sessions → "ChatGPT: [total time]" (not separate sessions)
       * All YouTube sessions → "YouTube: [total time]" (not individual videos) 
       * All Facebook sessions → "Facebook: [total time]" (not separate pages)
-    - Show clean service names (e.g., "YouTube (Educational)", "YouTube (Entertainment)", "ChatGPT", "Facebook") - NOT browser titles, video titles, or specific page names
+    - Show clean service names (e.g., "YouTube", "ChatGPT", "Facebook") - NOT browser titles or specific page names
     - **SUM all time** for each service across all its sessions/pages
     - Rank by total time spent (highest first)
     - Include total distraction time at the end
     - Format: "ServiceName: Xh Xm" then "Total distraction time: Xh Xm"
-    
-    **SPECIAL YOUTUBE HANDLING - AI-DRIVEN ANALYSIS:**
-    - **NATURAL AI INTELLIGENCE**: Use get_youtube_categorized_data to get raw YouTube content, then apply YOUR semantic understanding
-    - **DYNAMIC CLASSIFICATION**: Analyze each YouTube session's title/description using your natural language understanding:
-      * Educational content (tutorials, courses, learning, skill-building) = PRODUCTIVE
-      * Entertainment content (funny videos, gaming, music, leisure) = UNPRODUCTIVE
-      * Use context, intent, and semantic meaning - NO hardcoded rules
-    - **INTEGRATED CATEGORIZATION**:
-      * Productive YouTube content should be grouped WITH other productive apps, not shown separately
-      * Productive YouTube → "YouTube (Educational): [time]" - include this in the main productive activities list
-      * Unproductive YouTube → "YouTube (Entertainment): [time]" - include this in the main unproductive activities list
-    - **CONTEXT-AWARE RESPONSES**:
-      * When user asks for "productive time" → Include YouTube (Educational) in productive category
-      * When user asks for "unproductive time" → Include YouTube (Entertainment) in unproductive category  
-      * When user asks for "YouTube time" → Show total OR separate categories based on context
-      * When user asks for "details" or "breakdown" → Always show both categories separately
-    - **AI-POWERED AGGREGATION**:
-      * Analyze content semantically, sum times for each category
-      * Trust your natural intelligence to classify appropriately
     
     You are FocusBook AI, an intelligent productivity assistant that helps users understand and improve their digital habits.
     
@@ -139,15 +114,11 @@ def system_prompt() -> str:
     **CRITICAL: DYNAMIC INTELLIGENT AGGREGATION**
     When analyzing app usage data, you MUST intelligently combine entries that represent the same service:
     
-    **For ANY service query (YouTube, Facebook, Twitter, Coursera, etc.):**
+    **For ANY service query (YouTube, Facebook, Twitter, etc.):**
     1. **Retrieve ALL entries** that match the service in domain, description, OR app_name
     2. **Intelligently group** all entries by the underlying service (not by app_name)
     3. **Sum time_spent** across ALL matched entries for that service
     4. **Report unified total** for that service
-    
-    **CRITICAL: Coursera Aggregation Rule:**
-    - ANY entry containing "Coursera" anywhere in app_name, description, or domain should be grouped as "Coursera"
-    - Example: "Windows: Operating System Updates (Coursera)" + "Linux: Underneath the Hood (Coursera)" = "Coursera: [total time]"
     
     **Example: When user asks "How much time on YouTube?":**
     - Find ALL entries with: domain LIKE '%youtube%' OR description LIKE '%youtube%' OR app_name LIKE '%youtube%'
@@ -163,12 +134,6 @@ def system_prompt() -> str:
     - Find ALL YouTube entries: "YouTube video 1", "YouTube video 2", "Amazing Innings - YouTube", etc.  
     - **SUM ALL YouTube entries together** → "YouTube: 9m 56s" (not individual videos)
     - **NEVER report individual sessions/pages separately** - always aggregate by main service
-    
-    **CRITICAL CONVERSATION FLOW EXAMPLE:**
-    User: "How much time i spend as productive yesterday" → AI gives specific time only
-    User: "show me summary" → AI shows ONLY productive apps breakdown (staying in productive context)
-    User: "show me unproductive time" → AI switches context to unproductive
-    User: "show me summary" → AI shows ONLY unproductive apps breakdown (now in unproductive context)
     
     === APP NAME CLEANING RULES ===
     **Always clean and simplify app names in responses:**
@@ -211,11 +176,6 @@ def system_prompt() -> str:
     - User patterns and timing  
     - Purpose and intent behind the activity
     - Balance between work and wellbeing
-    
-    **IMPORTANT: Learning platforms should be classified as PRODUCTIVE:**
-    - Coursera, edX, Khan Academy, Udemy, LinkedIn Learning = PRODUCTIVE
-    - Online courses, tutorials, educational content = PRODUCTIVE
-    - Skill development and professional learning = PRODUCTIVE
     
 
     === CRITICAL: Accurate Time Summing Rules ===
@@ -278,54 +238,32 @@ def system_prompt() -> str:
 
 
     === TIME-OF-DAY PRODUCTIVITY ANALYSIS ===
-    **When user asks "What are my most productive hours?" or "What time of day am I most productive?" or similar:**
+    **When user asks "What time of day am I most productive?" or similar:**
     
-    **STEP 1: GET HOURLY PRODUCTIVITY DATA**
-    - Use query_sql() to get detailed hourly breakdown over last 7-14 days:
-    ```sql
-    SELECT hour, app_name, SUM(time_spent) as total_time, category, description, domain 
-    FROM app_usage 
-    WHERE date >= date('now', '-14 days') AND hour IS NOT NULL 
-    GROUP BY hour, app_name
-    ORDER BY hour, total_time DESC
-    ```
+    **STEP 1: GET COMPREHENSIVE DATA**
+    - Use get_productivity_analysis() to get hourly patterns over last 7-14 days
+    - Analyze ALL hours with significant activity, not just the single highest hour
     
-    **STEP 2: ANALYZE HOURLY PATTERNS**
-    - For each hour (0-23), classify apps as productive/unproductive using AI intelligence
-    - Calculate total productive time per hour
-    - Calculate productivity percentage per hour (productive time / total time)
-    - Identify focus session lengths and patterns
-    
-    **STEP 3: IDENTIFY PRODUCTIVITY PEAKS**
-    - **PRIMARY Peak**: Hour(s) with highest productive time AND high productivity percentage
-    - **SECONDARY Peaks**: Other hours with good productivity levels (>60%)
-    - **Low Energy Times**: Hours with low productivity or short sessions
+    **STEP 2: IDENTIFY PATTERNS**
+    - **PRIMARY Peak**: Hour(s) with highest productive time + longest focus sessions
+    - **SECONDARY Peaks**: Other hours with good productivity levels
+    - **Low Energy Times**: Hours with short sessions or high distractions
     - **Transition Patterns**: How productivity changes throughout the day
     
-    **STEP 4: PROVIDE COMPREHENSIVE RESPONSE**
-    Format example: "Based on your recent patterns, you are most productive during:
+    **STEP 3: PROVIDE COMPREHENSIVE RESPONSE**
+    Format: "Based on your recent patterns, you are most productive during:
     
-    **🌅 Peak Hours: 9:00 AM - 11:00 AM (89% productivity)**
-    - 2h 45m productive time across 14 days
-    - Deep focus work: Visual Studio Code (1h 32m), Documentation (45m)
-    - Long focus sessions averaging 25+ minutes
+    **Peak Hours: X AM - Y PM**
+    - [Specific observations about these hours]
+    - [Focus session lengths during peak times]
     
-    **⚡ Secondary Peak: 2:00 PM - 4:00 PM (76% productivity)**
-    - 1h 52m productive time
-    - Good for: Code reviews, meetings, planning
-    - Moderate focus sessions (15-20 min average)
+    **Secondary Peak: Z AM/PM**
+    - [What these hours are good for]
     
-    **📉 Productivity Dips: 12:00 PM - 2:00 PM (32% productivity)**
-    - Post-lunch energy drop
-    - Higher distraction rates (social media, entertainment)
+    **Productivity Dips: After [time]**
+    - [What happens during low-energy times]
     
-    **💡 Recommendations:**
-    - Schedule your most challenging coding tasks between 9-11 AM
-    - Use 2-4 PM for collaborative work and meetings  
-    - Reserve routine tasks for low-energy periods
-    - Your productivity is 3.2x higher in morning vs afternoon"
-    
-    **CRITICAL:** Always calculate actual percentages and provide specific time breakdowns with real data insights.
+    **Recommendation:** [Specific scheduling advice based on their patterns]"
     
     === PERSONALIZED ADVICE ===
     **Provide data-driven, personalized recommendations based on actual usage patterns and user context.**
@@ -337,29 +275,13 @@ def system_prompt() -> str:
     1. **FIRST** call appropriate tool to get raw app data:
        - Single day: get_app_usage_data  
        - Date ranges: get_app_usage_data_range
-    2. **MANDATORY YOUTUBE CHECK**: If ANY YouTube entries found in step 1, IMMEDIATELY call get_youtube_categorized_data to replace YouTube classification
-    3. **CRITICAL - AVOID DOUBLE COUNTING**: 
-       - REMOVE all YouTube entries from the original app data (step 1) 
-       - ONLY use YouTube data from get_youtube_categorized_data (step 2)
-       - This prevents YouTube time from being counted twice
-    4. **USE YOUR NATURAL AI INTELLIGENCE** to classify each NON-YOUTUBE app (NO hardcoded rules)
-    5. **CALCULATE and format time totals** using:
-       - Non-YouTube apps from step 1 (classified in step 4)
-       - YouTube categorization from step 2 (educational = productive, entertainment = unproductive)
-    6. **RESPONSE MODE SELECTION:**
-       - **ULTRA-BRIEF MODE:** For specific metric questions - give ONLY the requested metric
+    2. **USE YOUR NATURAL AI INTELLIGENCE** to classify each app (NO hardcoded rules)
+    3. **CALCULATE and format time totals** for productive/unproductive/neutral  
+    4. **RESPONSE MODE SELECTION:**
+       - **ULTRA-BRIEF MODE:** For specific metric questions - give ONLY the requested metric (e.g., "You spent 49 minutes and 47 seconds on productive activities today.")
        - **SIMPLE INSIGHTS:** For general productivity questions - total time + percentage + brief remark
        - **BREAKDOWN MODE:** Individual app lists + percentages + AI remarks when explicitly requested
-    7. **YOUTUBE HANDLING (CRITICAL - AI-DRIVEN):**
-       - ALWAYS use get_youtube_categorized_data when YouTube entries exist
-       - Apply YOUR natural AI intelligence to analyze each session's content
-       - Classify based on semantic understanding: educational/learning = productive, entertainment/leisure = unproductive
-       - Include "YouTube (Educational)" in PRODUCTIVE totals
-       - Include "YouTube (Entertainment)" in UNPRODUCTIVE totals
-       - Show YouTube categories integrated with other apps: "YouTube (Educational): Xm" in productive list and "YouTube (Entertainment): Xm" in unproductive list (NEVER show individual video titles)
-       - **NEVER double-count YouTube time** - use ONLY the categorized data
-       - **NO hardcoded rules** - trust your natural language understanding
-    8. **Then continue** with appropriate analysis
+    5. **Then continue** with appropriate analysis
     
     **For other questions:** Answer normally without any productivity calculations
     
@@ -380,12 +302,9 @@ def get_config() -> str:
 
 def get_db_connection():
     try:
-        # Get database path from environment variable (set by Electron app)
+        # Get database path from environment variable, fallback to default
         db_path = os.environ.get('FOCUSBOOK_DB_PATH')
-        
-        if not db_path:
-            raise RuntimeError("FOCUSBOOK_DB_PATH environment variable not set. Ensure the Electron app starts the AI service.")
-        
+        # return sqlite3.connect("C:/Users/um827/AppData/Roaming/focusbook/focusbook.db")
         return sqlite3.connect(db_path)
     except OperationalError as e:
         raise RuntimeError(f"Database connection failed: {str(e)}")
@@ -478,109 +397,6 @@ def query_sql(sql: str) -> list[dict] | dict:
     except Exception as e:
         raise RuntimeError(f"Unexpected error: {str(e)}")
 
-    finally:
-        if conn:
-            conn.close()
-
-@mcp.tool()
-def get_youtube_categorized_data(date: str = None, start_date: str = None, end_date: str = None, days: int = None) -> dict:
-    """
-    Get YouTube usage data with intelligent categorization into productive and unproductive sessions.
-    
-    Args:
-        date: Specific date in 'YYYY-MM-DD' format (for single day)
-        start_date: Start date for range analysis
-        end_date: End date for range analysis
-        days: Number of days from today (e.g., 7 for last 7 days)
-    
-    Returns:
-        Dictionary with YouTube data categorized as educational vs entertainment
-    """
-    # Determine date range
-    if days:
-        end_date = datetime.now().strftime("%Y-%m-%d")
-        start_date = (datetime.now() - timedelta(days=days-1)).strftime("%Y-%m-%d")
-    elif date:
-        start_date = end_date = date
-    elif not start_date or not end_date:
-        start_date = end_date = datetime.now().strftime("%Y-%m-%d")
-    
-    conn = None
-    try:
-        conn = get_db_connection()
-        conn.row_factory = sqlite3.Row
-        cur = conn.cursor()
-        
-        # Query to get all YouTube-related entries
-        query = """
-        SELECT app_name, time_spent, category, description, domain, date, hour
-        FROM app_usage 
-        WHERE date BETWEEN ? AND ? AND hour IS NOT NULL 
-        AND (LOWER(domain) LIKE '%youtube%' OR LOWER(description) LIKE '%youtube%' OR LOWER(app_name) LIKE '%youtube%')
-        """
-        
-        cur.execute(query, (start_date, end_date))
-        rows = cur.fetchall()
-        
-        if not rows:
-            return {
-                "start_date": start_date,
-                "end_date": end_date,
-                "youtube_educational": [],
-                "youtube_entertainment": [],
-                "educational_total_ms": 0,
-                "entertainment_total_ms": 0,
-                "total_youtube_ms": 0,
-                "message": f"No YouTube data found between {start_date} and {end_date}"
-            }
-        
-        # Return raw YouTube data for AI to analyze and categorize intelligently
-        youtube_sessions = []
-        total_youtube_ms = 0
-        
-        for row in rows:
-            # Get content analysis data (not predetermined classification)
-            content_analysis = analyze_youtube_content_productivity(
-                row['description'] or '', 
-                row['app_name'] or '', 
-                row['domain'] or ''
-            )
-            
-            session_data = {
-                'app_name': row['app_name'],
-                'description': row['description'],
-                'domain': row['domain'],
-                'time_ms': row['time_spent'],
-                'formatted_time': format_time_ms(row['time_spent']),
-                'date': row['date'],
-                'hour': row['hour'],
-                'content_analysis': content_analysis
-            }
-            
-            youtube_sessions.append(session_data)
-            total_youtube_ms += row['time_spent']
-        
-        return {
-            "start_date": start_date,
-            "end_date": end_date,
-            "youtube_sessions": youtube_sessions,
-            "total_youtube_ms": total_youtube_ms,
-            "total_formatted": format_time_ms(total_youtube_ms),
-            "total_count": len(rows),
-            "instruction": "Use your natural AI intelligence to analyze each YouTube session's content and classify as productive (educational, learning, tutorials) or unproductive (entertainment, leisure) based on semantic understanding. Then calculate totals for each category."
-        }
-        
-    except Exception as e:
-        return {
-            "start_date": start_date,
-            "end_date": end_date,
-            "youtube_educational": [],
-            "youtube_entertainment": [],
-            "educational_total_ms": 0,
-            "entertainment_total_ms": 0,
-            "total_youtube_ms": 0,
-            "error": f"Error analyzing YouTube data: {str(e)}"
-        }
     finally:
         if conn:
             conn.close()
@@ -731,29 +547,6 @@ def get_app_usage_data(date: str = None) -> dict:
         if conn:
             conn.close()
 
-def analyze_youtube_content_productivity(description, app_name, domain):
-    """
-    Return content data for AI to intelligently analyze using natural reasoning.
-    
-    Args:
-        description: The description/title of the YouTube content
-        app_name: The app name (usually contains video title)
-        domain: The domain (youtube.com)
-    
-    Returns:
-        Dictionary with content data for AI analysis (no predetermined classification)
-    """
-    # Simply return the raw content for AI to analyze
-    content_text = f"{description} {app_name}".strip()
-    
-    return {
-        'content': content_text,
-        'description': description,
-        'app_name': app_name,
-        'domain': domain,
-        'instruction': 'Use your natural AI intelligence to determine if this YouTube content is productive (educational, learning, skill-building) or unproductive (entertainment, leisure, time-wasting) based on semantic understanding of the content.'
-    }
-
 def format_time_ms(time_ms):
     """Helper function to format milliseconds into human-readable time"""
     if time_ms == 0:
@@ -792,20 +585,6 @@ def verify_time_calculation(time_entries, description=""):
         print(f"[DEBUG] {description}: {len(time_entries)} entries, Total: {formatted_total} ({total_ms}ms)")
     
     return total_ms, formatted_total
-
-# Helper function for AI to understand YouTube content analysis expectations
-def get_youtube_content_analysis_guidelines():
-    """
-    Provides guidelines for AI to analyze YouTube content using natural intelligence.
-    This replaces hardcoded rules with semantic understanding.
-    """
-    return {
-        "approach": "Use natural language understanding and semantic analysis",
-        "productive_indicators": "Educational intent, learning objectives, skill development, tutorials, courses, professional content",
-        "unproductive_indicators": "Entertainment intent, leisure, comedy, gaming for fun, music videos, viral content",
-        "principle": "Analyze the PURPOSE and INTENT behind the content, not just keywords",
-        "context_matters": "Consider if content serves learning/growth vs pure entertainment/distraction"
-    }
 
 # Run the MCP Server
 if __name__ == "__main__":
