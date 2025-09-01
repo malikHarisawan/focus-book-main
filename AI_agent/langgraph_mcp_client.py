@@ -17,7 +17,7 @@ from mcp.client.stdio import stdio_client
 
 from langchain_core.messages import HumanMessage, AIMessage
 from langchain.memory import ConversationBufferMemory
-
+from langchain_google_genai import ChatGoogleGenerativeAI
 import asyncio
 import os
 import sys
@@ -35,11 +35,18 @@ server_params = StdioServerParameters(
 )
 
 async def create_graph(session):
-    llm = ChatOpenAI(
-        # model="gpt-4.1-mini",
-        model="gpt-4o",
+    # llm = ChatOpenAI(
+    #     # model="gpt-4.1-mini",
+    #     model="gpt-4o",
+    #     temperature=0,
+    #     api_key=os.getenv("OPENAI_API_KEY")
+    # )
+    llm = ChatGoogleGenerativeAI(
+        model="gemini-2.0-flash",
         temperature=0,
-        api_key=os.getenv("OPENAI_API_KEY")
+        # You'll need to set GOOGLE_API_KEY environment variable
+        # Get it from: https://makersuite.google.com/app/apikey
+        api_key="AIzaSyBd07mXyPhwKgHbLBsw6oHU0OsdZ6TDeow"
     )
 
     tools = await load_mcp_tools(session)
