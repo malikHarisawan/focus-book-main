@@ -497,6 +497,63 @@ class AIServiceManager {
       req.end()
     })
   } 
+
+/**
+   * Reset the AI service conversation memory
+   */
+  async resetMemory() {
+    if (!this.isRunning || !this.port) {
+      throw new Error('AI service is not running')
+    }
+
+    return new Promise((resolve, reject) => {
+      const http = require('http')
+
+      const options = {
+        hostname: '127.0.0.1',
+        port: this.port,
+        path: '/reset',
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        timeout: 10000 // 10 second timeout for reset
+      }
+
+      const req = http.request(options, (res) => {
+        let responseData = ''
+
+        res.on('data', (chunk) => {
+          responseData += chunk
+        })
+
+        res.on('end', () => {
+          try {
+            if (res.statusCode !== 200) {
+              reject(new Error(`HTTP ${res.statusCode}: ${res.statusMessage}`))
+              return
+            }
+
+            const jsonResponse = JSON.parse(responseData)
+            resolve(jsonResponse)
+          } catch (error) {
+            reject(new Error(`Failed to parse response: ${error.message}`))
+          }
+        })
+      })
+
+      req.on('error', (error) => {
+        reject(new Error(`Reset request failed: ${error.message}`))
+      })
+
+      req.on('timeout', () => {
+        req.destroy()
+        reject(new Error('Reset request timeout'))
+      })
+
+      req.end()
+    })
+  }
 }
 
 module.exports = AIServiceManager
