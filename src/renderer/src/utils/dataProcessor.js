@@ -1,6 +1,38 @@
-const focusCategories = ['Code', 'Documenting', 'Learning']
-const neutralCategories = ['Utility', 'Miscellaneous', 'Personal']
-const unproductive = ['Entertainment', 'Messaging', 'Communication', 'Browsing']
+// Note: This will be replaced by database-driven productivity mapping
+// Kept as fallback for when database categories aren't loaded yet
+const DEFAULT_FOCUS_CATEGORIES = ['Code', 'Documenting', 'Learning']
+const DEFAULT_NEUTRAL_CATEGORIES = ['Utility', 'Miscellaneous', 'Personal', 'Utilities']
+const DEFAULT_UNPRODUCTIVE = ['Entertainment', 'Messaging', 'Communication', 'Browsing']
+
+// Global variable to store database category mappings
+let categoryProductivityMap = null
+
+// Function to load category productivity mapping from main process
+async function loadCategoryProductivityMapping() {
+  try {
+    // Request categories from the main process via activeWindow API
+    const categories = await window.activeWindow.loadCategories()
+    if (categories && Array.isArray(categories)) {
+      categoryProductivityMap = {}
+      categories.forEach(category => {
+        if (category.name && category.productivity_type) {
+          categoryProductivityMap[category.name] = category.productivity_type
+        }
+      })
+      console.log('Dashboard: Category productivity mapping loaded:', categoryProductivityMap)
+    }
+  } catch (error) {
+    console.error('Dashboard: Error loading category productivity mapping:', error)
+  }
+}
+
+// Initialize the mapping when the module loads
+loadCategoryProductivityMapping()
+
+// Export function to refresh category mappings if needed
+export const refreshCategoryMapping = () => {
+  return loadCategoryProductivityMapping()
+}
 export const formatTime = (milliseconds) => {
   const hours = Math.floor(milliseconds / (1000 * 60 * 60))
   const minutes = Math.floor((milliseconds % (1000 * 60 * 60)) / (1000 * 60))
@@ -9,10 +41,29 @@ export const formatTime = (milliseconds) => {
 }
 
 const getProductivity = (category) => {
-  if (focusCategories.includes(category)) {
+  // First try to use database mapping if available
+  if (categoryProductivityMap && categoryProductivityMap[category]) {
+    const productivityType = categoryProductivityMap[category]
+    switch (productivityType) {
+      case 'productive':
+        return 'Productive'
+      case 'distracted':
+        return 'Un-Productive'
+      case 'neutral':
+        return 'Neutral'
+      default:
+        return 'Neutral'
+    }
+  }
+  
+  // Fallback to static arrays if database mapping not loaded
+  if (DEFAULT_FOCUS_CATEGORIES.includes(category)) {
     return 'Productive'
-  } else if (unproductive.includes(category)) return 'Un-Productive'
-  else return 'Neutral'
+  } else if (DEFAULT_UNPRODUCTIVE.includes(category)) {
+    return 'Un-Productive'
+  } else {
+    return 'Neutral'
+  }
 }
 
 export function formatAppsData(rawData, date) {
@@ -376,6 +427,14 @@ export const processMostUsedApps = (jsonData, date) => {
       }))
 }
 
+const isProductiveCategory = (category) => {
+  if (categoryProductivityMap && categoryProductivityMap[category]) {
+    return categoryProductivityMap[category] === 'productive'
+  }
+  // Fallback to static categories
+  return DEFAULT_FOCUS_CATEGORIES.includes(category)
+}
+
 export const getTotalFocusTime = (jsonData, date, processedChartData, view) => {
   let totalTime = 0
 
@@ -384,7 +443,7 @@ export const getTotalFocusTime = (jsonData, date, processedChartData, view) => {
       return '0'
     }
     for (const app of Object.values(jsonData[date].apps)) {
-      if (focusCategories.includes(app.category)) {
+      if (isProductiveCategory(app.category)) {
         totalTime += app.time
       }
     }

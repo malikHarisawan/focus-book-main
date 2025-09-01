@@ -22,7 +22,7 @@ import asyncio
 import os
 import sys
 from dotenv import load_dotenv
-
+from langchain_google_genai import ChatGoogleGenerativeAI
 load_dotenv()  
 
 # Get the directory where this script is located
@@ -35,6 +35,7 @@ server_params = StdioServerParameters(
 )
 
 async def create_graph(session):
+
     # llm = ChatOpenAI(
     #     # model="gpt-4.1-mini",
     #     model="gpt-4o",
@@ -47,7 +48,23 @@ async def create_graph(session):
         # You'll need to set GOOGLE_API_KEY environment variable
         # Get it from: https://makersuite.google.com/app/apikey
         api_key="AIzaSyBd07mXyPhwKgHbLBsw6oHU0OsdZ6TDeow"
+
+      
+    llm = ChatGoogleGenerativeAI(
+        model="gemini-1.5-flash",
+        temperature=0,
+        # You'll need to set GOOGLE_API_KEY environment variable
+        # Get it from: https://makersuite.google.com/app/apikey
+        # api_key="AIzaSyBd07mXyPhwKgHbLBsw6oHU0OsdZ6TDeow"
+
+      
     )
+    # llm = ChatOpenAI(
+    #     # model="gpt-4.1-mini",
+    #     model="gpt-4o",
+    #     temperature=0,
+    #     api_key="your-openai-api-key-here"
+    # )
 
     tools = await load_mcp_tools(session)
     llm_with_tool = llm.bind_tools(tools)
