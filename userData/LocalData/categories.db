@@ -1,0 +1,8 @@
+{"$$indexCreated":{"fieldName":"type"}}
+{"$$indexCreated":{"fieldName":"name","unique":true}}
+{"name":"Code","type":"productive","createdAt":{"$$date":1753183593128},"updatedAt":{"$$date":1753183593128},"_id":"Yangf5i6BZNYqWv7"}
+{"name":"Browsing","type":"neutral","createdAt":{"$$date":1753183593130},"updatedAt":{"$$date":1753183593130},"_id":"i3KXlz026jMy6wwp"}
+{"name":"Communication","type":"neutral","createdAt":{"$$date":1753183593132},"updatedAt":{"$$date":1753183593132},"_id":"El5Osj9RGMe4T73O"}
+{"name":"Utilities","type":"neutral","createdAt":{"$$date":1753183593133},"updatedAt":{"$$date":1753183593133},"_id":"gIG10kCLzB0oECsf"}
+{"name":"Entertainment","type":"distracted","createdAt":{"$$date":1753183593134},"updatedAt":{"$$date":1753183593134},"_id":"0BKmynyrCSUwMz8F"}
+{"name":"Miscellaneous","type":"neutral","createdAt":{"$$date":1753183593136},"updatedAt":{"$$date":1753183593136},"_id":"VX3XgpsODPx9iuDc"}

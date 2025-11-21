@@ -1,0 +1,19 @@
+{
+  "projectVision": "Brainstorming Organizer - A tool to structure raw ideas into actionable features using a visual Kanban board.",
+  "features": [
+    {
+      "id": "550e8400-e29b-41d4-a716-446655440000",
+      "title": "User Authentication",
+      "description": "Allow users to sign up and log in securely using email or social accounts.",
+      "tags": ["auth", "security"],
+      "phase": "R&D"
+    },
+    {
+      "id": "550e8400-e29b-41d4-a716-446655440001",
+      "title": "Kanban Board UI",
+      "description": "Implement a Trello-style board with draggable cards and horizontally scrollable columns.",
+      "tags": ["ui", "drag-drop"],
+      "phase": "MVP"
+    }
+  ]
+}

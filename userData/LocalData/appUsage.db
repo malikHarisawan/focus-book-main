@@ -1,0 +1,6 @@
+{"$$indexCreated":{"fieldName":"date"}}
+{"$$indexCreated":{"fieldName":"appName"}}
+{"$$indexCreated":{"fieldName":"category"}}
+{"$$indexCreated":{"fieldName":"hour"}}
+{"$$indexCreated":{"fieldName":"date,hour","unique":false}}
+{"$$indexCreated":{"fieldName":"date,appName","unique":false}}

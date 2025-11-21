@@ -1,0 +1,85 @@
+appId: com.focusbook.app
+productName: FocusBook
+directories:
+  buildResources: build
+  output: dist
+files:
+  - out/**/*
+  - package.json
+  - '!**/node_modules/*/{CHANGELOG.md,README.md,README,readme.md,readme}'
+  - '!**/node_modules/*/{test,__tests__,tests,powered-test,example,examples}'
+  - '!**/node_modules/*.d.ts'
+  - '!**/node_modules/.bin'
+  - '!**/*.{iml,o,hprof,orig,pyc,pyo,rbc,swp,csproj,sln,xproj}'
+  - '!.editorconfig'
+  - '!**/._*'
+  - '!**/{.DS_Store,.git,.hg,.svn,CVS,RCS,SCCS,.gitignore,.gitattributes}'
+  - '!**/{__pycache__,thumbs.db,.flowconfig,.idea,.vs,.nyc_output}'
+  - '!**/{appveyor.yml,.travis.yml,circle.yml}'
+  - '!**/{npm-debug.log,yarn.lock,.yarn-integrity,.yarn-metadata.json}'
+extraResources:
+  - from: AI_agent/dist
+    to: ai_service
+    filter:
+      - '**/*'
+  - from: scripts
+    to: scripts
+    filter:
+      - '**/*.py'
+  - from: .
+    to: .
+    filter:
+      - icon.png
+      - icon.ico
+asarUnpack:
+  - resources/**
+win:
+  executableName: FocusBook
+  signAndEditExecutable: false
+  target:
+    - target: nsis
+      arch:
+        - x64
+nsis:
+  oneClick: false
+  allowToChangeInstallationDirectory: true
+  perMachine: true
+  createDesktopShortcut: true
+  createStartMenuShortcut: true
+  shortcutName: FocusBook
+  runAfterFinish: true
+  installerIcon: icon.ico
+  uninstallerIcon: icon.ico
+  artifactName: focusbook-setup.${ext}
+squirrelWindows:
+  iconUrl: https://raw.githubusercontent.com/electron/electron-quick-start/master/build/icon.ico
+  loadingGif: false
+  msi: false
+  remoteReleases: false
+  useAppIdAsId: true
+  name: FocusBook
+buildVersion: 1.0.0
+compression: normal
+mac:
+  entitlementsInherit: build/entitlements.mac.plist
+  extendInfo:
+    - NSCameraUsageDescription: Application requests access to the device's camera.
+    - NSMicrophoneUsageDescription: Application requests access to the device's microphone.
+    - NSDocumentsFolderUsageDescription: Application requests access to the user's Documents folder.
+    - NSDownloadsFolderUsageDescription: Application requests access to the user's Downloads folder.
+  notarize: false
+dmg:
+  artifactName: ${name}-${version}.${ext}
+linux:
+  target:
+    - AppImage
+    - snap
+    - deb
+  maintainer: electronjs.org
+  category: Utility
+appImage:
+  artifactName: ${name}-${version}.${ext}
+npmRebuild: false
+publish:
+  provider: generic
+  url: https://example.com/auto-updates

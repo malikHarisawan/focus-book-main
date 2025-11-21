@@ -1,0 +1,71 @@
+node_modules
+dist
+out
+.DS_Store
+.eslintcache
+*.log*
+focusbook-win32-x64
+installer
+
+# Build artifacts and installers
+Installer.zip
+*.exe
+*.msi
+*.dmg
+*.AppImage
+
+# Database files
+*.db
+*.db-wal
+*.db-shm
+appUsage.db
+userData/*.db
+userData/*.db-wal
+userData/*.db-shm
+
+# Electron build output
+electron-app/
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+develop-eggs/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+MANIFEST
+
+# PyInstaller
+*.manifest
+*.spec
+
+# Environments
+.env
+.venv
+env/
+venv/
+ENV/
+env.bak/
+venv.bak/
+
+# AI_agent specific ignores
+AI_agent/venv/
+AI_agent/build/
+AI_agent/dist/
+AI_agent/.langgraph_api/
+AI_agent/__pycache__/
+AI_agent/*.pyc
+AI_agent/*.spec

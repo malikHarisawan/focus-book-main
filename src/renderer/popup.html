@@ -1,0 +1,263 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Distraction Popup</title>
+    <style>
+      /* General styles */
+      body {
+        margin: 0;
+        padding: 0;
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        height: 100vh;
+        background: #242b3af0;
+
+        color: #ffffff;
+        font-family: 'Arial', sans-serif;
+        overflow: hidden;
+      }
+
+      .main {
+        background: #1e1e2e;
+        padding: 30px;
+        border-radius: 12px;
+        box-shadow: 0 10px 30px rgba(0, 0, 0, 0.7);
+        text-align: center;
+        max-width: 400px;
+        width: 100%;
+        z-index: 2;
+      }
+
+      .popup h2 {
+        font-size: 22px;
+        margin-bottom: 15px;
+      }
+
+      .popup p {
+        font-size: 15px;
+        line-height: 1.6;
+        margin-bottom: 25px;
+      }
+
+      .label-container {
+        margin: 20px 0;
+        background: #28283e;
+        padding: 10px;
+        border-radius: 8px;
+        font-size: 14px;
+        color: #b5b5c3;
+        cursor: pointer;
+      }
+
+      .button-container {
+        display: flex;
+        gap: 10px;
+        justify-content: center;
+      }
+
+      button {
+        flex: 1;
+        padding: 12px 16px;
+        font-size: 14px;
+        border: none;
+        border-radius: 8px;
+        cursor: pointer;
+        transition: all 0.3s ease;
+      }
+
+      #stay-focused {
+        background: #4a90e2;
+        color: #ffffff;
+      }
+
+      #stay-focused:hover {
+        background: #357abd;
+      }
+
+      #reminder {
+        background: #333;
+        color: #cccccc;
+        opacity: 0.4;
+        cursor: not-allowed;
+      }
+
+      #reminder:hover {
+        background: #444;
+      }
+
+      #reminder:enabled {
+        opacity: 1;
+        cursor: pointer;
+      }
+
+      .session-info {
+        background: #28283e;
+        padding: 15px;
+        border-radius: 8px;
+        margin: 20px 0;
+        font-size: 14px;
+        color: #b5b5c3;
+      }
+
+      .session-timer {
+        font-size: 20px;
+        font-weight: bold;
+        color: #4a90e2;
+        margin: 10px 0;
+      }
+
+      .session-type {
+        color: #ffffff;
+        font-weight: bold;
+        text-transform: capitalize;
+      }
+
+      .interruption-note {
+        font-size: 12px;
+        color: #888;
+        margin-top: 10px;
+        font-style: italic;
+      }
+    </style>
+  </head>
+
+  <body>
+    <div class="main">
+      <div class="popup">
+        <h2>Getting Distracted?</h2>
+
+        <div class="session-info" id="session-info" style="display: none">
+          <div>Current Focus Session:</div>
+          <div class="session-type" id="session-type">Focus</div>
+          <div class="session-timer" id="session-timer">25:00</div>
+          <div class="interruption-note">This interruption will be recorded</div>
+        </div>
+
+        <div class="button-container">
+          <button id="stay-focused">Stay Focused</button>
+          <button id="reminder" disabled>Take a Break</button>
+        </div>
+        <div class="label-container" id="dismiss">This is not a distraction</div>
+      </div>
+    </div>
+    <script>
+      const reminderButton = document.getElementById('reminder')
+      const dismiss = document.getElementById('dismiss')
+      const sessionInfo = document.getElementById('session-info')
+      const sessionType = document.getElementById('session-type')
+      const sessionTimer = document.getElementById('session-timer')
+
+      let currentSession = null
+      let sessionUpdateInterval = null
+
+      // Load current session on popup load
+      async function loadCurrentSession() {
+        try {
+          if (window.electronAPI && window.electronAPI.getCurrentFocusSession) {
+            currentSession = await window.electronAPI.getCurrentFocusSession()
+            if (
+              currentSession &&
+              (currentSession.status === 'active' || currentSession.status === 'paused')
+            ) {
+              displaySessionInfo()
+              startSessionTimer()
+            }
+          }
+        } catch (error) {
+          console.error('Error loading session:', error)
+        }
+      }
+
+      function displaySessionInfo() {
+        if (currentSession) {
+          sessionInfo.style.display = 'block'
+          sessionType.textContent = currentSession.type.replace(/([A-Z])/g, ' $1').trim()
+          updateSessionTimer()
+        }
+      }
+
+      function updateSessionTimer() {
+        if (currentSession) {
+          const elapsed = Date.now() - new Date(currentSession.startTime).getTime()
+          const remaining = currentSession.plannedDuration - elapsed
+          const timeLeft = Math.max(0, Math.floor(remaining / 1000))
+
+          const mins = Math.floor(timeLeft / 60)
+          const secs = timeLeft % 60
+          sessionTimer.textContent = `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`
+        }
+      }
+
+      function startSessionTimer() {
+        if (sessionUpdateInterval) {
+          clearInterval(sessionUpdateInterval)
+        }
+
+        sessionUpdateInterval = setInterval(() => {
+          updateSessionTimer()
+        }, 1000)
+      }
+
+      // Record interruption when showing popup
+      async function recordInterruption(appName) {
+        if (
+          currentSession &&
+          window.electronAPI &&
+          window.electronAPI.addFocusSessionInterruption
+        ) {
+          try {
+            await window.electronAPI.addFocusSessionInterruption(
+              currentSession._id,
+              'Application switch',
+              appName
+            )
+          } catch (error) {
+            console.error('Error recording interruption:', error)
+          }
+        }
+      }
+
+      document.getElementById('stay-focused').addEventListener('click', () => {
+        console.log('stay-focus')
+        window.electronAPI.sendToMain('stay-focused')
+      })
+
+      reminderButton.addEventListener('click', () => {
+        console.log('cooool downnnnnnn')
+        window.electronAPI.sendToMain('cooldown')
+      })
+
+      let timeLeft = 0
+      const countdownTimer = setInterval(() => {
+        if (timeLeft <= 0) {
+          clearInterval(countdownTimer)
+          reminderButton.disabled = false
+          reminderButton.textContent = 'Take a Break'
+        } else {
+          reminderButton.textContent = `Take a Break (${timeLeft}s)`
+          timeLeft--
+        }
+      }, 1000)
+
+      dismiss.addEventListener('click', () => {
+        console.log('dismess clicked')
+        window.electronAPI.sendToMain('dismiss')
+      })
+
+      // Load session info when popup opens
+      window.addEventListener('load', () => {
+        loadCurrentSession()
+      })
+
+      // Clean up intervals when popup closes
+      window.addEventListener('beforeunload', () => {
+        if (sessionUpdateInterval) {
+          clearInterval(sessionUpdateInterval)
+        }
+      })
+    </script>
+  </body>
+</html>
