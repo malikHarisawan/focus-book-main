@@ -1,22 +1,16 @@
 name: Build & Release FocusBook
 
 on:
-  # Trigger on push to main branch
   push:
     branches:
       - main
+    tags:
+      - 'v*'
 
-  # Trigger on pull requests
   pull_request:
     branches:
       - main
 
-  # Trigger on new tags (for releases)
-  push:
-    tags:
-      - 'v*'
-
-  # Allow manual trigger
   workflow_dispatch:
 
 jobs:
