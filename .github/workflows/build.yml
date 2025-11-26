@@ -73,7 +73,7 @@ jobs:
           cache-dependency-path: 'AI_agent/requirements.txt'
 
       - name: Install Node dependencies
-        run: npm ci
+        run: npm ci --ignore-scripts
 
       - name: Install Python dependencies
         shell: bash
@@ -81,11 +81,11 @@ jobs:
           python -m pip install --upgrade pip
           pip install -r AI_agent/requirements.txt
 
+      - name: Rebuild native modules for Electron
+        run: npx electron-rebuild -f
+
       - name: Build AI Service
         run: npm run build-ai-service
-
-      - name: Rebuild native modules
-        run: npm run rebuild-native
 
       - name: Build Electron App
         run: npm run build
