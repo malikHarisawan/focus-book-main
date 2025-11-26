@@ -10,12 +10,18 @@ import { useEffect, useState } from 'react'
 import { useTheme } from '../../context/ThemeContext'
 
 export function Sidebar({ productivityScore, dailyGoalProgress, weeklyGoalProgress }) {
-  const { theme } = useTheme()
   const location = useLocation()
   const pathname = location.pathname
+  const { resolvedTheme } = useTheme()
   const [currentSession, setCurrentSession] = useState(null)
   const [timeLeft, setTimeLeft] = useState(0)
   const [isStarting, setIsStarting] = useState(false)
+
+  // Theme-aware glow colors
+  const glowColors = {
+    green: resolvedTheme === 'dark' ? 'rgba(0, 255, 0, 0.7)' : 'rgba(16, 185, 129, 0.6)',
+    orange: resolvedTheme === 'dark' ? 'rgba(255, 153, 0, 0.7)' : 'rgba(249, 115, 22, 0.6)',
+  }
 
   const loadCurrentSession = async () => {
     try {
@@ -94,74 +100,72 @@ export function Sidebar({ productivityScore, dailyGoalProgress, weeklyGoalProgre
   }
 
   return (
-    <Card className={`backdrop-blur-sm w-full min-w-0 ${theme === 'dark' ? 'bg-slate-900/30 border-slate-700/30' : 'bg-white border-gray-100 shadow-sm'}`}>
+    <Card className="backdrop-blur-md w-full min-w-0 border-0 bg-light-bg-card/80 border border-neon-cyan-500/20 dark:bg-dark-bg-card/40 dark:neon-border">
       <CardContent className="p-3 sm:p-4 md:p-5 min-w-0">
-        <div className="flex items-center space-x-2.5 mb-6 sm:mb-8 min-w-0">
-          <Hexagon className="h-5 w-5 sm:h-6 sm:w-6 text-cyan-500 flex-shrink-0" />
-          <span className="text-sm sm:text-base font-bold bg-gradient-to-r from-cyan-400 to-blue-500 bg-clip-text text-transparent truncate min-w-0 tracking-tight">
+        <div className="flex items-center space-x-2.5 mb-6 sm:mb-8 min-w-0 stagger-1">
+          <Hexagon className="h-5 w-5 sm:h-6 sm:w-6 flex-shrink-0 text-neon-cyan-600 dark:text-neon-cyan-500" />
+          <span className="text-sm sm:text-base font-heading font-black tracking-widest truncate min-w-0 uppercase gradient-text dark:neon-glow">
             FOCUS BOOK
           </span>
         </div>
 
         <nav className="space-y-1">
-          <NavItem href="/" icon={Command} label="Dashboard" active={pathname === '/'} theme={theme} />
+          <NavItem href="/" icon={Command} label="Dashboard" active={pathname === '/'} />
           <NavItem
             href="/activity"
             icon={Activity}
             label="Activities"
             active={pathname === '/activity'}
-            theme={theme}
           />
-          <NavItem href="/focus" icon={Timer} label="Focus Timer" active={pathname === '/focus'} theme={theme} />
-          <NavItem href="/chat" icon={MessageSquare} label="AI Insights" active={pathname === '/chat'} theme={theme} />
-          <NavItem href="/tasks" icon={ListTodo} label="Tasks" active={pathname === '/tasks'} theme={theme} />
+          <NavItem href="/focus" icon={Timer} label="Focus Timer" active={pathname === '/focus'} />
+          <NavItem href="/chat" icon={MessageSquare} label="AI Insights" active={pathname === '/chat'} />
+          <NavItem href="/tasks" icon={ListTodo} label="Tasks" active={pathname === '/tasks'} />
           <NavItem
             href="/settings"
             icon={Settings}
             label="Settings"
             active={pathname === '/settings'}
-            theme={theme}
           />
         </nav>
 
         {/* Focus Session Status - Always visible */}
-        <div className={`mt-6 sm:mt-8 pt-5 sm:pt-6 border-t ${theme === 'dark' ? 'border-slate-700/30' : 'border-gray-200'}`}>
-          <div className={`text-xs mb-3 uppercase tracking-wider font-medium ${theme === 'dark' ? 'text-slate-500' : 'text-slate-500'}`}>Focus Session</div>
-          <div className={`rounded-xl p-3 sm:p-4 space-y-3 ${theme === 'dark' ? 'bg-slate-800/30' : 'bg-gray-50 border border-gray-100'}`}>
+        <div className="mt-6 sm:mt-8 pt-5 sm:pt-6 border-t border-neon-cyan-500/30 dark:border-neon-cyan-500/20">
+          <div className="text-xs mb-3 uppercase tracking-widest font-heading font-bold text-neon-cyan-600 dark:text-neon-cyan-500">Focus Session</div>
+          <div className="rounded-none p-3 sm:p-4 space-y-3 transition-all duration-300 bg-light-bg-secondary border border-neon-cyan-500/20 hover:border-neon-cyan-500/40 dark:bg-dark-bg-tertiary/50 dark:border-neon-cyan-500/20 dark:hover:border-neon-cyan-500/40">
             {currentSession && (currentSession.status === 'active' || currentSession.status === 'paused') ? (
               <>
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-2">
                     {currentSession.status === 'active' ? (
                       <>
-                        <div className="w-2 h-2 rounded-full bg-green-500 animate-pulse"></div>
-                        <span className={`text-xs font-medium ${theme === 'dark' ? 'text-green-400' : 'text-green-600'}`}>Active</span>
+                        <div className="w-2 h-2 rounded-full bg-neon-green-500 animate-pulse" style={{boxShadow: `0 0 10px ${glowColors.green}`}}></div>
+                        <span className="text-xs font-heading font-semibold uppercase tracking-wider text-neon-green-600 dark:text-neon-green-400">Active</span>
                       </>
                     ) : (
                       <>
-                        <div className="w-2 h-2 rounded-full bg-yellow-500"></div>
-                        <span className={`text-xs font-medium ${theme === 'dark' ? 'text-yellow-400' : 'text-yellow-600'}`}>Paused</span>
+                        <div className="w-2 h-2 rounded-full bg-neon-orange-500" style={{boxShadow: `0 0 10px ${glowColors.orange}`}}></div>
+                        <span className="text-xs font-heading font-semibold uppercase tracking-wider text-neon-orange-600 dark:text-neon-orange-400">Paused</span>
                       </>
                     )}
                   </div>
-                  <span className={`text-xs capitalize font-medium ${theme === 'dark' ? 'text-slate-400' : 'text-slate-600'}`}>{currentSession.type}</span>
+                  <span className="text-xs capitalize font-heading font-medium tracking-wide text-neon-purple-600 dark:text-neon-purple-400">{currentSession.type}</span>
                 </div>
-                <div className={`text-2xl font-mono font-bold tracking-tight ${theme === 'dark' ? 'text-slate-100' : 'text-slate-900'}`}>{formatTime(timeLeft)}</div>
-                <div className={`text-xs font-medium ${theme === 'dark' ? 'text-slate-500' : 'text-slate-600'}`}>
+                <div className="text-3xl font-heading font-black tracking-tight text-neon-cyan-600 dark:text-neon-cyan-400 dark:neon-glow">{formatTime(timeLeft)}</div>
+                <div className="text-xs font-body font-medium tracking-wide text-slate-600 dark:text-slate-400">
                   {currentSession.type === 'focus' ? 'Time Remaining' : 'Break Time'}
                 </div>
               </>
             ) : (
               <>
                 <div className="flex items-center gap-2">
-                  <div className={`w-2 h-2 rounded-full ${theme === 'dark' ? 'bg-slate-600' : 'bg-gray-400'}`}></div>
-                  <span className={`text-xs font-medium ${theme === 'dark' ? 'text-slate-400' : 'text-slate-600'}`}>No Active Session</span>
+                  <div className="w-2 h-2 rounded-full bg-gray-400 dark:bg-slate-600"></div>
+                  <span className="text-xs font-heading font-medium uppercase tracking-wider text-slate-600 dark:text-slate-500">No Active Session</span>
                 </div>
-                <div className={`text-2xl font-mono font-bold tracking-tight ${theme === 'dark' ? 'text-slate-400' : 'text-slate-400'}`}>00:00</div>
+                <div className="text-3xl font-heading font-black tracking-tight text-slate-400 dark:text-slate-600">00:00</div>
                 <div className="flex flex-col gap-2 mt-1 w-full">
                   <Button
                     size="sm"
-                    className="w-full text-xs font-medium"
+                    className="w-full text-xs font-heading font-semibold tracking-wider uppercase transition-all duration-300 hover-lift bg-neon-cyan-500 text-white border border-neon-cyan-600 hover:bg-neon-cyan-600 dark:bg-neon-cyan-500/20 dark:text-neon-cyan-400 dark:border-neon-cyan-500/50 dark:hover:bg-neon-cyan-500/30 dark:hover:border-neon-cyan-500 dark:neon-border"
                     onClick={startQuickFocusSession}
                     disabled={isStarting}
                   >
@@ -172,11 +176,11 @@ export function Sidebar({ productivityScore, dailyGoalProgress, weeklyGoalProgre
                     size="sm"
                     variant="outline"
                     asChild
-                    className="w-full"
+                    className="w-full font-heading font-medium tracking-wider uppercase transition-all duration-300 hover-lift border-neon-pink-500 text-neon-pink-600 hover:bg-neon-pink-50 dark:border-neon-pink-500/50 dark:text-neon-pink-400 dark:hover:bg-neon-pink-500/10 dark:hover:border-neon-pink-500"
                   >
                     <Link to="/focus" className="flex items-center justify-center">
                       <Timer className="w-3.5 h-3.5 mr-1.5" />
-                      <span className="text-xs font-medium">Custom Timer</span>
+                      <span className="text-xs">Custom Timer</span>
                     </Link>
                   </Button>
                 </div>
@@ -190,24 +194,20 @@ export function Sidebar({ productivityScore, dailyGoalProgress, weeklyGoalProgre
 }
 
 // Component for nav items
-function NavItem({ icon: Icon, label, active, href, theme }) {
+function NavItem({ icon: Icon, label, active, href }) {
   return (
     <Button
       variant="ghost"
       asChild
-      className={`w-full justify-start text-sm px-3 py-2.5 min-w-0 font-medium rounded-lg transition-all ${
-        active
-          ? theme === 'dark'
-            ? 'bg-slate-800/60 text-cyan-400 hover:bg-slate-800/80'
-            : 'bg-cyan-50 text-cyan-600 hover:bg-cyan-100'
-          : theme === 'dark'
-          ? 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/40'
-          : 'text-slate-600 hover:text-slate-900 hover:bg-gray-100'
+      className={`w-full justify-start text-sm px-3 py-2.5 min-w-0 font-body font-medium rounded-none transition-all duration-300 hover-lift group 
+        ${active 
+          ? 'bg-neon-cyan-50 text-neon-cyan-700 border-l-2 border-neon-cyan-500 hover:bg-neon-cyan-100 dark:bg-neon-cyan-500/10 dark:text-neon-cyan-400 dark:border-l-2 dark:border-neon-cyan-500 dark:hover:bg-neon-cyan-500/20 dark:neon-border' 
+          : 'text-slate-600 hover:text-neon-cyan-600 hover:bg-neon-cyan-50 border-l-2 border-transparent hover:border-neon-cyan-500/50 dark:text-slate-400 dark:hover:text-neon-cyan-400 dark:hover:bg-neon-cyan-500/5 dark:border-l-2 dark:border-transparent dark:hover:border-neon-cyan-500/50'
       }`}
     >
       <Link to={href} className="flex items-center min-w-0 w-full gap-2.5">
-        <Icon className="h-4 w-4 flex-shrink-0" />
-        <span className="truncate text-left">{label}</span>
+        <Icon className={`h-4 w-4 flex-shrink-0 transition-transform duration-300 ${active ? 'scale-110' : 'group-hover:scale-110'}`} />
+        <span className="truncate text-left font-body font-medium tracking-wide">{label}</span>
       </Link>
     </Button>
   )

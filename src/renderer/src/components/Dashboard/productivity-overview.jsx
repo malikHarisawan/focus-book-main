@@ -11,7 +11,6 @@ import StatCard from './StatCard'
 import SmartDatePicker from '../shared/smart-date-picker'
 import AppUsageDetails from './AppUsageDetails'
 import { useDate } from '../../context/DateContext'
-import { useTheme } from '../../context/ThemeContext'
 import {
   processUsageChartData,
   processMostUsedApps,
@@ -24,7 +23,6 @@ import {
   getProductivityType
 } from '../../utils/dataProcessor'
 export default function ProductivityOverview() {
-  const { theme } = useTheme()
   const [view, setView] = useState('day')
   const [chartData, setChartData] = useState([])
   const [appsData, setAppsData] = useState([])
@@ -188,10 +186,10 @@ export default function ProductivityOverview() {
   }
 
   return (
-    <Card className={`${theme === 'dark' ? 'bg-slate-900/40 border-slate-800/50' : 'bg-white border-gray-200 shadow-lg'} backdrop-blur-sm overflow-hidden transition-colors h-full`}>
-      <CardHeader className={`border-b ${theme === 'dark' ? 'bg-slate-900/60 border-slate-800/50' : 'bg-white border-gray-100'} py-5 px-6 lg:px-8`}>
+    <Card className="bg-white border-gray-200 shadow-lg dark:bg-slate-900/40 dark:border-slate-800/50 backdrop-blur-sm overflow-hidden transition-colors h-full">
+      <CardHeader className="border-b bg-white border-gray-100 dark:bg-slate-900/60 dark:border-slate-800/50 py-5 px-6 lg:px-8">
         <div className="flex flex-col lg:flex-row items-start lg:items-center justify-between gap-4">
-          <CardTitle className={`${theme === 'dark' ? 'text-slate-100' : 'text-slate-900'} flex items-center text-xl font-semibold tracking-tight`}>
+          <CardTitle className="text-slate-900 dark:text-slate-100 flex items-center text-xl font-semibold tracking-tight">
             <Activity className="mr-3 h-6 w-6 text-cyan-500 flex-shrink-0" />
             <span>Productivity Overview</span>
           </CardTitle>
@@ -201,7 +199,7 @@ export default function ProductivityOverview() {
               onClick={loadAndProcessData}
               variant="ghost"
               size="icon"
-              className={`h-10 w-10 ${theme === 'dark' ? 'text-slate-400 hover:text-slate-200 hover:bg-slate-800' : 'text-slate-600 hover:text-slate-900 hover:bg-gray-100'} flex-shrink-0 transition-colors`}
+              className="h-10 w-10 text-slate-600 hover:text-slate-900 hover:bg-gray-100 dark:text-slate-400 dark:hover:text-slate-200 dark:hover:bg-slate-800 flex-shrink-0 transition-colors"
               title="Refresh data"
             >
               <RefreshCw className="h-5 w-5" />
@@ -214,12 +212,8 @@ export default function ProductivityOverview() {
         <div className="mb-4">
           <div className="grid grid-cols-1 lg:grid-cols-4 gap-3">
             {/* Productivity Score Circle */}
-            <div className={`rounded-lg p-4 border ${
-              theme === 'dark'
-                ? 'bg-slate-800/50 border-slate-700/50'
-                : 'bg-white border-gray-200 shadow-sm'
-            }`}>
-              <div className={`text-xs uppercase tracking-wider font-semibold mb-3 ${theme === 'dark' ? 'text-slate-400' : 'text-slate-600'}`}>
+            <div className="rounded-lg p-4 border bg-white border-gray-200 shadow-sm dark:bg-slate-800/50 dark:border-slate-700/50">
+              <div className="text-xs uppercase tracking-wider font-semibold mb-3 text-slate-600 dark:text-slate-400">
                 Today
               </div>
               <div className="relative w-32 h-32 mx-auto mb-3">
@@ -231,7 +225,7 @@ export default function ProductivityOverview() {
                     stroke="currentColor"
                     strokeWidth="10"
                     fill="transparent"
-                    className={theme === 'dark' ? 'text-slate-700/40' : 'text-gray-200'}
+                    className="text-gray-200 dark:text-slate-700/40"
                   />
                   <circle
                     cx="64"
@@ -252,15 +246,15 @@ export default function ProductivityOverview() {
                 </svg>
                 <div className="absolute inset-0 flex items-center justify-center">
                   <div className={`text-4xl font-bold ${
-                    productivePercentage >= 70 ? theme === 'dark' ? 'text-green-400' : 'text-green-600' :
-                    productivePercentage >= 40 ? theme === 'dark' ? 'text-amber-400' : 'text-amber-600' :
-                    theme === 'dark' ? 'text-red-400' : 'text-red-600'
+                    productivePercentage >= 70 ? 'text-green-600 dark:text-green-400' :
+                    productivePercentage >= 40 ? 'text-amber-600 dark:text-amber-400' :
+                    'text-red-600 dark:text-red-400'
                   }`}>
                     {isNaN(productivePercentage) ? '0' : productivePercentage}%
                   </div>
                 </div>
               </div>
-              <div className={`text-sm text-center font-medium ${theme === 'dark' ? 'text-slate-400' : 'text-slate-600'}`}>
+              <div className="text-sm text-center font-medium text-slate-600 dark:text-slate-400">
                 {productivePercentage >= 70 ? 'Excellent' :
                  productivePercentage >= 40 ? 'Good' :
                  'Needs Work'}
@@ -270,84 +264,72 @@ export default function ProductivityOverview() {
             {/* Time Breakdown */}
             <div className="lg:col-span-3 grid grid-cols-1 sm:grid-cols-3 gap-3">
               {/* Productive */}
-              <div className={`rounded-lg p-4 border ${
-                theme === 'dark'
-                  ? 'bg-slate-800/50 border-green-500/30'
-                  : 'bg-white border-green-200 shadow-sm'
-              }`}>
+              <div className="rounded-lg p-4 border bg-white border-green-200 shadow-sm dark:bg-slate-800/50 dark:border-green-500/30">
                 <div className="flex items-center justify-between mb-2">
-                  <div className={`text-xs uppercase tracking-wide font-semibold ${theme === 'dark' ? 'text-green-400' : 'text-green-700'}`}>
+                  <div className="text-xs uppercase tracking-wide font-semibold text-green-700 dark:text-green-400">
                     Productive
                   </div>
                   <div className="h-2 w-2 rounded-full bg-green-500"></div>
                 </div>
-                <div className={`text-2xl font-bold mb-2 ${theme === 'dark' ? 'text-slate-100' : 'text-slate-900'}`}>
+                <div className="text-2xl font-bold mb-2 text-slate-900 dark:text-slate-100">
                   {Math.floor(productiveTime / 3600)}h {Math.floor((productiveTime % 3600) / 60)}m
                 </div>
                 <div className="flex items-center gap-2">
-                  <div className={`flex-1 rounded-full h-2 overflow-hidden ${theme === 'dark' ? 'bg-slate-700/50' : 'bg-gray-200'}`}>
+                  <div className="flex-1 rounded-full h-2 overflow-hidden bg-gray-200 dark:bg-slate-700/50">
                     <div
                       className="bg-green-500 h-full transition-all duration-500"
                       style={{ width: `${isNaN(productivePercentage) ? 0 : productivePercentage}%` }}
                     ></div>
                   </div>
-                  <span className={`font-bold text-sm ${theme === 'dark' ? 'text-green-400' : 'text-green-600'}`}>
+                  <span className="font-bold text-sm text-green-600 dark:text-green-400">
                     {isNaN(productivePercentage) ? 0 : productivePercentage}%
                   </span>
                 </div>
               </div>
 
               {/* Neutral */}
-              <div className={`rounded-lg p-4 border ${
-                theme === 'dark'
-                  ? 'bg-slate-800/50 border-amber-500/30'
-                  : 'bg-white border-amber-200 shadow-sm'
-              }`}>
+              <div className="rounded-lg p-4 border bg-white border-amber-200 shadow-sm dark:bg-slate-800/50 dark:border-amber-500/30">
                 <div className="flex items-center justify-between mb-2">
-                  <div className={`text-xs uppercase tracking-wide font-semibold ${theme === 'dark' ? 'text-amber-400' : 'text-amber-700'}`}>
+                  <div className="text-xs uppercase tracking-wide font-semibold text-amber-700 dark:text-amber-400">
                     Neutral
                   </div>
                   <div className="h-2 w-2 rounded-full bg-amber-500"></div>
                 </div>
-                <div className={`text-2xl font-bold mb-2 ${theme === 'dark' ? 'text-slate-100' : 'text-slate-900'}`}>
+                <div className="text-2xl font-bold mb-2 text-slate-900 dark:text-slate-100">
                   {Math.floor(neutralTime / 3600)}h {Math.floor((neutralTime % 3600) / 60)}m
                 </div>
                 <div className="flex items-center gap-2">
-                  <div className={`flex-1 rounded-full h-2 overflow-hidden ${theme === 'dark' ? 'bg-slate-700/50' : 'bg-gray-200'}`}>
+                  <div className="flex-1 rounded-full h-2 overflow-hidden bg-gray-200 dark:bg-slate-700/50">
                     <div
                       className="bg-amber-500 h-full transition-all duration-500"
                       style={{ width: `${isNaN(neutralPercentage) ? 0 : neutralPercentage}%` }}
                     ></div>
                   </div>
-                  <span className={`font-bold text-sm ${theme === 'dark' ? 'text-amber-400' : 'text-amber-600'}`}>
+                  <span className="font-bold text-sm text-amber-600 dark:text-amber-400">
                     {isNaN(neutralPercentage) ? 0 : neutralPercentage}%
                   </span>
                 </div>
               </div>
 
               {/* Distracting */}
-              <div className={`rounded-lg p-4 border ${
-                theme === 'dark'
-                  ? 'bg-slate-800/50 border-red-500/30'
-                  : 'bg-white border-red-200 shadow-sm'
-              }`}>
+              <div className="rounded-lg p-4 border bg-white border-red-200 shadow-sm dark:bg-slate-800/50 dark:border-red-500/30">
                 <div className="flex items-center justify-between mb-2">
-                  <div className={`text-xs uppercase tracking-wide font-semibold ${theme === 'dark' ? 'text-red-400' : 'text-red-700'}`}>
+                  <div className="text-xs uppercase tracking-wide font-semibold text-red-700 dark:text-red-400">
                     Distracting
                   </div>
                   <div className="h-2 w-2 rounded-full bg-red-500"></div>
                 </div>
-                <div className={`text-2xl font-bold mb-2 ${theme === 'dark' ? 'text-slate-100' : 'text-slate-900'}`}>
+                <div className="text-2xl font-bold mb-2 text-slate-900 dark:text-slate-100">
                   {Math.floor(distractingTime / 3600)}h {Math.floor((distractingTime % 3600) / 60)}m
                 </div>
                 <div className="flex items-center gap-2">
-                  <div className={`flex-1 rounded-full h-2 overflow-hidden ${theme === 'dark' ? 'bg-slate-700/50' : 'bg-gray-200'}`}>
+                  <div className="flex-1 rounded-full h-2 overflow-hidden bg-gray-200 dark:bg-slate-700/50">
                     <div
                       className="bg-red-500 h-full transition-all duration-500"
                       style={{ width: `${isNaN(distractingPercentage) ? 0 : distractingPercentage}%` }}
                     ></div>
                   </div>
-                  <span className={`font-bold text-sm ${theme === 'dark' ? 'text-red-400' : 'text-red-600'}`}>
+                  <span className="font-bold text-sm text-red-600 dark:text-red-400">
                     {isNaN(distractingPercentage) ? 0 : distractingPercentage}%
                   </span>
                 </div>
@@ -356,16 +338,16 @@ export default function ProductivityOverview() {
           </div>
 
           {/* Total Screen Time Bar */}
-          <div className={`mt-3 p-4 rounded-lg border ${theme === 'dark' ? 'bg-slate-800/30 border-slate-700/50' : 'bg-gray-50 border-gray-200'}`}>
+          <div className="mt-3 p-4 rounded-lg border bg-gray-50 border-gray-200 dark:bg-slate-800/30 dark:border-slate-700/50">
             <div className="flex items-center justify-between mb-3">
-              <span className={`text-xs font-semibold uppercase tracking-wide ${theme === 'dark' ? 'text-slate-400' : 'text-slate-600'}`}>
+              <span className="text-xs font-semibold uppercase tracking-wide text-slate-600 dark:text-slate-400">
                 Total Screen Time
               </span>
-              <span className={`text-xl font-bold ${theme === 'dark' ? 'text-cyan-400' : 'text-cyan-600'}`}>
+              <span className="text-xl font-bold text-cyan-600 dark:text-cyan-400">
                 {totalTimeFormatted}
               </span>
             </div>
-            <div className={`relative w-full rounded-full h-2 overflow-hidden ${theme === 'dark' ? 'bg-slate-700/50' : 'bg-gray-200'}`}>
+            <div className="relative w-full rounded-full h-2 overflow-hidden bg-gray-200 dark:bg-slate-700/50">
               <div
                 className="absolute top-0 left-0 h-full bg-green-500 transition-all duration-500"
                 style={{ width: `${isNaN(productivePercentage) ? 0 : productivePercentage}%` }}
@@ -392,22 +374,22 @@ export default function ProductivityOverview() {
         <div className="mt-5">
           <Tabs defaultValue="categories" className="w-full">
             <div className="flex flex-col lg:flex-row items-start lg:items-center justify-between mb-3 gap-3">
-              <TabsList className={`p-0.5 w-full lg:w-auto ${theme === 'dark' ? 'bg-slate-800/50 border border-slate-700/50' : 'bg-gray-100 border border-gray-200'} rounded-md`}>
+              <TabsList className="p-0.5 w-full lg:w-auto bg-gray-100 border border-gray-200 dark:bg-slate-800/50 dark:border-slate-700/50 rounded-md">
                 <TabsTrigger
                   value="applications"
-                  className={`text-xs px-3 py-1.5 rounded-sm font-medium transition-all ${theme === 'dark' ? 'data-[state=active]:bg-cyan-600 data-[state=active]:text-white text-slate-400' : 'data-[state=active]:bg-cyan-500 data-[state=active]:text-white text-slate-600'}`}
+                  className="text-xs px-3 py-1.5 rounded-sm font-medium transition-all text-slate-600 data-[state=active]:bg-cyan-500 data-[state=active]:text-white dark:text-slate-400 dark:data-[state=active]:bg-cyan-600 dark:data-[state=active]:text-white"
                 >
                   Apps
                 </TabsTrigger>
                 <TabsTrigger
                   value="categories"
-                  className={`text-xs px-3 py-1.5 rounded-sm font-medium transition-all ${theme === 'dark' ? 'data-[state=active]:bg-cyan-600 data-[state=active]:text-white text-slate-400' : 'data-[state=active]:bg-cyan-500 data-[state=active]:text-white text-slate-600'}`}
+                  className="text-xs px-3 py-1.5 rounded-sm font-medium transition-all text-slate-600 data-[state=active]:bg-cyan-500 data-[state=active]:text-white dark:text-slate-400 dark:data-[state=active]:bg-cyan-600 dark:data-[state=active]:text-white"
                 >
                   Timeline
                 </TabsTrigger>
               </TabsList>
 
-              <div className={`flex items-center gap-2 text-[10px] font-medium w-full lg:w-auto justify-center lg:justify-end ${theme === 'dark' ? 'text-slate-400' : 'text-slate-600'}`}>
+              <div className="flex items-center gap-2 text-[10px] font-medium w-full lg:w-auto justify-center lg:justify-end text-slate-600 dark:text-slate-400">
                 <div className="flex items-center gap-1">
                   <div className="h-1 w-1 rounded-full bg-green-500"></div>
                   <span>Productive</span>
@@ -424,12 +406,8 @@ export default function ProductivityOverview() {
             </div>
 
             <TabsContent value="applications" className="mt-0">
-              <div className={`rounded-lg border overflow-hidden h-56 sm:h-64 lg:h-72 flex flex-col ${
-                theme === 'dark' ? 'bg-slate-800/30 border-slate-700/50' : 'bg-white border-gray-200'
-              }`}>
-                <div className={`grid grid-cols-12 text-xs p-2 sm:p-3 border-b flex-shrink-0 ${
-                  theme === 'dark' ? 'text-slate-400 border-slate-700/50 bg-slate-800/50' : 'text-slate-600 border-gray-200 bg-gray-50'
-                }`}>
+              <div className="rounded-lg border overflow-hidden h-56 sm:h-64 lg:h-72 flex flex-col bg-white border-gray-200 dark:bg-slate-800/30 dark:border-slate-700/50">
+                <div className="grid grid-cols-12 text-xs p-2 sm:p-3 border-b flex-shrink-0 text-slate-600 border-gray-200 bg-gray-50 dark:text-slate-400 dark:border-slate-700/50 dark:bg-slate-800/50">
                   <div className="col-span-4 sm:col-span-5">Application</div>
                   <div className="col-span-2 hidden sm:block">Category</div>
                   <div className="col-span-3 sm:col-span-2">Time Spent</div>
@@ -467,9 +445,7 @@ export default function ProductivityOverview() {
             </TabsContent>
 
             <TabsContent value="categories" className="mt-0">
-              <div className={`h-80 lg:h-96 w-full relative rounded-lg overflow-hidden border ${
-                theme === 'dark' ? 'bg-slate-800/40 border-slate-700/50' : 'bg-white shadow-sm border-gray-200'
-              }`}>
+              <div className="h-80 lg:h-96 w-full relative rounded-lg overflow-hidden border bg-white shadow-sm border-gray-200 dark:bg-slate-800/40 dark:border-slate-700/50">
                 <ProductiveAreaChart
                   data={productiveData}
                   rawData={rawData}
@@ -547,10 +523,10 @@ function AppUsageRow({ name, category, timeSpent, timePercent = 100, productivit
   return (
     <div>
       {/* Main Row */}
-      <div className="grid grid-cols-12 py-2 px-2 sm:px-3 text-xs sm:text-sm hover:bg-slate-800/50">
-        <div className="col-span-4 sm:col-span-5 text-slate-300 truncate pr-1">{name}</div>
-        <div className="col-span-2 text-slate-400 hidden sm:block truncate">{category}</div>
-        <div className="col-span-3 sm:col-span-2 text-cyan-400">{timeSpent}</div>
+      <div className="grid grid-cols-12 py-2 px-2 sm:px-3 text-xs sm:text-sm hover:bg-gray-100 dark:hover:bg-slate-800/50">
+        <div className="col-span-4 sm:col-span-5 text-gray-800 dark:text-slate-300 truncate pr-1">{name}</div>
+        <div className="col-span-2 text-gray-600 dark:text-slate-400 hidden sm:block truncate">{category}</div>
+        <div className="col-span-3 sm:col-span-2 text-cyan-600 dark:text-cyan-400">{timeSpent}</div>
         <div className="col-span-3 sm:col-span-2">
           <Badge variant="outline" className={`${getProductivityColor()} text-xs`}>
             <span className="hidden sm:inline">{productivity}</span>
@@ -563,7 +539,7 @@ function AppUsageRow({ name, category, timeSpent, timePercent = 100, productivit
           <Button
             variant="ghost"
             size="sm"
-            className="h-6 w-6 p-0 text-slate-400 hover:text-cyan-400"
+            className="h-6 w-6 p-0 text-gray-600 dark:text-slate-400 hover:text-cyan-600 dark:hover:text-cyan-400"
             onClick={onToggleDetails}
             title={isExpanded ? 'Hide details' : 'Show details'}
           >
@@ -574,15 +550,15 @@ function AppUsageRow({ name, category, timeSpent, timePercent = 100, productivit
 
       {/* Inline Breakdown - Minimalistic */}
       {isExpanded && detailedData.length > 0 && (
-        <div className="bg-slate-800/30 px-4 sm:px-6 py-2 border-t border-slate-700/30">
+        <div className="bg-gray-50 dark:bg-slate-800/30 px-4 sm:px-6 py-2 border-t border-gray-200 dark:border-slate-700/30">
           <div className="space-y-1 max-h-40 overflow-y-auto custom-scrollbar">
             {detailedData.map((detail, index) => (
               <div key={index} className="flex items-center justify-between py-1.5 text-xs">
-                <div className="flex-1 text-slate-400 truncate pr-3 pl-4">
-                  <span className="text-slate-600 mr-2">└</span>
+                <div className="flex-1 text-gray-700 dark:text-slate-400 truncate pr-3 pl-4">
+                  <span className="text-gray-400 dark:text-slate-600 mr-2">└</span>
                   {formatDomain(detail.domain) || detail.name}
                 </div>
-                <div className="text-cyan-400/80 font-mono text-xs">
+                <div className="text-cyan-600 dark:text-cyan-400/80 font-mono text-xs">
                   {detail.time >= 60
                     ? `${Math.floor(detail.time / 60)}h ${detail.time % 60}m`
                     : `${detail.time}m`
@@ -638,9 +614,9 @@ function CategoryChart() {
           ></div>
 
           <div className="absolute inset-0 flex items-center justify-center">
-            <div className="bg-slate-900/80 rounded-full w-24 h-24 flex flex-col items-center justify-center">
-              <div className="text-xs text-slate-400">Total Time</div>
-              <div className="text-lg font-mono text-cyan-400">6h 05m</div>
+            <div className="bg-gray-200 dark:bg-slate-900/80 rounded-full w-24 h-24 flex flex-col items-center justify-center">
+              <div className="text-xs text-gray-600 dark:text-slate-400">Total Time</div>
+              <div className="text-lg font-mono text-cyan-600 dark:text-cyan-400">6h 05m</div>
             </div>
           </div>
         </div>

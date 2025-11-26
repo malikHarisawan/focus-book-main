@@ -21,7 +21,7 @@ const BreadcrumbNavigation = ({
 }) => {
   return (
     <div className="flex items-center gap-2">
-      <span className="text-xs text-gray-500">View:</span>
+      <span className="text-xs text-slate-600 dark:text-gray-500">View:</span>
       {breadcrumbPath.map((level, index) => (
         <div key={level} className="flex items-center gap-1">
           <button
@@ -29,17 +29,17 @@ const BreadcrumbNavigation = ({
             disabled={disabled}
             className={`text-xs px-2 py-1 rounded transition-colors ${
               disabled
-                ? 'text-gray-600 cursor-not-allowed'
+                ? 'text-gray-400 dark:text-gray-600 cursor-not-allowed'
                 : level === currentZoomLevel
                   ? 'bg-cyan-500 text-white'
-                  : 'text-gray-400 hover:text-cyan-400 hover:bg-gray-700'
+                  : 'text-slate-600 dark:text-gray-400 hover:text-cyan-600 dark:hover:text-cyan-400 hover:bg-slate-200 dark:hover:bg-gray-700'
             }`}
             title={disabled ? 'Zoom disabled when range is selected' : `Switch to ${level} view`}
           >
             {level.charAt(0).toUpperCase() + level.slice(1)}
           </button>
           {index < breadcrumbPath.length - 1 && (
-            <ChevronRight size={12} className="text-gray-600" />
+            <ChevronRight size={12} className="text-slate-400 dark:text-gray-600" />
           )}
         </div>
       ))}

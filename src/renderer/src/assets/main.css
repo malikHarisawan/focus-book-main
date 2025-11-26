@@ -1,6 +1,238 @@
+@import url('https://fonts.googleapis.com/css2?family=Orbitron:wght@400;500;600;700;800;900&family=IBM+Plex+Sans:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500;600;700&display=swap');
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
+
+/* Retro-Futuristic Base Styles */
+@layer base {
+  body {
+    font-family: 'IBM Plex Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    font-feature-settings: 'cv11', 'ss01';
+    font-weight: 400;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+
+  h1, h2, h3, h4, h5, h6 {
+    font-family: 'Orbitron', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    font-weight: 700;
+    letter-spacing: 0.01em;
+  }
+
+  h1 {
+    font-weight: 800;
+    letter-spacing: 0.02em;
+  }
+
+  h2 {
+    font-weight: 700;
+  }
+
+  h3, h4, h5, h6 {
+    font-weight: 600;
+  }
+
+  code, pre, .font-mono {
+    font-family: 'JetBrains Mono', 'Courier New', monospace;
+    font-feature-settings: 'liga' 1, 'calt' 1;
+  }
+}
+
+/* Retro-Futuristic Grid Background */
+.retro-grid {
+  background-image:
+    linear-gradient(rgba(0, 255, 255, 0.03) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(0, 255, 255, 0.03) 1px, transparent 1px);
+  background-size: 50px 50px;
+  background-position: 0 0, 0 0;
+  animation: gridScroll 20s linear infinite;
+}
+
+@keyframes gridScroll {
+  0% {
+    background-position: 0 0, 0 0;
+  }
+  100% {
+    background-position: 50px 50px, 50px 50px;
+  }
+}
+
+/* Scan Line Effect */
+.scan-lines::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: linear-gradient(
+    to bottom,
+    transparent 50%,
+    rgba(0, 255, 255, 0.02) 50%
+  );
+  background-size: 100% 4px;
+  pointer-events: none;
+  z-index: 1;
+  animation: scanlineMove 8s linear infinite;
+}
+
+@keyframes scanlineMove {
+  0% {
+    transform: translateY(0);
+  }
+  100% {
+    transform: translateY(4px);
+  }
+}
+
+/* Neon Glow Effects */
+.neon-glow {
+  text-shadow:
+    0 0 10px rgba(0, 255, 255, 0.5),
+    0 0 20px rgba(0, 255, 255, 0.3),
+    0 0 30px rgba(0, 255, 255, 0.2);
+}
+
+.neon-border {
+  box-shadow:
+    0 0 10px rgba(0, 255, 255, 0.3),
+    0 0 20px rgba(0, 255, 255, 0.1),
+    inset 0 0 10px rgba(0, 255, 255, 0.05);
+}
+
+.neon-border-pink {
+  box-shadow:
+    0 0 10px rgba(255, 0, 255, 0.3),
+    0 0 20px rgba(255, 0, 255, 0.1),
+    inset 0 0 10px rgba(255, 0, 255, 0.05);
+}
+
+/* Terminal Flicker Animation */
+.terminal-flicker {
+  animation: flicker 0.15s infinite alternate;
+}
+
+@keyframes flicker {
+  0%, 100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.97;
+  }
+}
+
+/* Page Load Stagger Animations */
+@keyframes fadeInUp {
+  from {
+    opacity: 0;
+    transform: translateY(20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes fadeInLeft {
+  from {
+    opacity: 0;
+    transform: translateX(-20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+@keyframes fadeInScale {
+  from {
+    opacity: 0;
+    transform: scale(0.95);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+@keyframes glitchPulse {
+  0%, 100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.8;
+    text-shadow:
+      2px 0 #00ffff,
+      -2px 0 #ff00ff;
+  }
+}
+
+/* Stagger delays for different elements */
+.stagger-1 {
+  animation: fadeInUp 0.6s ease-out 0.1s both;
+}
+
+.stagger-2 {
+  animation: fadeInUp 0.6s ease-out 0.2s both;
+}
+
+.stagger-3 {
+  animation: fadeInUp 0.6s ease-out 0.3s both;
+}
+
+.stagger-4 {
+  animation: fadeInUp 0.6s ease-out 0.4s both;
+}
+
+.stagger-5 {
+  animation: fadeInUp 0.6s ease-out 0.5s both;
+}
+
+.stagger-left {
+  animation: fadeInLeft 0.6s ease-out 0.1s both;
+}
+
+/* Hover Effects */
+.hover-lift {
+  transition: transform 0.3s cubic-bezier(0.34, 1.56, 0.64, 1), box-shadow 0.3s ease;
+}
+
+.hover-lift:hover {
+  transform: translateY(-4px) scale(1.02);
+}
+
+.hover-glow:hover {
+  box-shadow:
+    0 0 20px rgba(0, 255, 255, 0.4),
+    0 0 40px rgba(0, 255, 255, 0.2),
+    0 4px 20px rgba(0, 0, 0, 0.3);
+}
+
+/* Gradient Text */
+.gradient-text {
+  background: linear-gradient(135deg, #00ffff 0%, #ff00ff 100%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
+
+/* Vignette Effect */
+.vignette::after {
+  content: '';
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  pointer-events: none;
+  background: radial-gradient(
+    ellipse at center,
+    transparent 0%,
+    rgba(0, 0, 0, 0.4) 100%
+  );
+  z-index: 9999;
+}
 
 /* Custom Scrollbar Styling */
 /* Webkit browsers (Chrome, Safari, Edge) */
@@ -10,28 +242,32 @@
 }
 
 ::-webkit-scrollbar-track {
-  background: rgb(30 41 59 / 0.5); /* slate-800/50 */
-  border-radius: 4px;
+  background: rgba(0, 0, 0, 0.3);
+  border-radius: 0;
+  border-left: 1px solid rgba(0, 255, 255, 0.1);
 }
 
 ::-webkit-scrollbar-thumb {
-  background: rgb(71 85 105 / 0.7); /* slate-600/70 */
-  border-radius: 4px;
-  transition: background-color 0.2s ease;
+  background: linear-gradient(180deg, rgba(0, 255, 255, 0.3) 0%, rgba(0, 255, 255, 0.5) 100%);
+  border-radius: 0;
+  border: 1px solid rgba(0, 255, 255, 0.2);
+  transition: all 0.3s ease;
 }
 
 ::-webkit-scrollbar-thumb:hover {
-  background: rgb(71 85 105 / 0.9); /* slate-600/90 */
+  background: linear-gradient(180deg, rgba(0, 255, 255, 0.5) 0%, rgba(0, 255, 255, 0.7) 100%);
+  box-shadow: 0 0 10px rgba(0, 255, 255, 0.5);
 }
 
 ::-webkit-scrollbar-thumb:active {
-  background: rgb(100 116 139 / 0.9); /* slate-500/90 */
+  background: linear-gradient(180deg, rgba(0, 255, 255, 0.7) 0%, rgba(0, 255, 255, 0.9) 100%);
+  box-shadow: 0 0 15px rgba(0, 255, 255, 0.7);
 }
 
 /* Firefox */
 html {
   scrollbar-width: thin;
-  scrollbar-color: rgb(71 85 105 / 0.7) rgb(30 41 59 / 0.5);
+  scrollbar-color: rgba(0, 255, 255, 0.4) rgba(0, 0, 0, 0.3);
 }
 
 /* Custom scrollbar for specific components */
@@ -41,18 +277,20 @@ html {
 }
 
 .custom-scrollbar::-webkit-scrollbar-track {
-  background: rgb(15 23 42 / 0.3); /* slate-900/30 */
-  border-radius: 3px;
+  background: rgba(0, 0, 0, 0.2);
+  border-radius: 0;
 }
 
 .custom-scrollbar::-webkit-scrollbar-thumb {
-  background: rgb(51 65 85 / 0.6); /* slate-700/60 */
-  border-radius: 3px;
-  transition: background-color 0.2s ease;
+  background: linear-gradient(180deg, rgba(0, 255, 255, 0.2) 0%, rgba(0, 255, 255, 0.4) 100%);
+  border-radius: 0;
+  border: 1px solid rgba(0, 255, 255, 0.15);
+  transition: all 0.2s ease;
 }
 
 .custom-scrollbar::-webkit-scrollbar-thumb:hover {
-  background: rgb(51 65 85 / 0.8); /* slate-700/80 */
+  background: linear-gradient(180deg, rgba(0, 255, 255, 0.4) 0%, rgba(0, 255, 255, 0.6) 100%);
+  box-shadow: 0 0 8px rgba(0, 255, 255, 0.4);
 }
 
 /* Hide scrollbar but keep functionality for specific cases */

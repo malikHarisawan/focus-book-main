@@ -64,15 +64,15 @@ export default function BulkCategoryDialog({ apps, onCategorize }) {
   return (
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger asChild>
-        <Button variant="outline" className="bg-slate-800/50 border-slate-700 text-slate-200">
+        <Button variant="outline" className="bg-gray-50 dark:bg-slate-800 border-gray-300 dark:border-slate-700 text-gray-900 dark:text-slate-200 hover:bg-gray-100 dark:hover:bg-slate-700">
           <Tag className="mr-2 h-4 w-4" />
           Bulk Categorize
         </Button>
       </DialogTrigger>
-      <DialogContent className="sm:max-w-[500px] bg-slate-900 border-slate-700 text-slate-200">
+      <DialogContent className="sm:max-w-[500px] bg-white dark:bg-slate-900 border-gray-300 dark:border-slate-700 text-gray-900 dark:text-slate-50">
         <DialogHeader>
-          <DialogTitle>Bulk Categorize Applications</DialogTitle>
-          <DialogDescription className="text-slate-400">
+          <DialogTitle className="text-gray-900 dark:text-slate-50">Bulk Categorize Applications</DialogTitle>
+          <DialogDescription className="text-gray-600 dark:text-slate-400">
             Select multiple applications and assign them to a category.
           </DialogDescription>
         </DialogHeader>
@@ -83,32 +83,32 @@ export default function BulkCategoryDialog({ apps, onCategorize }) {
               variant="outline"
               size="sm"
               onClick={handleSelectAll}
-              className="bg-slate-800/50 border-slate-700 text-slate-200 hover:bg-slate-800 hover:text-slate-100"
+              className="bg-gray-50 dark:bg-slate-800 border-gray-300 dark:border-slate-700 text-gray-900 dark:text-slate-200 hover:bg-gray-100 dark:hover:bg-slate-700"
             >
               {selectedApps.length === apps.length ? 'Deselect All' : 'Select All'}
             </Button>
-            <span className="text-sm text-slate-400">
+            <span className="text-sm text-gray-600 dark:text-slate-400">
               {selectedApps.length} of {apps.length} selected
             </span>
           </div>
 
-          <ScrollArea className="h-[200px] border border-slate-700 rounded-md p-2">
+          <ScrollArea className="h-[200px] border border-gray-300 dark:border-slate-700 rounded-md p-2">
             <div className="space-y-2">
               {apps.map((app) => (
                 <div
                   key={app.id}
-                  className="flex items-center justify-between p-2 rounded hover:bg-slate-800/50"
+                  className="flex items-center justify-between p-2 rounded hover:bg-gray-100 dark:hover:bg-slate-800"
                 >
                   <div className="flex items-center space-x-3">
                     <Checkbox
                       id={`app-${app.id}`}
                       checked={selectedApps.includes(app.id)}
                       onCheckedChange={() => handleToggleApp(app.id)}
-                      className="border-slate-600 data-[state=checked]:bg-cyan-500 data-[state=checked]:border-cyan-500"
+                      className="border-gray-300 dark:border-slate-600 data-[state=checked]:bg-cyan-500 data-[state=checked]:border-cyan-500"
                     />
                     <label
                       htmlFor={`app-${app.id}`}
-                      className="text-sm font-medium leading-none cursor-pointer flex items-center"
+                      className="text-sm font-medium leading-none cursor-pointer flex items-center text-gray-900 dark:text-slate-200"
                     >
                       {app.name}
                     </label>
@@ -120,12 +120,12 @@ export default function BulkCategoryDialog({ apps, onCategorize }) {
           </ScrollArea>
 
           <div className="space-y-2">
-            <label className="text-sm font-medium text-slate-400">Target Category</label>
+            <label className="text-sm font-medium text-gray-700 dark:text-slate-300">Target Category</label>
             <Select value={selectedCategory} onValueChange={setSelectedCategory}>
-              <SelectTrigger className="bg-slate-800/50 border-slate-700 text-slate-200">
+              <SelectTrigger className="bg-gray-50 dark:bg-slate-800 border-gray-300 dark:border-slate-700 text-gray-900 dark:text-slate-200">
                 <SelectValue placeholder="Select category" />
               </SelectTrigger>
-              <SelectContent className="bg-slate-900 border-slate-700 text-slate-200">
+              <SelectContent className="bg-white dark:bg-slate-900 border-gray-300 dark:border-slate-700 text-gray-900 dark:text-slate-50">
                 {categories.map((category) => (
                   <SelectItem key={category} value={category}>
                     <div className="flex items-center">
@@ -142,14 +142,14 @@ export default function BulkCategoryDialog({ apps, onCategorize }) {
           <Button
             variant="ghost"
             onClick={() => setOpen(false)}
-            className="text-slate-400 hover:text-slate-100 hover:bg-slate-800"
+            className="text-gray-600 dark:text-slate-400 hover:text-gray-900 dark:hover:text-slate-200 hover:bg-gray-100 dark:hover:bg-slate-800"
           >
             Cancel
           </Button>
           <Button
             onClick={handleCategorize}
             disabled={selectedApps.length === 0 || !selectedCategory}
-            className="bg-cyan-600 hover:bg-cyan-700 text-white"
+            className="bg-cyan-500 hover:bg-cyan-600 text-white disabled:opacity-50 disabled:cursor-not-allowed"
           >
             <Check className="mr-2 h-4 w-4" />
             Apply Category

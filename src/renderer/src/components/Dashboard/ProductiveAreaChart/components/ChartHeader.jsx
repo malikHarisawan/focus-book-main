@@ -27,14 +27,14 @@ const ChartHeader = ({
   return (
     <div className="flex justify-between items-center">
       <div className="flex items-center gap-3">
-        <h3 className="text-white text-sm font-medium">Productivity Over Time</h3>
+        <h3 className="text-slate-800 dark:text-white text-sm font-medium">Productivity Over Time</h3>
         <div className="flex items-center gap-2">
-          <span className="text-xs text-gray-400 bg-gray-700 px-2 py-1 rounded">
+          <span className="text-xs text-slate-600 dark:text-gray-400 bg-slate-200 dark:bg-gray-700 px-2 py-1 rounded">
             {zoomLevelLabel}
           </span>
           <button
             onClick={onToggleHelp}
-            className="text-gray-400 hover:text-cyan-400 transition-colors"
+            className="text-slate-600 dark:text-gray-400 hover:text-cyan-600 dark:hover:text-cyan-400 transition-colors"
             title="Help & Controls"
           >
             <HelpCircle size={14} />
@@ -46,7 +46,7 @@ const ChartHeader = ({
         {selectedRange && (
           <button
             onClick={onClearSelection}
-            className="text-cyan-400 hover:text-cyan-300 text-xs px-3 py-1 rounded border border-cyan-400 hover:border-cyan-300 transition-colors"
+            className="text-cyan-600 dark:text-cyan-400 hover:text-cyan-700 dark:hover:text-cyan-300 text-xs px-3 py-1 rounded border border-cyan-600 dark:border-cyan-400 hover:border-cyan-700 dark:hover:border-cyan-300 transition-colors"
           >
             Clear Selection
           </button>

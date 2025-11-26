@@ -38,6 +38,9 @@ import ZoomProgressIndicator from './components/ZoomProgressIndicator'
 import HelpPanel from './components/HelpPanel'
 import CustomTooltip from './components/CustomTooltip'
 
+// Import theme hook
+import { useTheme } from '../../../context/ThemeContext'
+
 // Import custom hooks
 import useZoomState from './hooks/useZoomState'
 import useSelectionState from './hooks/useSelectionState'
@@ -61,6 +64,18 @@ const ProductiveAreaChart = ({
   onZoomLevelChange,
   onSelectionChange
 }) => {
+  // Get current theme
+  const { resolvedTheme } = useTheme()
+
+  // Theme-aware colors
+  const chartColors = {
+    productive: resolvedTheme === 'dark' ? '#82ca9d' : '#10b981', // green
+    unproductive: resolvedTheme === 'dark' ? '#ff6b6b' : '#ef4444', // red
+    selection: resolvedTheme === 'dark' ? '#06b6d4' : '#0891b2', // cyan
+    grid: resolvedTheme === 'dark' ? '#475569' : '#cbd5e1', // slate
+    text: resolvedTheme === 'dark' ? '#ffffff' : '#1e293b', // white/slate
+  }
+
   // State management using custom hooks
   const {
     zoomLevel,
@@ -257,21 +272,21 @@ const ProductiveAreaChart = ({
   // Loading state
   if (!currentData || currentData.length === 0) {
     return (
-      <div className="bg-gray-800 p-4 rounded-md h-[250px] flex items-center justify-center">
+      <div className="bg-slate-100 dark:bg-gray-800 p-4 rounded-md h-[250px] flex items-center justify-center">
         {isLoading ? (
-          <div className="flex items-center gap-2 text-cyan-400">
-            <div className="animate-spin w-4 h-4 border-2 border-cyan-400 border-t-transparent rounded-full"></div>
+          <div className="flex items-center gap-2 text-cyan-600 dark:text-cyan-400">
+            <div className="animate-spin w-4 h-4 border-2 border-cyan-600 dark:border-cyan-400 border-t-transparent rounded-full"></div>
             <span>Loading data...</span>
           </div>
         ) : (
-          <span className="text-gray-500">No data available</span>
+          <span className="text-gray-600 dark:text-gray-500">No data available</span>
         )}
       </div>
     )
   }
 
   return (
-    <div ref={containerRef} className="bg-gray-800 p-4 rounded-md" tabIndex={0}>
+    <div ref={containerRef} className="bg-slate-100 dark:bg-gray-800 p-4 rounded-md" tabIndex={0}>
       <div className="space-y-3 mb-4">
         <ChartHeader
           zoomLevelLabel={zoomLevelDisplay.label}
@@ -315,20 +330,20 @@ const ProductiveAreaChart = ({
         >
           <defs>
             <linearGradient id="colorProductive" x1="0" y1="0" x2="0" y2="1">
-              <stop offset="5%" stopColor="#82ca9d" stopOpacity={0.8} />
-              <stop offset="95%" stopColor="#82ca9d" stopOpacity={0} />
+              <stop offset="5%" stopColor={chartColors.productive} stopOpacity={0.8} />
+              <stop offset="95%" stopColor={chartColors.productive} stopOpacity={0} />
             </linearGradient>
             <linearGradient id="colorUnproductive" x1="0" y1="0" x2="0" y2="1">
-              <stop offset="5%" stopColor="#ff6b6b" stopOpacity={0.8} />
-              <stop offset="95%" stopColor="#ff6b6b" stopOpacity={0} />
+              <stop offset="5%" stopColor={chartColors.unproductive} stopOpacity={0.8} />
+              <stop offset="95%" stopColor={chartColors.unproductive} stopOpacity={0} />
             </linearGradient>
           </defs>
           <XAxis
             dataKey="day"
-            stroke="#ffffff"
+            stroke={chartColors.text}
             style={{ userSelect: 'none', WebkitUserSelect: 'none', MozUserSelect: 'none' }}
           />
-          <CartesianGrid strokeDasharray="3 3" />
+          <CartesianGrid strokeDasharray="3 3" stroke={chartColors.grid} />
           <Tooltip
             content={
               <CustomTooltip
@@ -343,23 +358,23 @@ const ProductiveAreaChart = ({
             type="monotone"
             dataKey="productive"
             name="Productive"
-            stroke="#82ca9d"
+            stroke={chartColors.productive}
             fill="url(#colorProductive)"
           />
           <Area
             type="monotone"
             dataKey="unproductive"
             name="Unproductive"
-            stroke="#ff6b6b"
+            stroke={chartColors.unproductive}
             fill="url(#colorUnproductive)"
           />
           {isDragging && dragStart && dragEnd && (
             <ReferenceArea
               x1={dragStart}
               x2={dragEnd}
-              fill="#06b6d4"
+              fill={chartColors.selection}
               fillOpacity={0.4}
-              stroke="#06b6d4"
+              stroke={chartColors.selection}
               strokeWidth={2}
               strokeDasharray="4 4"
             />
@@ -368,9 +383,9 @@ const ProductiveAreaChart = ({
             <ReferenceArea
               x1={currentData[selectedRange.startIndex]?.day}
               x2={currentData[selectedRange.endIndex]?.day}
-              fill="#06b6d4"
+              fill={chartColors.selection}
               fillOpacity={0.25}
-              stroke="#06b6d4"
+              stroke={chartColors.selection}
               strokeWidth={2}
             />
           )}

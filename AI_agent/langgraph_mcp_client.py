@@ -21,27 +21,67 @@ from langchain_google_genai import ChatGoogleGenerativeAI
 import asyncio
 import os
 import sys
-from dotenv import load_dotenv
-
-load_dotenv()  
 
 # Get the directory where this script is located
 current_dir = os.path.dirname(os.path.abspath(__file__))
 
+# Pass environment variables to MCP server subprocess
+# This ensures the subprocess has access to FOCUSBOOK_DB_PATH
 server_params = StdioServerParameters(
     command=sys.executable,
     args=[os.path.join(current_dir, "math_mcp_server.py")],
-    env=os.environ.copy(),
+    env=os.environ.copy()  # Pass all environment variables to subprocess
 )
 
 async def create_graph(session):
-    llm = ChatOpenAI(
-        # model="gpt-4.1-mini",
-        model="gpt-4o",
-        temperature=0,
-        api_key=os.getenv("OPENAI_API_KEY")
-    )
-    
+    """
+    Create LangGraph agent with AI model from environment variables.
+
+    Environment variables (set by Electron app via start_service.py):
+    - AI_PROVIDER: 'openai' or 'gemini' (default: 'openai')
+    - OPENAI_API_KEY: API key for OpenAI
+    - GEMINI_API_KEY: API key for Google Gemini
+    """
+    # Get AI provider from environment variable (default to 'openai')
+    provider = os.getenv("AI_PROVIDER", "openai").lower()
+
+    print(f"Initializing AI service with provider: {provider}")
+
+    # Initialize LLM based on provider using environment variables
+    if provider == "gemini":
+        # Get Gemini API key from environment variable
+        gemini_api_key = os.getenv("GEMINI_API_KEY")
+
+        if not gemini_api_key:
+            raise ValueError(
+                "GEMINI_API_KEY environment variable is not set. "
+                "Please configure your API key in the Settings page."
+            )
+
+        llm = ChatGoogleGenerativeAI(
+            model="gemini-2.5-flash",
+            temperature=0,
+            api_key=gemini_api_key
+        )
+        print(f"Using Gemini model: gemini-2.5-flash")
+    else:
+        # Default to OpenAI
+        # Get OpenAI API key from environment variable
+        openai_api_key = os.getenv("OPENAI_API_KEY")
+
+        if not openai_api_key:
+            raise ValueError(
+                "OPENAI_API_KEY environment variable is not set. "
+                "Please configure your API key in the Settings page."
+            )
+
+        llm = ChatOpenAI(
+            model="gpt-4o",
+            temperature=0,
+            api_key=openai_api_key
+        )
+        print(f"Using OpenAI model: gpt-4o")
+
     tools = await load_mcp_tools(session)
     llm_with_tool = llm.bind_tools(tools)
 
@@ -75,18 +115,6 @@ async def main():
         async with ClientSession(read, write) as session:
             await session.initialize()
 
-            # tools = await load_mcp_tools(session)
-            # print("Available tools:", [tool.name for tool in tools])
-
-            # example_prompt = await load_mcp_prompt(session, "example_prompt", arguments={"question": "what is 2+2"})
-            # print("example_prompt:", example_prompt[0].content)
-
-            # system_prompt = await load_mcp_prompt(session, "system_prompt")
-            # print("system_prompt:", system_prompt[0].content)
-
-            # resources = await load_mcp_resources(session, uris=["greeting://Alice", "config://app"])
-            # print("Available resources:", [res.data for res in resources])
-
             agent = await create_graph(session)
 
             #  Initialize LangChain memory
@@ -108,7 +136,3 @@ async def main():
 if __name__ == "__main__":
 
     asyncio.run(main())
-
-
-
-

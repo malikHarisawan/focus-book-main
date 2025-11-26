@@ -1,9 +1,7 @@
 import { useState, useEffect } from 'react'
 import { Minus, Square, X, Maximize2, Minimize2 } from 'lucide-react'
-import { useTheme } from '../../context/ThemeContext'
 
 export function TitleBar() {
-  const { theme } = useTheme()
   const [isMaximized, setIsMaximized] = useState(false)
 
   useEffect(() => {
@@ -41,16 +39,12 @@ export function TitleBar() {
 
   return (
     <div
-      className={`h-8 flex items-center justify-between px-4 select-none ${
-        theme === 'dark'
-          ? 'bg-slate-900/95 border-b border-slate-800/50'
-          : 'bg-white/95 border-b border-gray-200'
-      }`}
+      className="h-8 flex items-center justify-between px-4 select-none backdrop-blur-md transition-all bg-white/80 border-b border-neon-cyan-500/30 dark:bg-black/80 dark:border-b dark:border-neon-cyan-500/20"
       style={{ WebkitAppRegion: 'drag' }}
     >
       {/* App Title */}
       <div className="flex items-center gap-2">
-        <span className={`text-xs font-semibold ${theme === 'dark' ? 'text-cyan-400' : 'text-cyan-600'}`}>
+        <span className="text-xs font-heading font-bold tracking-widest uppercase text-neon-cyan-600 dark:text-neon-cyan-500 dark:neon-glow">
           FocusBook
         </span>
       </div>
@@ -59,33 +53,21 @@ export function TitleBar() {
       <div className="flex items-center" style={{ WebkitAppRegion: 'no-drag' }}>
         <button
           onClick={handleMinimize}
-          className={`h-8 w-10 flex items-center justify-center transition-colors ${
-            theme === 'dark'
-              ? 'hover:bg-slate-700/50 text-slate-400 hover:text-slate-200'
-              : 'hover:bg-gray-100 text-slate-600 hover:text-slate-900'
-          }`}
+          className="h-8 w-10 flex items-center justify-center transition-all duration-200 text-slate-600 hover:text-neon-cyan-600 hover:bg-neon-cyan-500/10 dark:text-slate-400 dark:hover:text-neon-cyan-500 dark:hover:bg-neon-cyan-500/10"
           title="Minimize"
         >
           <Minus size={14} />
         </button>
         <button
           onClick={handleMaximize}
-          className={`h-8 w-10 flex items-center justify-center transition-colors ${
-            theme === 'dark'
-              ? 'hover:bg-slate-700/50 text-slate-400 hover:text-slate-200'
-              : 'hover:bg-gray-100 text-slate-600 hover:text-slate-900'
-          }`}
+          className="h-8 w-10 flex items-center justify-center transition-all duration-200 text-slate-600 hover:text-neon-cyan-600 hover:bg-neon-cyan-500/10 dark:text-slate-400 dark:hover:text-neon-cyan-500 dark:hover:bg-neon-cyan-500/10"
           title={isMaximized ? 'Restore' : 'Maximize'}
         >
           {isMaximized ? <Minimize2 size={14} /> : <Maximize2 size={14} />}
         </button>
         <button
           onClick={handleClose}
-          className={`h-8 w-10 flex items-center justify-center transition-colors ${
-            theme === 'dark'
-              ? 'hover:bg-red-600 text-slate-400 hover:text-white'
-              : 'hover:bg-red-500 text-slate-600 hover:text-white'
-          }`}
+          className="h-8 w-10 flex items-center justify-center transition-all duration-200 text-slate-600 hover:text-white hover:bg-neon-pink-500/80 dark:text-slate-400 dark:hover:text-white dark:hover:bg-neon-pink-600/80 dark:hover:neon-border-pink"
           title="Close"
         >
           <X size={14} />

@@ -14,7 +14,7 @@ export default function useCategoryChangeToast() {
           <span>
             <strong>{appName}</strong> is now categorized as <strong>{category}</strong>
           </span>
-          <Check className="ml-2 h-4 w-4 text-green-400" />
+          <Check className="ml-2 h-4 w-4 text-primary" />
         </div>
       ),
       duration: 3000

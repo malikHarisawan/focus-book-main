@@ -42,7 +42,17 @@ import CategoryBadge from './category-badge'
 import BulkCategoryDialog from './bulk-categories-dialog'
 import { formatAppsData } from '../../utils/dataProcessor'
 import { useDate } from '../../context/DateContext'
+import { useTheme } from '../../context/ThemeContext'
+
 export default function AppUsageTable() {
+  const { resolvedTheme } = useTheme()
+
+  // Theme-aware colors for timeline grid
+  const gridBorderColors = {
+    major: resolvedTheme === 'dark' ? 'rgba(148, 163, 184, 0.4)' : 'rgba(100, 116, 139, 0.3)',
+    minor: resolvedTheme === 'dark' ? 'rgba(148, 163, 184, 0.15)' : 'rgba(148, 163, 184, 0.1)',
+  }
+
   const [filter, setFilter] = useState('All')
   const [sortBy, setSortBy] = useState('timeSpent')
   const [sortOrder, setSortOrder] = useState('desc')
@@ -173,48 +183,48 @@ export default function AppUsageTable() {
   const getCategoryIcon = (category) => {
     switch (category) {
       case 'Browsing':
-        return <Globe className="h-4 w-4 text-blue-400" />
+        return <Globe className="h-4 w-4 text-blue-500 dark:text-blue-400" />
       case 'Code':
-        return <CodeIcon className="h-4 w-4 text-cyan-400" />
+        return <CodeIcon className="h-4 w-4 text-cyan-600 dark:text-cyan-400" />
       case 'Documenting':
-        return <FileText className="h-4 w-4 text-green-400" />
+        return <FileText className="h-4 w-4 text-green-600 dark:text-green-400" />
       case 'Entertainment':
-        return <Video className="h-4 w-4 text-red-400" />
+        return <Video className="h-4 w-4 text-red-600 dark:text-red-400" />
       case 'Learning':
-        return <BookOpen className="h-4 w-4 text-purple-400" />
+        return <BookOpen className="h-4 w-4 text-purple-600 dark:text-purple-400" />
       case 'Messaging':
       case 'Communication':
-        return <MessageSquare className="h-4 w-4 text-indigo-400" />
+        return <MessageSquare className="h-4 w-4 text-indigo-600 dark:text-indigo-400" />
       case 'Miscellaneous':
-        return <Package className="h-4 w-4 text-slate-400" />
+        return <Package className="h-4 w-4 text-slate-600 dark:text-slate-400" />
       case 'Personal':
-        return <User className="h-4 w-4 text-pink-400" />
+        return <User className="h-4 w-4 text-pink-600 dark:text-pink-400" />
       case 'Productivity':
-        return <Briefcase className="h-4 w-4 text-amber-400" />
+        return <Briefcase className="h-4 w-4 text-amber-600 dark:text-amber-400" />
       case 'Utility':
-        return <Terminal className="h-4 w-4 text-emerald-400" />
+        return <Terminal className="h-4 w-4 text-emerald-600 dark:text-emerald-400" />
       default:
-        return <Package className="h-4 w-4 text-slate-400" />
+        return <Package className="h-4 w-4 text-slate-600 dark:text-slate-400" />
     }
   }
   const handleDate = (e) => {
     handleDateChange(e.target.value)
   }
   return (
-    <Card className="bg-slate-900/50 border-slate-700/50 backdrop-blur-sm">
-      <CardHeader className="border-b border-slate-700/50 pb-3">
+    <Card className="bg-background/50 border-border/50 backdrop-blur-sm">
+      <CardHeader className="border-b border-border/50 pb-3">
         <div className="flex items-center justify-between">
-          <CardTitle className="text-slate-100">Application Usage</CardTitle>
+          <CardTitle className="text-foreground">Application Usage</CardTitle>
           <div className="flex items-center space-x-2">
-            <div className="relative inline-flex items-center bg-slate-800/50 text-cyan-400 border border-cyan-500/50 text-xs px-2 py-1 rounded-md">
+            <div className="relative inline-flex items-center bg-muted/50 text-primary border border-primary/50 text-xs px-2 py-1 rounded-md">
               <input
                 type="date"
                 value={selectedDate}
                 onChange={handleDate}
-                className="bg-transparent text-cyan-400 outline-none text-xs"
+                className="bg-transparent text-primary outline-none text-xs"
               />
 
-              <Calendar className="absolute right-2 w-4 h-4 text-cyan-400 pointer-events-none" />
+              <Calendar className="absolute right-2 w-4 h-4 text-primary pointer-events-none" />
             </div>
 
             <DropdownMenu>
@@ -222,7 +232,7 @@ export default function AppUsageTable() {
                 <Button
                   variant="outline"
                   size="sm"
-                  className="h-8 border-slate-700 bg-slate-800/50"
+                  className="h-8 border-border bg-muted/50"
                 >
                   <Filter className="mr-2 h-4 w-4" />
                   {filter}
@@ -230,7 +240,7 @@ export default function AppUsageTable() {
               </DropdownMenuTrigger>
               <DropdownMenuContent
                 align="end"
-                className="bg-slate-900 border-slate-700 text-slate-50 cursor-default"
+                className="bg-background border-border text-foreground cursor-default"
               >
                 <DropdownMenuItem onClick={() => setFilter('All')}>All</DropdownMenuItem>
                 <DropdownMenuItem onClick={() => setFilter('Productive')}>
@@ -249,7 +259,7 @@ export default function AppUsageTable() {
               onClick={loadApps}
               variant="ghost"
               size="icon"
-              className="h-8 w-8 text-slate-400"
+              className="h-8 w-8 text-muted-foreground"
             >
               <RefreshCw className="h-4 w-4" />
             </Button>
@@ -259,43 +269,43 @@ export default function AppUsageTable() {
       <CardContent className="p-0">
         <Tabs defaultValue="table" className="w-full">
           <div className="px-6 pt-6 pb-2 flex items-center justify-between">
-            <TabsList className="bg-slate-800/50 p-1">
+            <TabsList className="bg-muted/50 p-1">
               <TabsTrigger
                 value="table"
-                className="data-[state=active]:bg-slate-700 data-[state=active]:text-cyan-400"
+                className="data-[state=active]:bg-muted data-[state=active]:text-primary"
               >
                 Table
               </TabsTrigger>
               <TabsTrigger
                 value="timeline"
-                className="data-[state=active]:bg-slate-700 data-[state=active]:text-cyan-400"
+                className="data-[state=active]:bg-muted data-[state=active]:text-primary"
               >
                 Timeline
               </TabsTrigger>
               <TabsTrigger
                 value="stats"
-                className="data-[state=active]:bg-slate-700 data-[state=active]:text-cyan-400"
+                className="data-[state=active]:bg-muted data-[state=active]:text-primary"
               >
                 Stats
               </TabsTrigger>
             </TabsList>
 
             <div className="flex items-center space-x-4">
-              <div className="text-sm text-slate-400">
-                Total time: <span className="text-cyan-400 font-mono">{totalTimeFormatted}</span>
+              <div className="text-sm text-muted-foreground">
+                Total time: <span className="text-primary font-mono">{totalTimeFormatted}</span>
               </div>
             </div>
           </div>
 
           <TabsContent value="table" className="mt-0">
-            <div className="rounded-md border border-slate-700/50 overflow-hidden mx-6 mb-6">
+            <div className="rounded-md border border-border/50 overflow-hidden mx-6 mb-6">
               <Table>
-                <TableHeader className="bg-slate-800/50">
-                  <TableRow className="hover:bg-slate-800/80 border-slate-700/50">
-                    <TableHead className="text-slate-400 w-[300px]">
+                <TableHeader className="bg-muted/50">
+                  <TableRow className="hover:bg-muted/80 border-border/50">
+                    <TableHead className="text-muted-foreground w-[300px]">
                       <Button
                         variant="ghost"
-                        className="p-0 font-medium text-slate-400 hover:text-slate-100"
+                        className="p-0 font-medium text-muted-foreground hover:text-foreground"
                         onClick={() => toggleSort('name')}
                       >
                         Application
@@ -304,11 +314,11 @@ export default function AppUsageTable() {
                         )}
                       </Button>
                     </TableHead>
-                    <TableHead className="text-slate-400">Category</TableHead>
-                    <TableHead className="text-slate-400">
+                    <TableHead className="text-muted-foreground">Category</TableHead>
+                    <TableHead className="text-muted-foreground">
                       <Button
                         variant="ghost"
-                        className="p-0 font-medium text-slate-400 hover:text-slate-100"
+                        className="p-0 font-medium text-muted-foreground hover:text-foreground"
                         onClick={() => toggleSort('timeSpent')}
                       >
                         Time Spent
@@ -317,57 +327,59 @@ export default function AppUsageTable() {
                         )}
                       </Button>
                     </TableHead>
-                    <TableHead className="text-slate-400">Productivity</TableHead>
+                    <TableHead className="text-muted-foreground">Productivity</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
                   {filteredData
                     .filter((app) => app.timeSpentSeconds > 60)
                     .map((app) => (
-                      <TableRow key={app.id} className="hover:bg-slate-800/50 border-slate-700/30">
-                        <TableCell className="font-medium text-slate-300">
+                      <TableRow key={app.id} className="hover:bg-muted/50 border-border/30">
+                        <TableCell className="font-medium text-foreground">
                           <div className="flex items-center">
                             <span className="mr-2 text-lg">{app.icon}</span>
                             {app.name}
                           </div>
                         </TableCell>
-                        <TableCell className="text-slate-400">
-                          <div className="flex items-center space-x-2 text-slate-400">
+                        <TableCell className="text-muted-foreground">
+                          <div className="flex items-center space-x-2 text-muted-foreground">
                             <CategoryBadge category={app.category} />
                           </div>
                         </TableCell>
-                        <TableCell className="text-cyan-400 font-mono">{app.timeSpent}</TableCell>
+                        <TableCell className="text-primary font-mono">{app.timeSpent}</TableCell>
                         <TableCell>
                           <ProductivityBadge productivity={app.productivity} />
                         </TableCell>
-                        <TableCell className="text-slate-400">{app.lastUsed}</TableCell>
-                        <TableCell className="text-slate-400">{app.sessions}</TableCell>
+                        <TableCell className="text-muted-foreground">{app.lastUsed}</TableCell>
+                        <TableCell className="text-muted-foreground">{app.sessions}</TableCell>
                         <TableCell className="text-right">
                           <DropdownMenu className="hover:cursor-pointer">
                             <DropdownMenuTrigger asChild>
                               <Button
                                 variant="ghost"
                                 size="icon"
-                                className="h-8 w-8 text-slate-400"
+                                className="h-8 w-8 text-muted-foreground"
                               >
                                 <MoreHorizontal className="h-4 w-4" />
                               </Button>
                             </DropdownMenuTrigger>
                             <DropdownMenuContent
                               align="end"
-                              className="bg-slate-900 border-slate-700 text-slate-50 hover:cursor-pointer"
+                              className="bg-white dark:bg-slate-900 border-gray-300 dark:border-slate-700 text-gray-900 dark:text-slate-50 shadow-xl"
                             >
-                              <DropdownMenuLabel>Actions</DropdownMenuLabel>
-                              <DropdownMenuSeparator className="bg-slate-700" />
-                              <DropdownMenuItem>View Details</DropdownMenuItem>
+                              <DropdownMenuLabel className="text-gray-900 dark:text-slate-200">Actions</DropdownMenuLabel>
+                              <DropdownMenuSeparator className="bg-gray-300 dark:bg-slate-700" />
+                              <DropdownMenuItem className="hover:bg-gray-100 dark:hover:bg-slate-800 cursor-pointer">
+                                View Details
+                              </DropdownMenuItem>
 
                               {/* Add category submenu */}
                               <DropdownMenuSub>
-                                <DropdownMenuSubTrigger className="flex items-center">
+                                <DropdownMenuSubTrigger className="flex items-center hover:bg-gray-100 dark:hover:bg-slate-800">
                                   <Tag className="h-4 w-4 mr-2" />
                                   <span>Change Category</span>
                                 </DropdownMenuSubTrigger>
-                                <DropdownMenuSubContent className="bg-slate-900 border-slate-700">
+                                <DropdownMenuSubContent className="bg-white dark:bg-slate-900 border-gray-300 dark:border-slate-700 text-gray-900 dark:text-slate-50 shadow-xl">
                                   {[
                                     'Browsing',
                                     'Code',
@@ -383,7 +395,7 @@ export default function AppUsageTable() {
                                   ].map((category) => (
                                     <DropdownMenuItem
                                       key={category}
-                                      className="flex items-center"
+                                      className="flex items-center hover:bg-gray-100 dark:hover:bg-slate-800 cursor-pointer"
                                       onClick={() => handleCategoryChange(app.id, category)}
                                     >
                                       {getCategoryIcon(category)}
@@ -396,8 +408,8 @@ export default function AppUsageTable() {
                                 </DropdownMenuSubContent>
                               </DropdownMenuSub>
 
-                              <DropdownMenuSeparator className="bg-slate-700" />
-                              <DropdownMenuItem className="text-red-400">
+                              <DropdownMenuSeparator className="bg-gray-300 dark:bg-slate-700" />
+                              <DropdownMenuItem className="text-red-500 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-950/20 cursor-pointer">
                                 Ignore App
                               </DropdownMenuItem>
                             </DropdownMenuContent>
@@ -410,7 +422,7 @@ export default function AppUsageTable() {
             </div>
           </TabsContent>
           <TabsContent value="timeline" className="mt-0 px-6 pb-6">
-            <div className="h-[400px] w-full relative bg-slate-800/30 rounded-lg border border-slate-700/50 overflow-hidden">
+            <div className="h-[400px] w-full relative bg-muted/30 rounded-lg border border-border/50 overflow-hidden">
               <AppTimelineChart date={selectedDate} />
             </div>
           </TabsContent>
@@ -437,7 +449,7 @@ export default function AppUsageTable() {
               />
             </div>
 
-            <div className="mt-6 h-[300px] w-full relative bg-slate-800/30 rounded-lg border border-slate-700/50 overflow-hidden">
+            <div className="mt-6 h-[300px] w-full relative bg-muted/30 rounded-lg border border-border/50 overflow-hidden">
               <AppCategoryDistribution />
             </div>
           </TabsContent>
@@ -458,7 +470,7 @@ function ProductivityBadge({ productivity }) {
       case 'Distracting':
         return 'bg-red-500/10 text-red-400 border-red-500/30'
       default:
-        return 'bg-slate-500/10 text-slate-400 border-slate-500/30'
+        return 'bg-muted/10 text-muted-foreground border-border/30'
     }
   }
 
@@ -504,23 +516,23 @@ function AppTimelineChart({ date }) {
 
   return (
     <div className="h-full w-full flex flex-col p-6">
-      <div className="text-sm text-slate-400 mb-4">
+      <div className="text-sm text-muted-foreground mb-4">
         Application usage timeline for {date === getFormattedDate() ? 'Today' : date}
       </div>
 
       {isLoading ? (
         <div className="flex-1 flex items-center justify-center">
-          <div className="text-slate-400">Loading timeline data...</div>
+          <div className="text-muted-foreground">Loading timeline data...</div>
         </div>
       ) : sortedTimelineData.length === 0 ? (
         <div className="flex-1 flex items-center justify-center">
-          <div className="text-slate-400">No timeline data available for this date</div>
+          <div className="text-muted-foreground">No timeline data available for this date</div>
         </div>
       ) : (
         <div className="flex-1 flex flex-col">
           {' '}
           {/* Time labels - 24 hour markers with labels every 4 hours */}
-          <div className="relative flex text-xs text-slate-500 mb-2">
+          <div className="relative flex text-xs text-foreground0 mb-2">
             {Array.from({ length: 5 }).map((_, i) => {
               const hour = i * 4
               const hourLabel =
@@ -549,7 +561,7 @@ function AppTimelineChart({ date }) {
             })}
           </div>
           {/* Timeline grid */}
-          <div className="flex-1 border-t border-l border-slate-700/30 relative overflow-y-auto custom-scrollbar">
+          <div className="flex-1 border-t border-l border-border/30 relative overflow-y-auto custom-scrollbar">
             {' '}
             {/* Vertical grid lines - 24 hour markers with emphasis on 4-hour marks */}
             <div className="absolute inset-0 flex pointer-events-none">
@@ -560,7 +572,7 @@ function AppTimelineChart({ date }) {
                   style={{
                     width: `${100 / 24}%`,
                     borderColor:
-                      i % 4 === 0 ? 'rgba(148, 163, 184, 0.4)' : 'rgba(148, 163, 184, 0.15)'
+                      i % 4 === 0 ? gridBorderColors.major : gridBorderColors.minor
                   }}
                 ></div>
               ))}
@@ -588,7 +600,7 @@ function AppTimelineRow({ name, icon, segments }) {
     <div className="flex items-center">
       <div className="w-40 flex items-center">
         <span className="mr-2">{icon}</span>
-        <span className="text-sm text-slate-300 truncate" title={name}>
+        <span className="text-sm text-foreground truncate" title={name}>
           {name}
         </span>
       </div>
@@ -641,18 +653,18 @@ function StatCard({ title, value, percentage, color }) {
       case 'red':
         return 'from-red-500 to-pink-500'
       default:
-        return 'from-slate-500 to-slate-600'
+        return 'from-muted to-muted/80'
     }
   }
 
   return (
-    <div className="bg-slate-800/50 rounded-lg border border-slate-700/50 p-4">
-      <div className="text-sm text-slate-400 mb-1">{title}</div>
-      <div className="text-xl font-mono text-slate-200 mb-2">{value}</div>
+    <div className="bg-muted/50 rounded-lg border border-border/50 p-4">
+      <div className="text-sm text-muted-foreground mb-1">{title}</div>
+      <div className="text-xl font-mono text-foreground mb-2">{value}</div>
       <div className="flex items-center justify-between mb-1">
-        <div className="text-xs text-slate-400">{percentage}% of total</div>
+        <div className="text-xs text-muted-foreground">{percentage}% of total</div>
       </div>
-      <div className="h-2 bg-slate-700 rounded-full overflow-hidden">
+      <div className="h-2 bg-muted rounded-full overflow-hidden">
         <div
           className={`h-full bg-gradient-to-r ${getColor()} rounded-full`}
           style={{ width: `${percentage}%` }}
@@ -700,9 +712,9 @@ function AppCategoryDistribution() {
           ></div>
 
           <div className="absolute inset-0 flex items-center justify-center">
-            <div className="bg-slate-900/80 rounded-full w-28 h-28 flex flex-col items-center justify-center">
-              <div className="text-xs text-slate-400">Categories</div>
-              <div className="text-lg font-mono text-cyan-400">5</div>
+            <div className="bg-background/80 rounded-full w-28 h-28 flex flex-col items-center justify-center">
+              <div className="text-xs text-muted-foreground">Categories</div>
+              <div className="text-lg font-mono text-primary">5</div>
             </div>
           </div>
         </div>
@@ -711,28 +723,28 @@ function AppCategoryDistribution() {
       <div className="w-64 flex flex-col justify-center space-y-3">
         <div className="flex items-center text-sm">
           <div className="h-3 w-3 rounded-sm bg-cyan-500 mr-2"></div>
-          <div className="text-slate-300 flex-1">Development</div>
-          <div className="text-cyan-400 font-mono">35%</div>
+          <div className="text-foreground flex-1">Development</div>
+          <div className="text-primary font-mono">35%</div>
         </div>
         <div className="flex items-center text-sm">
           <div className="h-3 w-3 rounded-sm bg-blue-500 mr-2"></div>
-          <div className="text-slate-300 flex-1">Office</div>
-          <div className="text-cyan-400 font-mono">15%</div>
+          <div className="text-foreground flex-1">Office</div>
+          <div className="text-primary font-mono">15%</div>
         </div>
         <div className="flex items-center text-sm">
           <div className="h-3 w-3 rounded-sm bg-purple-500 mr-2"></div>
-          <div className="text-slate-300 flex-1">Communication</div>
-          <div className="text-cyan-400 font-mono">20%</div>
+          <div className="text-foreground flex-1">Communication</div>
+          <div className="text-primary font-mono">20%</div>
         </div>
         <div className="flex items-center text-sm">
           <div className="h-3 w-3 rounded-sm bg-red-500 mr-2"></div>
-          <div className="text-slate-300 flex-1">Entertainment</div>
-          <div className="text-cyan-400 font-mono">20%</div>
+          <div className="text-foreground flex-1">Entertainment</div>
+          <div className="text-primary font-mono">20%</div>
         </div>
         <div className="flex items-center text-sm">
           <div className="h-3 w-3 rounded-sm bg-amber-500 mr-2"></div>
-          <div className="text-slate-300 flex-1">Social Media</div>
-          <div className="text-cyan-400 font-mono">10%</div>
+          <div className="text-foreground flex-1">Social Media</div>
+          <div className="text-primary font-mono">10%</div>
         </div>
       </div>
     </div>

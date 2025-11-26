@@ -9,12 +9,12 @@ const buttonVariants = cva(
   {
     variants: {
       variant: {
-        default: 'bg-cyan-600 text-white hover:bg-cyan-700',
-        destructive: 'bg-red-600 text-white hover:bg-red-700',
-        outline: 'border border-gray-600 bg-transparent text-cyan-400 hover:bg-gray-700 hover:text-cyan-300',
-        secondary: 'bg-gray-700 text-cyan-400 hover:bg-gray-600',
-        ghost: 'hover:bg-gray-700 hover:text-cyan-400',
-        link: 'text-cyan-400 underline-offset-4 hover:underline hover:text-cyan-300'
+        default: 'bg-cyan-600 text-white hover:bg-cyan-700 dark:bg-cyan-600 dark:text-white dark:hover:bg-cyan-700',
+        destructive: 'bg-red-600 text-white hover:bg-red-700 dark:bg-red-600 dark:text-white dark:hover:bg-red-700',
+        outline: 'border border-gray-300 dark:border-gray-600 bg-transparent text-cyan-600 dark:text-cyan-400 hover:bg-gray-100 dark:hover:bg-gray-700 hover:text-cyan-700 dark:hover:text-cyan-300',
+        secondary: 'bg-gray-200 dark:bg-gray-700 text-cyan-700 dark:text-cyan-400 hover:bg-gray-300 dark:hover:bg-gray-600',
+        ghost: 'hover:bg-gray-100 dark:hover:bg-gray-700 hover:text-cyan-700 dark:hover:text-cyan-400',
+        link: 'text-cyan-600 dark:text-cyan-400 underline-offset-4 hover:underline hover:text-cyan-700 dark:hover:text-cyan-300'
       },
       size: {
         default: 'h-10 px-4 py-2',

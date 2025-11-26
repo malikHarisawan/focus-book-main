@@ -30,7 +30,7 @@ const ZoomControls = ({
       <button
         onClick={onZoomIn}
         disabled={!canZoomIn || disabled}
-        className="text-cyan-400 hover:text-cyan-300 disabled:text-gray-500 disabled:cursor-not-allowed text-xs p-2 rounded border border-cyan-400 hover:border-cyan-300 disabled:border-gray-500 transition-all duration-200 hover:bg-cyan-400 hover:bg-opacity-10"
+        className="text-cyan-600 dark:text-cyan-400 hover:text-cyan-700 dark:hover:text-cyan-300 disabled:text-gray-400 dark:disabled:text-gray-500 disabled:cursor-not-allowed text-xs p-2 rounded border border-cyan-600 dark:border-cyan-400 hover:border-cyan-700 dark:hover:border-cyan-300 disabled:border-gray-400 dark:disabled:border-gray-500 transition-all duration-200 hover:bg-cyan-600 dark:hover:bg-cyan-400 hover:bg-opacity-10"
         title={
           disabled ? 'Zoom disabled when range is selected' : 'Zoom In (+) - More detailed view'
         }
@@ -41,7 +41,7 @@ const ZoomControls = ({
       <button
         onClick={onZoomOut}
         disabled={!canZoomOut || disabled}
-        className="text-cyan-400 hover:text-cyan-300 disabled:text-gray-500 disabled:cursor-not-allowed text-xs p-2 rounded border border-cyan-400 hover:border-cyan-300 disabled:border-gray-500 transition-all duration-200 hover:bg-cyan-400 hover:bg-opacity-10"
+        className="text-cyan-600 dark:text-cyan-400 hover:text-cyan-700 dark:hover:text-cyan-300 disabled:text-gray-400 dark:disabled:text-gray-500 disabled:cursor-not-allowed text-xs p-2 rounded border border-cyan-600 dark:border-cyan-400 hover:border-cyan-700 dark:hover:border-cyan-300 disabled:border-gray-400 dark:disabled:border-gray-500 transition-all duration-200 hover:bg-cyan-600 dark:hover:bg-cyan-400 hover:bg-opacity-10"
         title={
           disabled ? 'Zoom disabled when range is selected' : 'Zoom Out (-) - Broader time view'
         }
@@ -52,7 +52,7 @@ const ZoomControls = ({
       <button
         onClick={onReset}
         disabled={disabled}
-        className="text-cyan-400 hover:text-cyan-300 disabled:text-gray-500 disabled:cursor-not-allowed text-xs p-2 rounded border border-cyan-400 hover:border-cyan-300 disabled:border-gray-500 transition-all duration-200 hover:bg-cyan-400 hover:bg-opacity-10"
+        className="text-cyan-600 dark:text-cyan-400 hover:text-cyan-700 dark:hover:text-cyan-300 disabled:text-gray-400 dark:disabled:text-gray-500 disabled:cursor-not-allowed text-xs p-2 rounded border border-cyan-600 dark:border-cyan-400 hover:border-cyan-700 dark:hover:border-cyan-300 disabled:border-gray-400 dark:disabled:border-gray-500 transition-all duration-200 hover:bg-cyan-600 dark:hover:bg-cyan-400 hover:bg-opacity-10"
         title={disabled ? 'Zoom disabled when range is selected' : 'Reset to default view (0)'}
       >
         <RotateCcw size={12} />

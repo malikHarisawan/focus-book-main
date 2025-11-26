@@ -16,28 +16,28 @@ export default function CategoryBadge({ category }) {
   const getProductivityColor = () => {
     switch (category) {
       case 'Browsing':
-        return 'bg-blue-500/10 text-blue-400 border-blue-500/30'
+        return 'bg-blue-500/10 text-blue-500 dark:text-blue-400 border-blue-500/30'
       case 'Code':
-        return 'bg-cyan-500/10 text-cyan-400 border-cyan-500/30'
+        return 'bg-cyan-500/10 text-cyan-600 dark:text-cyan-400 border-cyan-500/30'
       case 'Documenting':
-        return 'bg-green-500/10 text-green-400 border-green-500/30'
+        return 'bg-green-500/10 text-green-600 dark:text-green-400 border-green-500/30'
       case 'Entertainment':
-        return 'bg-red-500/10 text-red-400 border-red-500/30'
+        return 'bg-red-500/10 text-red-600 dark:text-red-400 border-red-500/30'
       case 'Learning':
-        return 'bg-purple-500/10 text-purple-400 border-purple-500/30'
+        return 'bg-purple-500/10 text-purple-600 dark:text-purple-400 border-purple-500/30'
       case 'Messaging':
       case 'Communication':
-        return 'bg-indigo-500/10 text-indigo-400 border-indigo-500/30'
+        return 'bg-indigo-500/10 text-indigo-600 dark:text-indigo-400 border-indigo-500/30'
       case 'Miscellaneous':
-        return 'bg-slate-500/10 text-slate-400 border-slate-500/30'
+        return 'bg-slate-500/10 text-slate-600 dark:text-slate-400 border-slate-500/30'
       case 'Personal':
-        return 'bg-pink-500/10 text-pink-400 border-pink-500/30'
+        return 'bg-pink-500/10 text-pink-600 dark:text-pink-400 border-pink-500/30'
       case 'Productivity':
-        return 'bg-amber-500/10 text-amber-400 border-amber-500/30'
+        return 'bg-amber-500/10 text-amber-600 dark:text-amber-400 border-amber-500/30'
       case 'Utility':
-        return 'bg-emerald-500/10 text-emerald-400 border-emerald-500/30'
+        return 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/30'
       default:
-        return 'bg-slate-500/10 text-slate-400 border-slate-500/30'
+        return 'bg-slate-500/10 text-slate-600 dark:text-slate-400 border-slate-500/30'
     }
   }
 

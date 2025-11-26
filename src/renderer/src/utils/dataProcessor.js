@@ -55,7 +55,7 @@ const getProductivity = (category) => {
         return 'Neutral'
     }
   }
-  
+
   // Fallback to static arrays if database mapping not loaded
   if (DEFAULT_FOCUS_CATEGORIES.includes(category)) {
     return 'Productive'
@@ -63,6 +63,51 @@ const getProductivity = (category) => {
     return 'Un-Productive'
   } else {
     return 'Neutral'
+  }
+}
+
+// Export getProductivityType for external use
+export const getProductivityType = (category) => {
+  // First try to use database mapping if available
+  if (categoryProductivityMap && categoryProductivityMap[category]) {
+    return categoryProductivityMap[category]
+  }
+
+  // Fallback to static arrays if database mapping not loaded
+  if (DEFAULT_FOCUS_CATEGORIES.includes(category)) {
+    return 'productive'
+  } else if (DEFAULT_UNPRODUCTIVE.includes(category)) {
+    return 'distracted'
+  } else {
+    return 'neutral'
+  }
+}
+
+// Extract domain name from URL or app identifier
+export const extractDomainName = (domain, fallbackName = '') => {
+  if (!domain) return fallbackName
+
+  try {
+    // Handle special browser protocols
+    if (domain.startsWith('chrome://') || domain.startsWith('edge://') || domain.startsWith('brave://')) {
+      return domain.split('://')[1].split('/')[0] || domain
+    }
+
+    // Remove protocol
+    let d = domain.replace(/^https?:\/\//i, '').replace(/^ftp:\/\//i, '')
+
+    // Remove www prefix
+    d = d.replace(/^www\./i, '')
+
+    // Remove path, query, and hash
+    d = d.split('/')[0].split('?')[0].split('#')[0]
+
+    // Remove port if present
+    d = d.split(':')[0]
+
+    return d || fallbackName
+  } catch (e) {
+    return fallbackName
   }
 }
 

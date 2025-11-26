@@ -203,27 +203,27 @@ const handleResetConversation = async () => {
         <h1 className="text-3xl font-bold bg-gradient-to-r from-cyan-400 to-blue-500 bg-clip-text text-transparent">
           AI Insights
         </h1>
-        <p className="text-slate-400 mt-2">
+        <p className="text-gray-600 dark:text-slate-400 mt-2">
           Get personalized insights and summaries about your productivity patterns
         </p>
       </div>
 
       {/* Chat Container */}
-      <Card className="bg-gradient-to-br from-slate-900/90 to-slate-800/90 border-slate-700/50 backdrop-blur-sm">
+      <Card className="bg-white dark:bg-gradient-to-br dark:from-slate-900/90 dark:to-slate-800/90 border-gray-200 dark:border-slate-700/50 backdrop-blur-sm">
         <CardHeader className="pb-4">
-          <CardTitle className="flex items-center gap-2 text-slate-200">
-            <MessageSquare className="h-5 w-5 text-cyan-500" />
+          <CardTitle className="flex items-center gap-2 text-gray-900 dark:text-slate-200">
+            <MessageSquare className="h-5 w-5 text-cyan-600 dark:text-cyan-500" />
             Chat with AI Assistant
             <div className="flex items-center gap-2 ml-auto">
               <div className={`w-2 h-2 rounded-full ${serviceStatus.isRunning ? 'bg-green-500' : 'bg-red-500'}`}></div>
-              <span className="text-xs text-slate-400">
+              <span className="text-xs text-gray-600 dark:text-slate-400">
                 {serviceStatus.isRunning ? `Service Running (Port ${serviceStatus.port})` : 'Service Offline'}
               </span>
               <Button
                 variant="ghost"
                 size="sm"
                 onClick={() => setShowResetConfirm(true)}
-                className="text-slate-400 hover:text-red-400 hover:bg-red-900/20 p-1 h-8 w-8"
+                className="text-gray-600 dark:text-slate-400 hover:text-red-600 dark:hover:text-red-400 hover:bg-red-100 dark:hover:bg-red-900/20 p-1 h-8 w-8"
                 title="Reset conversation"
               >
                 <RotateCcw className="h-4 w-4" />
@@ -234,7 +234,7 @@ const handleResetConversation = async () => {
         </CardHeader>
         <CardContent className="space-y-4">
           {/* Messages Area */}
-          <ScrollArea className="h-96 w-full rounded-lg bg-slate-900/50 border border-slate-700/50">
+          <ScrollArea className="h-96 w-full rounded-lg bg-gray-50 dark:bg-slate-900/50 border border-gray-200 dark:border-slate-700/50">
             <div className="p-4 space-y-4">
               {messages.map((message) => (
                 <div
@@ -250,11 +250,11 @@ const handleResetConversation = async () => {
                     className={`max-w-[80%] rounded-lg px-4 py-3 ${
                       message.type === 'user'
                         ? 'bg-gradient-to-r from-cyan-600 to-blue-600 text-white'
-                        : 'bg-slate-800/70 border border-slate-700/50 text-slate-200'
+                        : 'bg-gray-200 dark:bg-slate-800/70 border border-gray-300 dark:border-slate-700/50 text-gray-900 dark:text-slate-200'
                     }`}
                   >
                     {message.type === 'bot' ? (
-                      <div className="text-sm leading-relaxed prose prose-invert prose-sm max-w-none">
+                      <div className="text-sm leading-relaxed prose dark:prose-invert prose-sm max-w-none">
                         <ReactMarkdown
                           remarkPlugins={[remarkGfm]}
                           rehypePlugins={[rehypeHighlight]}
@@ -266,11 +266,11 @@ const handleResetConversation = async () => {
                             h3: ({ children }) => <h3 className="text-sm font-semibold mb-1 text-cyan-300">{children}</h3>,
                             ul: ({ children }) => <ul className="list-disc list-inside mb-2 space-y-1">{children}</ul>,
                             ol: ({ children }) => <ol className="list-decimal list-inside mb-2 space-y-1">{children}</ol>,
-                            li: ({ children }) => <li className="text-slate-300">{children}</li>,
+                            li: ({ children }) => <li className="text-gray-800 dark:text-slate-300">{children}</li>,
                             code: ({ children, className }) => {
                               const isInline = !className;
                               return isInline ? (
-                                <code className="bg-slate-900/50 text-cyan-400 px-1 py-0.5 rounded text-xs font-mono">
+                                <code className="bg-gray-200 dark:bg-slate-900/50 text-cyan-700 dark:text-cyan-400 px-1 py-0.5 rounded text-xs font-mono">
                                   {children}
                                 </code>
                               ) : (
@@ -278,41 +278,41 @@ const handleResetConversation = async () => {
                               );
                             },
                             pre: ({ children }) => (
-                              <pre className="bg-slate-900/80 border border-slate-600/50 rounded-md p-3 mb-2 overflow-x-auto custom-scrollbar">
+                              <pre className="bg-gray-100 dark:bg-slate-900/80 border border-gray-300 dark:border-slate-600/50 rounded-md p-3 mb-2 overflow-x-auto custom-scrollbar">
                                 {children}
                               </pre>
                             ),
                             blockquote: ({ children }) => (
-                              <blockquote className="border-l-4 border-cyan-500/50 pl-4 italic text-slate-300 mb-2">
+                              <blockquote className="border-l-4 border-cyan-500/50 pl-4 italic text-gray-700 dark:text-slate-300 mb-2">
                                 {children}
                               </blockquote>
                             ),
-                            strong: ({ children }) => <strong className="text-white font-semibold">{children}</strong>,
+                            strong: ({ children }) => <strong className="text-gray-900 dark:text-white font-semibold">{children}</strong>,
                             em: ({ children }) => <em className="text-cyan-300">{children}</em>,
                             a: ({ children, href }) => (
                               <a 
                                 href={href} 
                                 target="_blank" 
                                 rel="noopener noreferrer"
-                                className="text-cyan-400 hover:text-cyan-300 underline"
+                                className="text-cyan-600 dark:text-cyan-400 hover:text-cyan-700 dark:hover:text-cyan-300 underline"
                               >
                                 {children}
                               </a>
                             ),
                             table: ({ children }) => (
                               <div className="overflow-x-auto mb-2 custom-scrollbar">
-                                <table className="min-w-full border-collapse border border-slate-600">
+                                <table className="min-w-full border-collapse border border-gray-300 dark:border-slate-600">
                                   {children}
                                 </table>
                               </div>
                             ),
                             th: ({ children }) => (
-                              <th className="border border-slate-600 px-3 py-2 bg-slate-700/50 text-left font-semibold text-cyan-300">
+                              <th className="border border-gray-300 dark:border-slate-600 px-3 py-2 bg-gray-200 dark:bg-slate-700/50 text-left font-semibold text-cyan-700 dark:text-cyan-300">
                                 {children}
                               </th>
                             ),
                             td: ({ children }) => (
-                              <td className="border border-slate-600 px-3 py-2 text-slate-300">
+                              <td className="border border-gray-300 dark:border-slate-600 px-3 py-2 text-gray-800 dark:text-slate-300">
                                 {children}
                               </td>
                             )
@@ -325,13 +325,13 @@ const handleResetConversation = async () => {
                       <p className="text-sm leading-relaxed">{message.content}</p>
                     )}
                     <p className={`text-xs mt-2 ${
-                      message.type === 'user' ? 'text-cyan-100' : 'text-slate-500'
+                      message.type === 'user' ? 'text-cyan-100' : 'text-gray-600 dark:text-slate-500'
                     }`}>
                       {formatTime(message.timestamp)}
                     </p>
                   </div>
                   {message.type === 'user' && (
-                    <div className="w-8 h-8 rounded-full bg-gradient-to-r from-slate-600 to-slate-700 flex items-center justify-center flex-shrink-0">
+                    <div className="w-8 h-8 rounded-full bg-gradient-to-r from-gray-400 to-gray-500 dark:from-slate-600 dark:to-slate-700 flex items-center justify-center flex-shrink-0">
                       <User className="w-4 h-4 text-white" />
                     </div>
                   )}
@@ -342,7 +342,7 @@ const handleResetConversation = async () => {
                   <div className="w-8 h-8 rounded-full bg-gradient-to-r from-cyan-500 to-blue-500 flex items-center justify-center flex-shrink-0">
                     <Bot className="w-4 h-4 text-white" />
                   </div>
-                  <div className="bg-slate-800/70 border border-slate-700/50 rounded-lg px-4 py-3">
+                  <div className="bg-gray-200 dark:bg-slate-800/70 border border-gray-300 dark:border-slate-700/50 rounded-lg px-4 py-3">
                     <div className="flex space-x-1">
                       <div className="w-2 h-2 bg-cyan-500 rounded-full animate-bounce"></div>
                       <div className="w-2 h-2 bg-cyan-500 rounded-full animate-bounce" style={{ animationDelay: '0.1s' }}></div>
@@ -357,14 +357,14 @@ const handleResetConversation = async () => {
 
           {/* Suggested Prompts */}
           <div className="space-y-2">
-            <p className="text-xs text-slate-500 font-mono">SUGGESTED PROMPTS</p>
+            <p className="text-xs text-gray-600 dark:text-slate-500 font-mono">SUGGESTED PROMPTS</p>
             <div className="flex flex-wrap gap-2">
               {suggestedPrompts.map((prompt, index) => (
                 <Button
                   key={index}
                   variant="outline"
                   size="sm"
-                  className="text-xs bg-slate-800/50 border-slate-700/50 hover:bg-slate-700/50 hover:border-cyan-500/50 text-slate-300"
+                  className="text-xs bg-gray-100 dark:bg-slate-800/50 border-gray-300 dark:border-slate-700/50 hover:bg-gray-200 dark:hover:bg-slate-700/50 hover:border-cyan-500/50 text-gray-700 dark:text-slate-300"
                   onClick={() => setInputMessage(prompt)}
                 >
                   {prompt}
@@ -382,7 +382,7 @@ const handleResetConversation = async () => {
                 onChange={(e) => setInputMessage(e.target.value)}
                 onKeyPress={handleKeyPress}
                 placeholder="Ask about your productivity patterns, request insights, or get a summary..."
-                className="w-full min-h-[60px] max-h-32 px-4 py-3 bg-slate-900/70 border border-slate-700/50 rounded-lg text-slate-200 placeholder-slate-500 resize-none focus:outline-none focus:ring-2 focus:ring-cyan-500/50 focus:border-transparent"
+                className="w-full min-h-[60px] max-h-32 px-4 py-3 bg-gray-50 dark:bg-slate-900/70 border border-gray-300 dark:border-slate-700/50 rounded-lg text-gray-900 dark:text-slate-200 placeholder-gray-500 dark:placeholder-slate-500 resize-none focus:outline-none focus:ring-2 focus:ring-cyan-500/50 focus:border-transparent"
                 disabled={isLoading}
               />
             </div>
@@ -400,22 +400,22 @@ const handleResetConversation = async () => {
       {/* Reset Confirmation Dialog */}
       {showResetConfirm && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-          <Card className="bg-slate-800 border-slate-700 w-96">
+          <Card className="bg-white dark:bg-slate-800 border-gray-300 dark:border-slate-700 w-96">
             <CardHeader>
-              <CardTitle className="text-slate-200 flex items-center gap-2">
-                <RotateCcw className="h-5 w-5 text-red-400" />
+              <CardTitle className="text-gray-900 dark:text-slate-200 flex items-center gap-2">
+                <RotateCcw className="h-5 w-5 text-red-500 dark:text-red-400" />
                 Reset Conversation
               </CardTitle>
             </CardHeader>
             <CardContent className="space-y-4">
-              <p className="text-slate-300">
+              <p className="text-gray-700 dark:text-slate-300">
                 Are you sure you want to clear the entire conversation? This action cannot be undone.
               </p>
               <div className="flex gap-3 justify-end">
                 <Button
                   variant="outline"
                   onClick={() => setShowResetConfirm(false)}
-                  className="bg-slate-700 border-slate-600 text-slate-300 hover:bg-slate-600"
+                  className="bg-gray-100 dark:bg-slate-700 border-gray-300 dark:border-slate-600 text-gray-700 dark:text-slate-300 hover:bg-gray-200 dark:hover:bg-slate-600"
                 >
                   Cancel
                 </Button>

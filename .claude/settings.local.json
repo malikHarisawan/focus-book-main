@@ -1,32 +1,16 @@
 {
   "permissions": {
     "allow": [
-      "Bash(node:*)",
-      "Bash(sudo systemctl status:*)",
-      "Bash(dpkg:*)",
-      "Bash(npm run dev:*)",
-      "Bash(npm uninstall:*)",
-      "Bash(rm:*)",
-      "Bash(npm run format:*)",
-      "Bash(npm install:*)",
-      "Bash(npm run lint)",
-      "Bash(npx eslint:*)",
-      "Bash(grep:*)",
-      "Bash(rg:*)",
-      "Bash(pkill:*)",
-      "Bash(npm run lint:*)",
-      "Bash(ls:*)",
-      "Bash(where python)",
-      "Bash(C:Python313python.exe -m pip install fastapi uvicorn)",
-      "Bash(\"C:\\Python313\\python.exe\" -m pip install fastapi uvicorn)",
-      "Bash(\"C:\\Python313\\python.exe\" -m pip install langchain langchain-openai langchain-core mcp)",
-      "Bash(source:*)",
-      "Bash(pip install:*)",
-      "Bash(python:*)",
+      "Bash(nul)",
+      "Bash(npm run dev)",
+      "Bash(\"D:\\CODE\\focusbookMain\\AI_agent\\venv\\Scripts\\python.exe\" -c \"import langchain; import fastapi; import mcp; print(''Dependencies OK'')\")",
+      "Bash(\"D:\\CODE\\focusbookMain\\AI_agent\\venv\\Scripts\\python.exe\":*)",
       "Bash(taskkill:*)",
-      "Bash(git add:*)",
-      "Bash(\"D:\\CODE\\focus-book-main\\AI_agent\\venv\\Scripts\\python.exe\" start_service.py \"C:\\Users\\malik\\AppData\\Roaming\\focusbook\\focusbook.db\" \"\" 8005)"
+      "Bash(wmic process where \"name=''''python.exe''''\" get processid,commandline)",
+      "Bash(findstr:*)",
+      "Bash(netstat:*)"
     ],
-    "deny": []
+    "deny": [],
+    "ask": []
   }
 }

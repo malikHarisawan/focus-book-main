@@ -5,11 +5,12 @@ import Activities from './components/Activity/page'
 import FocusPage from './components/Focus/page'
 import ChatPage from './components/Chat/page'
 import { DateProvider } from './context/DateContext'
+import { ThemeProvider } from './context/ThemeContext'
 import { HashRouter as Router, Routes, Route } from 'react-router-dom'
 import { MainLayout } from './components/layout/main-layout'
 function App() {
   return (
-    <div className="bg-gray-900 text-white min-h-screen">
+    <ThemeProvider>
       <DateProvider>
         <Router>
           <MainLayout>
@@ -23,7 +24,7 @@ function App() {
           </MainLayout>
         </Router>
       </DateProvider>
-    </div>
+    </ThemeProvider>
   )
 }
 

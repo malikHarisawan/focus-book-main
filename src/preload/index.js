@@ -1272,8 +1272,10 @@ contextBridge.exposeInMainWorld('electronAPI', {
   // AI Service API
   aiChat: (message) => ipcRenderer.invoke('ai-chat', message),
   getAiServiceStatus: () => ipcRenderer.invoke('ai-service-status'),
-  restartAiService: () => ipcRenderer.invoke('ai-service-restart'),
+  restartAiService: (config) => ipcRenderer.invoke('ai-service-restart', config),
   resetAiMemory: () => ipcRenderer.invoke('ai-service-reset-memory'),
+  getAiConfig: () => ipcRenderer.invoke('get-ai-config'),
+  saveAiConfig: (config) => ipcRenderer.invoke('save-ai-config', config),
   // Python Error Recovery API
   getPythonStatus: () => ipcRenderer.invoke('get-python-status'),
   resetPythonRecovery: () => ipcRenderer.invoke('reset-python-recovery'),

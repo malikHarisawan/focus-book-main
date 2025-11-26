@@ -1,9 +1,4 @@
 
-
-
-
-
-
 # math_mcp_server.py
 from mcp.server.fastmcp import FastMCP
 from datetime import datetime ,timedelta
@@ -382,10 +377,18 @@ def get_db_connection():
     try:
         # Get database path from environment variable (set by Electron app)
         db_path = os.environ.get('FOCUSBOOK_DB_PATH')
-        
+
         if not db_path:
+            # Log available environment variables for debugging
+            print(f"ERROR: FOCUSBOOK_DB_PATH not set. Available env vars: {list(os.environ.keys())[:10]}")
             raise RuntimeError("FOCUSBOOK_DB_PATH environment variable not set. Ensure the Electron app starts the AI service.")
-        
+
+        print(f"Connecting to database at: {db_path}")
+
+        # Check if database file exists
+        if not os.path.exists(db_path):
+            raise RuntimeError(f"Database file does not exist at: {db_path}")
+
         return sqlite3.connect(db_path)
     except OperationalError as e:
         raise RuntimeError(f"Database connection failed: {str(e)}")
@@ -807,7 +810,11 @@ def get_youtube_content_analysis_guidelines():
         "context_matters": "Consider if content serves learning/growth vs pure entertainment/distraction"
     }
 
-# Run the MCP Server
+# Run the MCP Server in stdio mode only
+# This server is invoked as a subprocess by langgraph_mcp_client.py
+# It should only communicate via stdio, not HTTP
 if __name__ == "__main__":
-    mcp.run()
+    # Force stdio transport mode to avoid port conflicts
+    import sys
+    mcp.run(transport='stdio')
 

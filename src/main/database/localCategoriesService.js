@@ -495,6 +495,47 @@ class LocalCategoriesService {
       }
     })
   }
+
+  async getExclusionList() {
+    return this.db.executeWithRetry(async () => {
+      const excludedItems = await this.db.find('exclusionList', {});
+      const apps = excludedItems.filter(item => item.type === 'app').map(item => item.identifier);
+      const domains = excludedItems.filter(item => item.type === 'domain').map(item => item.identifier);
+      return { apps, domains };
+    });
+  }
+
+  async addToExclusionList(identifier, type) {
+    return this.db.executeWithRetry(async () => {
+      const existing = await this.db.findOne('exclusionList', { identifier, type });
+      if (!existing) {
+        await this.db.insert('exclusionList', { identifier, type });
+        return true;
+      }
+      return false; // Already exists
+    });
+  }
+
+  async removeFromExclusionList(identifier, type) {
+    return this.db.executeWithRetry(async () => {
+      const result = await this.db.remove('exclusionList', { identifier, type });
+      return result > 0;
+    });
+  }
+
+  async isExcluded(identifier, type) {
+    return this.db.executeWithRetry(async () => {
+      const existing = await this.db.findOne('exclusionList', { identifier, type });
+      return !!existing;
+    });
+  }
+
+  async clearExclusionList() {
+    return this.db.executeWithRetry(async () => {
+      const result = await this.db.remove('exclusionList', {}, { multi: true });
+      return result;
+    });
+  }
 }
 
 module.exports = LocalCategoriesService

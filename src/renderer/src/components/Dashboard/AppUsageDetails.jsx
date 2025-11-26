@@ -197,21 +197,21 @@ const AppUsageDetails = ({
   }
 
   return (
-    <Card className="bg-slate-900/50 border-slate-700/50 backdrop-blur-sm mt-4">
-      <CardHeader className="border-b border-slate-700/50 pb-3">
+    <Card className="bg-white dark:bg-slate-900/50 border-gray-200 dark:border-slate-700/50 backdrop-blur-sm mt-4">
+      <CardHeader className="border-b border-gray-200 dark:border-slate-700/50 pb-3">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2">
-            <Clock className="h-5 w-5 text-cyan-500" />
-            <CardTitle className="text-slate-100">App Usage Details</CardTitle>
+            <Clock className="h-5 w-5 text-cyan-600 dark:text-cyan-500" />
+            <CardTitle className="text-gray-900 dark:text-slate-100">App Usage Details</CardTitle>
             <Badge
               variant="outline"
-              className="text-xs bg-cyan-500/10 text-cyan-400 border-cyan-500/30"
+              className="text-xs bg-cyan-500/10 text-cyan-600 dark:text-cyan-400 border-cyan-500/30"
             >
               {getRangeDescription()}
             </Badge>
           </div>
           <div className="flex items-center gap-2">
-            <span className="text-sm text-slate-400">
+            <span className="text-sm text-gray-600 dark:text-slate-400">
               {selectedApps.length} app{selectedApps.length !== 1 ? 's' : ''}
             </span>
             {selectedApps.length > 10 && (
@@ -219,7 +219,7 @@ const AppUsageDetails = ({
                 variant="ghost"
                 size="sm"
                 onClick={() => setShowAll(!showAll)}
-                className="text-cyan-400 hover:text-cyan-300"
+                className="text-cyan-600 dark:text-cyan-400 hover:text-cyan-700 dark:hover:text-cyan-300"
               >
                 {showAll ? 'Show Less' : 'Show All'}
               </Button>
@@ -231,7 +231,7 @@ const AppUsageDetails = ({
                 e.stopPropagation()
                 onClose()
               }}
-              className="text-slate-400 hover:text-slate-300"
+              className="text-gray-600 dark:text-slate-400 hover:text-gray-800 dark:hover:text-slate-300"
               title="Close details panel"
             >
               <ChevronUp className="h-4 w-4" />
@@ -241,26 +241,26 @@ const AppUsageDetails = ({
       </CardHeader>
 
       <CardContent className="p-0">
-          <div className="bg-slate-800/30 rounded-b-lg overflow-hidden">
+          <div className="bg-gray-50 dark:bg-slate-800/30 rounded-b-lg overflow-hidden">
             {/* Header */}
-            <div className="grid grid-cols-11 text-xs text-slate-400 p-3 border-b border-slate-700/50 bg-slate-800/50">
+            <div className="grid grid-cols-11 text-xs text-gray-600 dark:text-slate-400 p-3 border-b border-gray-200 dark:border-slate-700/50 bg-gray-100 dark:bg-slate-800/50">
               <button
                 onClick={() => handleSort('name')}
-                className="col-span-4 flex items-center gap-1 hover:text-cyan-400 transition-colors text-left"
+                className="col-span-4 flex items-center gap-1 hover:text-cyan-600 dark:hover:text-cyan-400 transition-colors text-left"
               >
                 Application
                 {getSortIcon('name')}
               </button>
               <button
                 onClick={() => handleSort('category')}
-                className="col-span-2 flex items-center gap-1 hover:text-cyan-400 transition-colors text-left"
+                className="col-span-2 flex items-center gap-1 hover:text-cyan-600 dark:hover:text-cyan-400 transition-colors text-left"
               >
                 Category
                 {getSortIcon('category')}
               </button>
               <button
                 onClick={() => handleSort('time')}
-                className="col-span-2 flex items-center gap-1 hover:text-cyan-400 transition-colors text-left"
+                className="col-span-2 flex items-center gap-1 hover:text-cyan-600 dark:hover:text-cyan-400 transition-colors text-left"
               >
                 Time Spent
                 {getSortIcon('time')}
@@ -270,35 +270,35 @@ const AppUsageDetails = ({
             </div>
 
             {/* App List */}
-            <div className="divide-y divide-slate-700/30 max-h-80 overflow-y-auto custom-scrollbar">
+            <div className="divide-y divide-gray-200 dark:divide-slate-700/30 max-h-80 overflow-y-auto custom-scrollbar">
               {sortedApps.map((app, index) => (
                 <div
                   key={`${app.name}-${index}`}
-                  className="grid grid-cols-11 py-3 px-3 text-sm hover:bg-slate-800/50 transition-colors"
+                  className="grid grid-cols-11 py-3 px-3 text-sm hover:bg-gray-100 dark:hover:bg-slate-800/50 transition-colors"
                   onClick={(e) => e.stopPropagation()}
                 >
                   <div className="col-span-4 flex items-center gap-2">
                     <div className="w-8 h-8 bg-gradient-to-br from-cyan-500/20 to-blue-500/20 rounded-lg flex items-center justify-center">
-                      <span className="text-xs font-medium text-cyan-400">
+                      <span className="text-xs font-medium text-cyan-600 dark:text-cyan-400">
                         {app.name?.charAt(0)?.toUpperCase() || '?'}
                       </span>
                     </div>
                     <div className="flex-1">
-                      <div className="text-slate-300 font-medium truncate">
+                      <div className="text-gray-800 dark:text-slate-300 font-medium truncate">
                         {app.name || 'Unknown App'}
                       </div>
                       {app.domain && (
-                        <div className="text-xs text-slate-500 truncate">{app.domain}</div>
+                        <div className="text-xs text-gray-500 dark:text-slate-500 truncate">{app.domain}</div>
                       )}
                     </div>
                   </div>
 
-                  <div className="col-span-2 text-slate-400 flex items-center gap-1">
+                  <div className="col-span-2 text-gray-700 dark:text-slate-400 flex items-center gap-1">
                     <span className="text-sm">{getCategoryIcon(app.category)}</span>
                     {app.category || 'Unknown'}
                   </div>
 
-                  <div className="col-span-2 text-cyan-400 font-medium">
+                  <div className="col-span-2 text-cyan-600 dark:text-cyan-400 font-medium">
                     {formatTime(app.timeSpentSeconds || 0)}
                   </div>
 
@@ -318,7 +318,7 @@ const AppUsageDetails = ({
                           <Button
                             variant="ghost"
                             size="icon"
-                            className="h-6 w-6 text-slate-400 hover:text-slate-300"
+                            className="h-6 w-6 text-gray-600 dark:text-slate-400 hover:text-gray-800 dark:hover:text-slate-300"
                             onClick={(e) => e.stopPropagation()}
                           >
                             <MoreHorizontal className="h-4 w-4" />
@@ -326,17 +326,17 @@ const AppUsageDetails = ({
                         </DropdownMenuTrigger>
                         <DropdownMenuContent
                           align="end"
-                          className="bg-slate-900 border-slate-700 text-slate-50"
+                          className="bg-white dark:bg-slate-900 border-gray-300 dark:border-slate-700 text-gray-900 dark:text-slate-50"
                           onClick={(e) => e.stopPropagation()}
                         >
                           <DropdownMenuLabel>Actions</DropdownMenuLabel>
-                          <DropdownMenuSeparator className="bg-slate-700" />
+                          <DropdownMenuSeparator className="bg-gray-300 dark:bg-slate-700" />
                           <DropdownMenuSub>
                             <DropdownMenuSubTrigger className="flex items-center">
                               <Tag className="h-4 w-4 mr-2" />
                               <span>Change Category</span>
                             </DropdownMenuSubTrigger>
-                            <DropdownMenuSubContent className="bg-slate-900 border-slate-700">
+                            <DropdownMenuSubContent className="bg-white dark:bg-slate-900 border-gray-300 dark:border-slate-700">
                               {categories.map((category) => (
                                 <DropdownMenuItem
                                   key={category}
@@ -365,8 +365,8 @@ const AppUsageDetails = ({
 
             {/* Footer */}
             {selectedApps.length > 0 && (
-              <div className="p-3 border-t border-slate-700/50 bg-slate-800/30">
-                <div className="flex items-center justify-between text-xs text-slate-400">
+              <div className="p-3 border-t border-gray-200 dark:border-slate-700/50 bg-gray-100 dark:bg-slate-800/30">
+                <div className="flex items-center justify-between text-xs text-gray-600 dark:text-slate-400">
                   <span>
                     Total:{' '}
                     {selectedApps.reduce((sum, app) => sum + (app.timeSpentSeconds || 0), 0) > 0

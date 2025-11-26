@@ -303,9 +303,39 @@ app.whenReady().then(async () => {
     console.error('❌ Failed to enable auto-startup:', error.message)
   }
 
-  // Start AI service
+  // Start AI service with config from config.json
   try {
-    await aiServiceManager.start()
+    const userDataPath = app.getPath('userData')
+    const configPath = path.join(userDataPath, 'config.json')
+
+    let aiConfig = {
+      provider: 'openai',
+      openaiKey: '',
+      geminiKey: ''
+    }
+
+    // Read config.json if it exists
+    if (fs.existsSync(configPath)) {
+      try {
+        const configData = fs.readFileSync(configPath, 'utf-8')
+        const savedConfig = JSON.parse(configData)
+
+        // Map config.json format to AIServiceManager format
+        aiConfig.provider = savedConfig.provider || 'openai'
+        if (savedConfig.provider === 'gemini') {
+          aiConfig.geminiKey = savedConfig.apiKey || ''
+        } else {
+          aiConfig.openaiKey = savedConfig.apiKey || ''
+        }
+
+        console.log('📋 Loaded AI config from:', configPath)
+        console.log('🤖 AI Provider:', aiConfig.provider)
+      } catch (configError) {
+        console.warn('⚠️ Could not parse config.json, using defaults:', configError.message)
+      }
+    }
+
+    await aiServiceManager.start(aiConfig)
     console.log('✅ AI service started successfully')
   } catch (error) {
     console.error('❌ Failed to start AI service:', error.message)
@@ -491,10 +521,11 @@ app.whenReady().then(async () => {
     }
   })
 
-  ipcMain.handle('ai-service-restart', async () => {
+  ipcMain.handle('ai-service-restart', async (event, config = {}) => {
     try {
       await aiServiceManager.stop()
-      await aiServiceManager.start()
+      // Pass the configuration (provider, openaiKey, geminiKey) to the start method
+      await aiServiceManager.start(config)
       return { success: true }
     } catch (error) {
       console.error('Error restarting AI service:', error)
@@ -622,6 +653,53 @@ ipcMain.handle('ai-service-reset-memory', async () => {
       return await aiServiceManager.resetMemory()
     } catch (error) {
       console.error('Error resetting AI service memory:', error)
+      return { error: error.message }
+    }
+  })
+
+  // AI Config file handlers
+  ipcMain.handle('get-ai-config', async () => {
+    try {
+      const userDataPath = app.getPath('userData')
+      const configPath = path.join(userDataPath, 'config.json')
+
+      if (!fs.existsSync(configPath)) {
+        // Return default config if file doesn't exist
+        return {
+          apiKey: '',
+          provider: 'openai',
+          lastUpdated: new Date().toISOString()
+        }
+      }
+
+      const configData = fs.readFileSync(configPath, 'utf-8')
+      return JSON.parse(configData)
+    } catch (error) {
+      console.error('Error reading AI config:', error)
+      return {
+        apiKey: '',
+        provider: 'openai',
+        lastUpdated: new Date().toISOString()
+      }
+    }
+  })
+
+  ipcMain.handle('save-ai-config', async (event, config) => {
+    try {
+      const userDataPath = app.getPath('userData')
+      const configPath = path.join(userDataPath, 'config.json')
+
+      // Add lastUpdated timestamp
+      const configToSave = {
+        ...config,
+        lastUpdated: new Date().toISOString()
+      }
+
+      fs.writeFileSync(configPath, JSON.stringify(configToSave, null, 2), 'utf-8')
+      console.log('AI config saved to:', configPath)
+      return { success: true }
+    } catch (error) {
+      console.error('Error saving AI config:', error)
       return { error: error.message }
     }
   })

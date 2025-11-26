@@ -34,11 +34,13 @@ class AIServiceManager {
   constructor() {
     this.process = null
     this.port = null
-    this.isStarting = false
+    this.isStarting = false;
+    this.isStopping = false;
     this.isRunning = false
     this.retryCount = 0
     this.maxRetries = 3
     this.healthCheckInterval = null
+    this.lastConfig = {};
   }
 
   /**
@@ -127,22 +129,30 @@ class AIServiceManager {
   /**
    * Start the AI service
    * - Allocates a port, spawns the process, and performs initial health checks.
-   * - Sets OPENAI_API_KEY in the environment if provided or available in process.env.
+   * - Sets AI provider and API keys in the environment if provided or available in process.env.
    *
    * Concurrency safety: if a start is in progress, waits until it completes and returns the port.
    *
-   * @param {string|null} [apiKey=null] - Optional API key to pass to the service; falls back to env.
+   * @param {Object} [config={}] - Configuration object
+   * @param {string} [config.openaiKey=null] - Optional OpenAI API key
+   * @param {string} [config.geminiKey=null] - Optional Gemini API key
+   * @param {string} [config.provider='openai'] - AI provider ('openai' or 'gemini')
    * @returns {Promise<number>} Resolves with the port the service is (or will be) listening on.
    * @throws If startup fails before spawning or port allocation fails.
    */
-  async start(apiKey = null) {
-    if (this.isStarting) {
-      console.log('AI service is already starting, waiting...')
-      // Wait for the current startup to complete
-      while (this.isStarting) {
-        await new Promise(resolve => setTimeout(resolve, 1000))
+  async start(config = {}) {
+    this.lastConfig = config;
+    // Support legacy single apiKey parameter for backwards compatibility
+    if (typeof config === 'string') {
+      config = { openaiKey: config, provider: 'openai' }
+    }
+
+    if (this.isStarting || this.isStopping) {
+      console.log('AI service is already starting or stopping, waiting...');
+      while (this.isStarting || this.isStopping) {
+        await new Promise(resolve => setTimeout(resolve, 1000));
       }
-      return this.port
+      return this.port;
     }
 
     if (this.isRunning) {
@@ -159,19 +169,30 @@ class AIServiceManager {
       // Get service executable info
       const { command, args } = this.getServiceExecutablePath()
       
+      const {
+        openaiKey = null,
+        geminiKey = null,
+        provider = 'openai'
+      } = config
       // Prepare arguments
       const dbPath = this.getDatabasePath()
-      const effectiveApiKey = apiKey || process.env.OPENAI_API_KEY || ''
+      const effectiveOpenAIKey = openaiKey || process.env.OPENAI_API_KEY || ''
+      const effectiveGeminiKey = geminiKey || process.env.GEMINI_API_KEY || ''
       const serviceArgs = [
         ...args,
         dbPath,
-        // Only pass API key if it's not empty (let .env file handle it)
-        effectiveApiKey.trim() ? effectiveApiKey : '',
-        this.port.toString()
+        // Pass OpenAI key
+        effectiveOpenAIKey.trim() ? effectiveOpenAIKey : '',
+        this.port.toString(),
+        // Pass provider
+        provider,
+        // Pass Gemini key
+        effectiveGeminiKey.trim() ? effectiveGeminiKey : ''
       ]
 
       console.log(`Starting AI service on port ${this.port}`)
       console.log(`Command: ${command}`)
+      console.log(`Provider: ${provider}`)
       console.log(`Args: ${serviceArgs.join(' ')}`)
 
       // Spawn the process
@@ -180,7 +201,9 @@ class AIServiceManager {
         env: {
           ...process.env,
           FOCUSBOOK_DB_PATH: dbPath,
-          OPENAI_API_KEY: apiKey || process.env.OPENAI_API_KEY || ''
+          OPENAI_API_KEY: effectiveOpenAIKey,
+          GEMINI_API_KEY: effectiveGeminiKey,
+          AI_PROVIDER: provider
         }
       })
 
@@ -275,30 +298,38 @@ class AIServiceManager {
   * @returns {Promise<void>} Resolves when stop logic completes (not necessarily process exit).
    */
   async stop() {
+    if (this.isStopping) {
+      console.log('AI service is already stopping, waiting...');
+      while (this.isStopping) {
+        await new Promise(resolve => setTimeout(resolve, 1000));
+      }
+      return;
+    }
+  
+    this.isStopping = true;
+  
     if (this.healthCheckInterval) {
-      clearInterval(this.healthCheckInterval)
-      this.healthCheckInterval = null
+      clearInterval(this.healthCheckInterval);
+      this.healthCheckInterval = null;
     }
-
+  
     if (this.process && !this.process.killed) {
-      console.log('Stopping AI service...')
-      
-      // Try graceful shutdown first
-      this.process.kill('SIGTERM')
-      
-      // Force kill after timeout
-      setTimeout(() => {
-        if (this.process && !this.process.killed) {
-          console.log('Force killing AI service process')
-          this.process.kill('SIGKILL')
-        }
-      }, 5000)
-
-      this.process = null
+      console.log('Stopping AI service...');
+      this.process.kill('SIGKILL'); // Use SIGKILL for a more forceful shutdown
+  
+      // Wait for the process to be killed
+      let timeout = 5000; // 5 seconds
+      while (this.process && !this.process.killed && timeout > 0) {
+        await new Promise(resolve => setTimeout(resolve, 100));
+        timeout -= 100;
+      }
+  
+      this.process = null;
     }
-
-    this.isRunning = false
-    this.port = null
+  
+    this.isRunning = false;
+    this.port = null;
+    this.isStopping = false;
   }
 
   /**
@@ -361,7 +392,7 @@ class AIServiceManager {
       console.log(`Attempting to restart AI service (attempt ${this.retryCount}/${this.maxRetries})`)
       
       setTimeout(() => {
-        this.start().catch(error => {
+        this.start(this.lastConfig).catch(error => {
           console.error('Failed to restart AI service:', error)
         })
       }, 5000) // Wait 5 seconds before restart
