@@ -2,60 +2,70 @@ name: Build & Release FocusBook
 
 on:
   push:
-    branches:
-      - main
-    tags:
-      - 'v*'
-
+    branches: [main]
+    tags: ['v*']     # e.g. v1.0.0 → triggers release job
   pull_request:
-    branches:
-      - main
-
+    branches: [main]
   workflow_dispatch:
 
 jobs:
-  # Lint and basic checks
+  # -----------------------------
+  # Lint & Code Quality
+  # -----------------------------
   lint:
     name: Lint & Code Quality
     runs-on: ubuntu-latest
+
     steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
 
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
+      - uses: actions/setup-node@v4
         with:
-          node-version: '18'
-          cache: 'npm'
+          node-version: 20
+          cache: npm
 
-      - name: Install dependencies
+      - name: Install Node deps (faster)
         run: npm ci
 
       - name: Run ESLint
         run: npm run lint
         continue-on-error: true
 
-  # Build for Windows
-  build-windows:
-    name: Build Windows
+
+  # -----------------------------
+  # Build Matrix (Windows, macOS, Linux)
+  # -----------------------------
+  build:
+    name: Build (${{ matrix.os }})
     needs: lint
-    runs-on: windows-latest
+    runs-on: ${{ matrix.os }}
+
+    strategy:
+      matrix:
+        os: [windows-latest, macos-latest, ubuntu-latest]
 
     steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
 
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
+      - uses: actions/setup-node@v4
         with:
-          node-version: '18'
-          cache: 'npm'
+          node-version: 20
+          cache: npm
 
-      - name: Setup Python
-        uses: actions/setup-python@v5
+      # Linux-only dependencies (needed for electron-active-window)
+      - name: Install X11 libs (Linux only)
+        if: matrix.os == 'ubuntu-latest'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            libx11-dev \
+            libxtst-dev \
+            libxkbfile-dev
+
+      - uses: actions/setup-python@v5
         with:
-          python-version: '3.11'
-          cache: 'pip'
+          python-version: "3.11"
+          cache: pip
 
       - name: Install Node dependencies
         run: npm ci
@@ -63,8 +73,8 @@ jobs:
       - name: Install Python dependencies
         run: |
           python -m pip install --upgrade pip
-          pip install -r requirements.txt
           pip install -r AI_agent/requirements.txt
+          if [ -f requirements.txt ]; then pip install -r requirements.txt; fi
 
       - name: Build AI Service
         run: npm run build-ai-service
@@ -72,161 +82,72 @@ jobs:
       - name: Rebuild native modules
         run: npm run rebuild-native
 
-      - name: Build Electron app
+      - name: Build Electron App
         run: npm run build
 
-      - name: Package Windows installer
-        run: electron-builder --win
+      # OS-specific packaging
+      - name: Package App
+        run: |
+          if [[ "${{ matrix.os }}" == "windows-latest" ]]; then
+            electron-builder --win;
+          elif [[ "${{ matrix.os }}" == "macos-latest" ]]; then
+            electron-builder --mac;
+          else
+            electron-builder --linux;
+          fi
+        shell: bash
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Upload Windows artifacts
-        uses: actions/upload-artifact@v4
+      # Upload artifacts per OS
+      - uses: actions/upload-artifact@v4
         with:
-          name: focusbook-windows
+          name: focusbook-${{ matrix.os }}
           path: |
             dist/*.exe
             dist/*.msi
             dist/*.zip
-          retention-days: 30
-
-  # Build for macOS
-  build-macos:
-    name: Build macOS
-    needs: lint
-    runs-on: macos-latest
-
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: '18'
-          cache: 'npm'
-
-      - name: Setup Python
-        uses: actions/setup-python@v5
-        with:
-          python-version: '3.11'
-          cache: 'pip'
-
-      - name: Install Node dependencies
-        run: npm ci
-
-      - name: Install Python dependencies
-        run: |
-          python -m pip install --upgrade pip
-          pip install -r AI_agent/requirements.txt
-
-      - name: Build AI Service
-        run: npm run build-ai-service
-
-      - name: Rebuild native modules
-        run: npm run rebuild-native
-
-      - name: Build Electron app
-        run: npm run build
-
-      - name: Package macOS app
-        run: electron-builder --mac
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-
-      - name: Upload macOS artifacts
-        uses: actions/upload-artifact@v4
-        with:
-          name: focusbook-macos
-          path: |
             dist/*.dmg
-            dist/*.zip
-          retention-days: 30
-
-  # Build for Linux
-  build-linux:
-    name: Build Linux
-    needs: lint
-    runs-on: ubuntu-latest
-
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: '18'
-          cache: 'npm'
-
-      - name: Setup Python
-        uses: actions/setup-python@v5
-        with:
-          python-version: '3.11'
-          cache: 'pip'
-
-      - name: Install Node dependencies
-        run: npm ci
-
-      - name: Install Python dependencies
-        run: |
-          python -m pip install --upgrade pip
-          pip install -r AI_agent/requirements.txt
-
-      - name: Build AI Service
-        run: npm run build-ai-service
-
-      - name: Rebuild native modules
-        run: npm run rebuild-native
-
-      - name: Build Electron app
-        run: npm run build
-
-      - name: Package Linux app
-        run: electron-builder --linux
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-
-      - name: Upload Linux artifacts
-        uses: actions/upload-artifact@v4
-        with:
-          name: focusbook-linux
-          path: |
             dist/*.AppImage
             dist/*.deb
             dist/*.snap
           retention-days: 30
 
-  # Create GitHub Release (only on tags)
+
+  # -----------------------------
+  # Release Job
+  # -----------------------------
   release:
-    name: Create Release
-    needs: [build-windows, build-macos, build-linux]
+    name: Publish Release
+    needs: build
     runs-on: ubuntu-latest
-    if: startsWith(github.ref, 'refs/tags/v')
+    if: startsWith(github.ref, 'refs/tags/v')  # ONLY on tags
 
     steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
 
       - name: Download Windows artifacts
         uses: actions/download-artifact@v4
         with:
-          name: focusbook-windows
+          name: focusbook-windows-latest
           path: dist/windows
+        continue-on-error: true
 
       - name: Download macOS artifacts
         uses: actions/download-artifact@v4
         with:
-          name: focusbook-macos
+          name: focusbook-macos-latest
           path: dist/macos
+        continue-on-error: true
 
       - name: Download Linux artifacts
         uses: actions/download-artifact@v4
         with:
-          name: focusbook-linux
+          name: focusbook-ubuntu-latest
           path: dist/linux
+        continue-on-error: true
 
-      - name: Create Release
+      - name: Create GitHub Release
         uses: softprops/action-gh-release@v1
         with:
           files: |
