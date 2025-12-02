@@ -11,6 +11,81 @@ import shutil
 import platform
 from pathlib import Path
 
+def create_spec_file(current_dir):
+    """Create PyInstaller spec file"""
+    spec_content = """# -*- mode: python ; coding: utf-8 -*-
+
+block_cipher = None
+
+a = Analysis(
+    ['start_service.py'],
+    pathex=['.'],
+    binaries=[],
+    datas=[
+        ('math_mcp_server.py', '.'),
+        ('langgraph_mcp_client.py', '.'),
+        ('app.py', '.')
+    ],
+    hiddenimports=[
+        'uvicorn.loops.auto',
+        'uvicorn.loops.asyncio',
+        'uvicorn.protocols.websockets.auto',
+        'uvicorn.protocols.websockets.websockets_impl',
+        'uvicorn.protocols.http.auto',
+        'uvicorn.protocols.http.h11_impl',
+        'uvicorn.lifespan.on',
+        'fastapi',
+        'starlette',
+        'pydantic',
+        'langchain',
+        'langchain_openai',
+        'langchain_core',
+        'langchain_mcp_adapters',
+        'langchain_google_genai',
+        'langgraph',
+        'openai',
+        'mcp',
+        'sqlite3',
+        'json',
+        'asyncio'
+    ],
+    hookspath=[],
+    hooksconfig={},
+    runtime_hooks=[],
+    excludes=[],
+    win_no_prefer_redirects=False,
+    win_private_assemblies=False,
+    cipher=block_cipher,
+    noarchive=False,
+)
+
+pyz = PYZ(a.pure, a.zipped_data, cipher=block_cipher)
+
+exe = EXE(
+    pyz,
+    a.scripts,
+    a.binaries,
+    a.zipfiles,
+    a.datas,
+    [],
+    name='ai_service',
+    debug=False,
+    bootloader_ignore_signals=False,
+    strip=False,
+    upx=True,
+    upx_exclude=[],
+    runtime_tmpdir=None,
+    console=True,
+    disable_windowed_traceback=False,
+    target_arch=None,
+    codesign_identity=None,
+    entitlements_file=None,
+)
+"""
+    spec_file = current_dir / "ai_service.spec"
+    spec_file.write_text(spec_content)
+    print(f"✅ Created spec file: {spec_file}")
+
 def main():
     """Main build function"""
     
@@ -27,6 +102,11 @@ def main():
         shutil.rmtree(dist_dir)
     if build_dir.exists():
         shutil.rmtree(build_dir)
+    
+    # Create spec file if it doesn't exist
+    if not spec_file.exists():
+        print("Creating PyInstaller spec file...")
+        create_spec_file(current_dir)
     
     print("Building AI service executable...")
     
