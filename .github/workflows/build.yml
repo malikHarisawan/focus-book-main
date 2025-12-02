@@ -76,6 +76,7 @@ jobs:
             libxkbfile-dev \
             libxss-dev \
             libxext-dev
+          sudo snap install snapcraft --classic
 
       - uses: actions/setup-python@v5
         with:
