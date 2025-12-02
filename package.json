@@ -42,6 +42,7 @@
     "clsx": "^2.1.1",
     "dotenv": "^16.4.5",
     "electron-active-window": "^0.0.6",
+    "electron-updater": "^6.6.2",
     "highlight.js": "^11.11.1",
     "lucide-react": "^0.477.0",
     "react-markdown": "^10.1.0",

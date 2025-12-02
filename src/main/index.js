@@ -9,6 +9,7 @@ const {
   globalShortcut,
   nativeImage
 } = require('electron')
+const { autoUpdater } = require('electron-updater')
 // const { is } = require('@electron-toolkit/utils') // Removed to fix production build issue
 const { exec, spawn } = require('child_process')
 const path = require('path')
@@ -266,6 +267,30 @@ function createPopUp() {
   }
 }
 
+// Configure auto-updater
+autoUpdater.autoDownload = false
+autoUpdater.autoInstallOnAppQuit = true
+
+autoUpdater.on('update-available', (info) => {
+  console.log('🔔 Update available:', info.version)
+  // Notify user about update
+  if (mainWindow) {
+    mainWindow.webContents.send('update-available', info)
+  }
+})
+
+autoUpdater.on('update-downloaded', (info) => {
+  console.log('✅ Update downloaded:', info.version)
+  // Notify user that update is ready
+  if (mainWindow) {
+    mainWindow.webContents.send('update-downloaded', info)
+  }
+})
+
+autoUpdater.on('error', (err) => {
+  console.error('❌ Auto-updater error:', err)
+})
+
 app.whenReady().then(async () => {
   try {
     await hybridConnection.connect()
@@ -285,6 +310,15 @@ app.whenReady().then(async () => {
   } catch (error) {
     console.error('❌ Failed to initialize database system:', error.message)
     console.log('📋 The app will continue to run with reduced functionality.')
+  }
+
+  // Check for updates (only in production)
+  if (!process.env.NODE_ENV || process.env.NODE_ENV === 'production') {
+    setTimeout(() => {
+      autoUpdater.checkForUpdates()
+        .then(() => console.log('✅ Checked for updates'))
+        .catch((err) => console.error('❌ Failed to check for updates:', err))
+    }, 5000) // Check after 5 seconds
   }
 
   // Enable auto-startup on first run (for fresh installs)
@@ -421,6 +455,31 @@ app.whenReady().then(async () => {
       console.error('Error loading categories:', error)
       return [[], []]
     }
+  })
+
+  // Auto-updater IPC handlers
+  ipcMain.handle('check-for-updates', async () => {
+    try {
+      const result = await autoUpdater.checkForUpdates()
+      return result
+    } catch (error) {
+      console.error('Error checking for updates:', error)
+      return null
+    }
+  })
+
+  ipcMain.handle('download-update', async () => {
+    try {
+      await autoUpdater.downloadUpdate()
+      return true
+    } catch (error) {
+      console.error('Error downloading update:', error)
+      return false
+    }
+  })
+
+  ipcMain.handle('install-update', () => {
+    autoUpdater.quitAndInstall()
   })
 
   ipcMain.handle('load-data', async () => {

@@ -81,5 +81,7 @@ appImage:
   artifactName: ${name}-${version}.${ext}
 npmRebuild: false
 publish:
-  provider: generic
-  url: https://example.com/auto-updates
+  provider: github
+  owner: malikHarisawan
+  repo: focus-book-main
+  releaseType: release

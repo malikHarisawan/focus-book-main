@@ -1288,6 +1288,12 @@ contextBridge.exposeInMainWorld('electronAPI', {
   removeFromExclusionList: (identifier, type) => ipcRenderer.invoke('remove-from-exclusion-list', identifier, type),
   isExcluded: (identifier, type) => ipcRenderer.invoke('is-excluded', identifier, type),
   clearExclusionList: () => ipcRenderer.invoke('clear-exclusion-list'),
+  // Auto-update API
+  checkForUpdates: () => ipcRenderer.invoke('check-for-updates'),
+  downloadUpdate: () => ipcRenderer.invoke('download-update'),
+  installUpdate: () => ipcRenderer.invoke('install-update'),
+  onUpdateAvailable: (callback) => ipcRenderer.on('update-available', (event, info) => callback(info)),
+  onUpdateDownloaded: (callback) => ipcRenderer.on('update-downloaded', (event, info) => callback(info)),
 })
 
 contextBridge.exposeInMainWorld('activeWindow', {
