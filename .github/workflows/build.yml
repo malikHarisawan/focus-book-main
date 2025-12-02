@@ -28,6 +28,12 @@ jobs:
           node-version: 20
           cache: npm
 
+      # Linux dependencies (needed for electron-active-window native compilation)
+      - name: Install X11 development headers
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libx11-dev libxtst-dev libxkbfile-dev
+
       - name: Install Node deps (faster)
         run: npm ci
 
