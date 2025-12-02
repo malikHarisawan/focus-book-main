@@ -84,7 +84,7 @@ exe = EXE(
 """
     spec_file = current_dir / "ai_service.spec"
     spec_file.write_text(spec_content)
-    print(f"✅ Created spec file: {spec_file}")
+    print(f"Created spec file: {spec_file}")
 
 def main():
     """Main build function"""
