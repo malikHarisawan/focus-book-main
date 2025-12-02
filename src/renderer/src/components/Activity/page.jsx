@@ -40,7 +40,7 @@ import { useToast } from '../../hooks/use-toast'
 import useCategoryChangeToast from './category-change-toast'
 import CategoryBadge from './category-badge'
 import BulkCategoryDialog from './bulk-categories-dialog'
-import { formatAppsData } from '../../utils/dataProcessor'
+import { formatAppsData, getProductivityType, refreshCategoryMapping } from '../../utils/dataProcessor'
 import { useDate } from '../../context/DateContext'
 import { useTheme } from '../../context/ThemeContext'
 
@@ -79,8 +79,12 @@ export default function AppUsageTable() {
     setApps(appsData)
   }
   const handleBulkCategorize = async (appIds, category) => {
-    // Update local state
-    setApps(apps.map((app) => (appIds.includes(app.id) ? { ...app, category } : app)))
+    // Calculate the new productivity status based on the category
+    const productivityType = getProductivityType(category)
+    const newProductivity = getProductivityDisplay(productivityType)
+
+    // Update local state with both category and productivity
+    setApps(apps.map((app) => (appIds.includes(app.id) ? { ...app, category, productivity: newProductivity } : app)))
 
     // Show toast for bulk categorization
     const count = appIds.length
@@ -97,6 +101,9 @@ export default function AppUsageTable() {
         const appIdentifier = app.domain || app.name
         await window.activeWindow.updateAppCategory(appIdentifier, category)
       }
+
+      // Refresh the category mapping to ensure consistency across the app
+      await refreshCategoryMapping()
     } catch (error) {
       console.error('Failed to save bulk category changes:', error)
       toast({
@@ -107,18 +114,39 @@ export default function AppUsageTable() {
     }
   }
 
+  // Helper function to get productivity display value from productivity type
+  const getProductivityDisplay = (productivityType) => {
+    switch (productivityType) {
+      case 'productive':
+        return 'Productive'
+      case 'distracted':
+        return 'Distracting'
+      case 'neutral':
+        return 'Neutral'
+      default:
+        return 'Neutral'
+    }
+  }
+
   // Update the handleCategoryChange function to show a toast notification
   const handleCategoryChange = async (appId, newCategory) => {
     const appToUpdate = apps.find((app) => app.id === appId)
     if (appToUpdate) {
-      // Update local state
-      setApps(apps.map((app) => (app.id === appId ? { ...app, category: newCategory } : app)))
+      // Calculate the new productivity status based on the category
+      const productivityType = getProductivityType(newCategory)
+      const newProductivity = getProductivityDisplay(productivityType)
+
+      // Update local state with both category and productivity
+      setApps(apps.map((app) => (app.id === appId ? { ...app, category: newCategory, productivity: newProductivity } : app)))
       showCategoryChangeToast(appToUpdate.name, newCategory)
 
       try {
         const appIdentifier = appToUpdate.domain || appToUpdate.name
         const key = appToUpdate.key
         await window.activeWindow.updateAppCategory(appIdentifier, newCategory, selectedDate, key)
+
+        // Refresh the category mapping to ensure consistency across the app
+        await refreshCategoryMapping()
       } catch (error) {
         console.error('Failed to save category change permanently:', error)
         toast({
@@ -276,18 +304,6 @@ export default function AppUsageTable() {
               >
                 Table
               </TabsTrigger>
-              <TabsTrigger
-                value="timeline"
-                className="data-[state=active]:bg-muted data-[state=active]:text-primary"
-              >
-                Timeline
-              </TabsTrigger>
-              <TabsTrigger
-                value="stats"
-                className="data-[state=active]:bg-muted data-[state=active]:text-primary"
-              >
-                Stats
-              </TabsTrigger>
             </TabsList>
 
             <div className="flex items-center space-x-4">
@@ -419,38 +435,6 @@ export default function AppUsageTable() {
                     ))}
                 </TableBody>
               </Table>
-            </div>
-          </TabsContent>
-          <TabsContent value="timeline" className="mt-0 px-6 pb-6">
-            <div className="h-[400px] w-full relative bg-muted/30 rounded-lg border border-border/50 overflow-hidden">
-              <AppTimelineChart date={selectedDate} />
-            </div>
-          </TabsContent>
-
-          <TabsContent value="stats" className="mt-0 px-6 pb-6">
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-              <StatCard
-                title="Productive Time"
-                value={`${Math.floor(productiveTime / 3600)}h ${Math.floor((productiveTime % 3600) / 60)}m`}
-                percentage={productivePercentage}
-                color="green"
-              />
-              <StatCard
-                title="Neutral Time"
-                value={`${Math.floor(neutralTime / 3600)}h ${Math.floor((neutralTime % 3600) / 60)}m`}
-                percentage={neutralPercentage}
-                color="blue"
-              />
-              <StatCard
-                title="Distracting Time"
-                value={`${Math.floor(distractingTime / 3600)}h ${Math.floor((distractingTime % 3600) / 60)}m`}
-                percentage={distractingPercentage}
-                color="red"
-              />
-            </div>
-
-            <div className="mt-6 h-[300px] w-full relative bg-muted/30 rounded-lg border border-border/50 overflow-hidden">
-              <AppCategoryDistribution />
             </div>
           </TabsContent>
         </Tabs>
