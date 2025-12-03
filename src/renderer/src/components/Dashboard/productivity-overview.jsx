@@ -208,34 +208,32 @@ export default function ProductivityOverview() {
         </div>
       </CardHeader>
       <CardContent className="p-3 sm:p-4">
-        {/* Daily Summary */}
-        <div className="mb-4">
-          <div className="grid grid-cols-1 lg:grid-cols-4 gap-3">
-            {/* Productivity Score Circle */}
-            <div className="rounded-xl p-4 border bg-white border-meta-gray-200 shadow-sm dark:bg-dark-bg-tertiary dark:border-dark-border-primary">
-              <div className="text-xs uppercase tracking-wide font-semibold mb-3 text-meta-gray-500 dark:text-dark-text-tertiary">
-                Today
-              </div>
-              <div className="relative w-32 h-32 mx-auto mb-3">
-                <svg className="transform -rotate-90 w-32 h-32">
+        {/* Compact Daily Summary */}
+        <div className="mb-4 rounded-xl border bg-white border-meta-gray-200 shadow-sm dark:bg-dark-bg-tertiary dark:border-dark-border-primary p-4">
+          {/* Header Row: Score + Total Time */}
+          <div className="flex items-center justify-between mb-3">
+            <div className="flex items-center gap-3">
+              {/* Mini Donut Chart */}
+              <div className="relative w-14 h-14 flex-shrink-0">
+                <svg className="transform -rotate-90 w-14 h-14">
                   <circle
-                    cx="64"
-                    cy="64"
-                    r="56"
+                    cx="28"
+                    cy="28"
+                    r="24"
                     stroke="currentColor"
-                    strokeWidth="10"
+                    strokeWidth="5"
                     fill="transparent"
                     className="text-meta-gray-200 dark:text-meta-gray-700"
                   />
                   <circle
-                    cx="64"
-                    cy="64"
-                    r="56"
+                    cx="28"
+                    cy="28"
+                    r="24"
                     stroke="currentColor"
-                    strokeWidth="10"
+                    strokeWidth="5"
                     fill="transparent"
-                    strokeDasharray={`${2 * Math.PI * 56}`}
-                    strokeDashoffset={`${2 * Math.PI * 56 * (1 - (isNaN(productivePercentage) ? 0 : productivePercentage / 100))}`}
+                    strokeDasharray={`${2 * Math.PI * 24}`}
+                    strokeDashoffset={`${2 * Math.PI * 24 * (1 - (isNaN(productivePercentage) ? 0 : productivePercentage / 100))}`}
                     className={`transition-all duration-1000 ${
                       productivePercentage >= 70 ? 'text-meta-green-600 dark:text-meta-green-400' :
                       productivePercentage >= 40 ? 'text-meta-orange-600 dark:text-meta-orange-400' :
@@ -245,129 +243,123 @@ export default function ProductivityOverview() {
                   />
                 </svg>
                 <div className="absolute inset-0 flex items-center justify-center">
-                  <div className={`text-4xl font-bold ${
+                  <span className={`text-sm font-bold ${
                     productivePercentage >= 70 ? 'text-meta-green-700 dark:text-meta-green-300' :
                     productivePercentage >= 40 ? 'text-meta-orange-700 dark:text-meta-orange-300' :
                     'text-meta-red-700 dark:text-meta-red-300'
                   }`}>
                     {isNaN(productivePercentage) ? '0' : productivePercentage}%
-                  </div>
-                </div>
-              </div>
-              <div className="text-sm text-center font-medium text-meta-gray-600 dark:text-dark-text-secondary">
-                {productivePercentage >= 70 ? 'Excellent' :
-                 productivePercentage >= 40 ? 'Good' :
-                 'Needs Work'}
-              </div>
-            </div>
-
-            {/* Time Breakdown */}
-            <div className="lg:col-span-3 grid grid-cols-1 sm:grid-cols-3 gap-3">
-              {/* Productive */}
-              <div className="rounded-xl p-4 border bg-white border-meta-green-100 shadow-sm dark:bg-dark-bg-tertiary dark:border-meta-green-900/40">
-                <div className="flex items-center justify-between mb-2">
-                  <div className="text-xs uppercase tracking-wide font-semibold text-meta-green-700 dark:text-meta-green-300">
-                    Productive
-                  </div>
-                  <div className="h-2 w-2 rounded-full bg-meta-green-600 dark:bg-meta-green-400"></div>
-                </div>
-                <div className="text-2xl font-bold mb-2 text-meta-gray-900 dark:text-dark-text-primary">
-                  {Math.floor(productiveTime / 3600)}h {Math.floor((productiveTime % 3600) / 60)}m
-                </div>
-                <div className="flex items-center gap-2">
-                  <div className="flex-1 rounded-full h-2 overflow-hidden bg-meta-gray-200 dark:bg-meta-gray-700">
-                    <div
-                      className="bg-meta-green-600 dark:bg-meta-green-400 h-full transition-all duration-500"
-                      style={{ width: `${isNaN(productivePercentage) ? 0 : productivePercentage}%` }}
-                    ></div>
-                  </div>
-                  <span className="font-semibold text-sm text-meta-green-700 dark:text-meta-green-300">
-                    {isNaN(productivePercentage) ? 0 : productivePercentage}%
                   </span>
                 </div>
               </div>
-
-              {/* Neutral */}
-              <div className="rounded-xl p-4 border bg-white border-meta-orange-100 shadow-sm dark:bg-dark-bg-tertiary dark:border-meta-orange-900/40">
-                <div className="flex items-center justify-between mb-2">
-                  <div className="text-xs uppercase tracking-wide font-semibold text-meta-orange-700 dark:text-meta-orange-300">
-                    Neutral
-                  </div>
-                  <div className="h-2 w-2 rounded-full bg-meta-orange-600 dark:bg-meta-orange-400"></div>
+              {/* Score Label */}
+              <div>
+                <div className={`text-lg font-semibold ${
+                  productivePercentage >= 70 ? 'text-meta-green-700 dark:text-meta-green-300' :
+                  productivePercentage >= 40 ? 'text-meta-orange-700 dark:text-meta-orange-300' :
+                  'text-meta-red-700 dark:text-meta-red-300'
+                }`}>
+                  {productivePercentage >= 70 ? 'Excellent Day!' :
+                   productivePercentage >= 40 ? 'Good Progress' :
+                   'Needs Focus'}
                 </div>
-                <div className="text-2xl font-bold mb-2 text-meta-gray-900 dark:text-dark-text-primary">
-                  {Math.floor(neutralTime / 3600)}h {Math.floor((neutralTime % 3600) / 60)}m
-                </div>
-                <div className="flex items-center gap-2">
-                  <div className="flex-1 rounded-full h-2 overflow-hidden bg-meta-gray-200 dark:bg-meta-gray-700">
-                    <div
-                      className="bg-meta-orange-600 dark:bg-meta-orange-400 h-full transition-all duration-500"
-                      style={{ width: `${isNaN(neutralPercentage) ? 0 : neutralPercentage}%` }}
-                    ></div>
-                  </div>
-                  <span className="font-semibold text-sm text-meta-orange-700 dark:text-meta-orange-300">
-                    {isNaN(neutralPercentage) ? 0 : neutralPercentage}%
-                  </span>
-                </div>
-              </div>
-
-              {/* Distracting */}
-              <div className="rounded-xl p-4 border bg-white border-meta-red-100 shadow-sm dark:bg-dark-bg-tertiary dark:border-meta-red-900/40">
-                <div className="flex items-center justify-between mb-2">
-                  <div className="text-xs uppercase tracking-wide font-semibold text-meta-red-700 dark:text-meta-red-300">
-                    Distracting
-                  </div>
-                  <div className="h-2 w-2 rounded-full bg-meta-red-600 dark:bg-meta-red-400"></div>
-                </div>
-                <div className="text-2xl font-bold mb-2 text-meta-gray-900 dark:text-dark-text-primary">
-                  {Math.floor(distractingTime / 3600)}h {Math.floor((distractingTime % 3600) / 60)}m
-                </div>
-                <div className="flex items-center gap-2">
-                  <div className="flex-1 rounded-full h-2 overflow-hidden bg-meta-gray-200 dark:bg-meta-gray-700">
-                    <div
-                      className="bg-meta-red-600 dark:bg-meta-red-400 h-full transition-all duration-500"
-                      style={{ width: `${isNaN(distractingPercentage) ? 0 : distractingPercentage}%` }}
-                    ></div>
-                  </div>
-                  <span className="font-semibold text-sm text-meta-red-700 dark:text-meta-red-300">
-                    {isNaN(distractingPercentage) ? 0 : distractingPercentage}%
-                  </span>
+                <div className="text-xs text-meta-gray-500 dark:text-dark-text-tertiary">
+                  Productivity Score
                 </div>
               </div>
             </div>
-          </div>
-
-          {/* Total Screen Time Bar */}
-          <div className="mt-3 p-4 rounded-xl border bg-meta-gray-50 border-meta-gray-200 dark:bg-dark-bg-tertiary dark:border-dark-border-primary">
-            <div className="flex items-center justify-between mb-3">
-              <span className="text-xs font-semibold uppercase tracking-wide text-meta-gray-500 dark:text-dark-text-tertiary">
-                Total Screen Time
-              </span>
-              <span className="text-xl font-bold text-meta-blue-600 dark:text-meta-blue-400">
+            {/* Total Screen Time */}
+            <div className="text-right">
+              <div className="text-2xl font-bold text-meta-gray-900 dark:text-dark-text-primary">
                 {totalTimeFormatted}
-              </span>
-            </div>
-            <div className="relative w-full rounded-full h-2 overflow-hidden bg-meta-gray-200 dark:bg-meta-gray-700">
-              <div
-                className="absolute top-0 left-0 h-full bg-meta-green-600 dark:bg-meta-green-400 transition-all duration-500"
-                style={{ width: `${isNaN(productivePercentage) ? 0 : productivePercentage}%` }}
-              ></div>
-              <div
-                className="absolute top-0 h-full bg-meta-orange-600 dark:bg-meta-orange-400 transition-all duration-500"
-                style={{
-                  left: `${isNaN(productivePercentage) ? 0 : productivePercentage}%`,
-                  width: `${isNaN(neutralPercentage) ? 0 : neutralPercentage}%`
-                }}
-              ></div>
-              <div
-                className="absolute top-0 h-full bg-meta-red-600 dark:bg-meta-red-400 transition-all duration-500"
-                style={{
-                  left: `${(isNaN(productivePercentage) ? 0 : productivePercentage) + (isNaN(neutralPercentage) ? 0 : neutralPercentage)}%`,
-                  width: `${isNaN(distractingPercentage) ? 0 : distractingPercentage}%`
-                }}
-              ></div>
+              </div>
+              <div className="text-xs text-meta-gray-500 dark:text-dark-text-tertiary">
+                Total Screen Time
+              </div>
             </div>
           </div>
+
+          {/* Stacked Progress Bar */}
+          <div className="relative w-full rounded-full h-3 overflow-hidden bg-meta-gray-200 dark:bg-meta-gray-700 mb-3">
+            <div
+              className="absolute top-0 left-0 h-full bg-meta-green-500 dark:bg-meta-green-400 transition-all duration-500"
+              style={{ width: `${isNaN(productivePercentage) ? 0 : productivePercentage}%` }}
+            ></div>
+            <div
+              className="absolute top-0 h-full bg-meta-orange-500 dark:bg-meta-orange-400 transition-all duration-500"
+              style={{
+                left: `${isNaN(productivePercentage) ? 0 : productivePercentage}%`,
+                width: `${isNaN(neutralPercentage) ? 0 : neutralPercentage}%`
+              }}
+            ></div>
+            <div
+              className="absolute top-0 h-full bg-meta-red-500 dark:bg-meta-red-400 transition-all duration-500"
+              style={{
+                left: `${(isNaN(productivePercentage) ? 0 : productivePercentage) + (isNaN(neutralPercentage) ? 0 : neutralPercentage)}%`,
+                width: `${isNaN(distractingPercentage) ? 0 : distractingPercentage}%`
+              }}
+            ></div>
+          </div>
+
+          {/* Time Breakdown - Horizontal Pills */}
+          <div className="flex flex-wrap gap-2 sm:gap-4">
+            {/* Productive */}
+            <div className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-meta-green-50 dark:bg-meta-green-500/10 border border-meta-green-200 dark:border-meta-green-500/30">
+              <div className="h-2.5 w-2.5 rounded-full bg-meta-green-500 dark:bg-meta-green-400"></div>
+              <span className="text-sm font-medium text-meta-green-700 dark:text-meta-green-300">
+                {Math.floor(productiveTime / 3600)}h {Math.floor((productiveTime % 3600) / 60)}m
+              </span>
+              <span className="text-xs text-meta-green-600 dark:text-meta-green-400">
+                ({isNaN(productivePercentage) ? 0 : productivePercentage}%)
+              </span>
+            </div>
+
+            {/* Neutral */}
+            <div className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-meta-orange-50 dark:bg-meta-orange-500/10 border border-meta-orange-200 dark:border-meta-orange-500/30">
+              <div className="h-2.5 w-2.5 rounded-full bg-meta-orange-500 dark:bg-meta-orange-400"></div>
+              <span className="text-sm font-medium text-meta-orange-700 dark:text-meta-orange-300">
+                {Math.floor(neutralTime / 3600)}h {Math.floor((neutralTime % 3600) / 60)}m
+              </span>
+              <span className="text-xs text-meta-orange-600 dark:text-meta-orange-400">
+                ({isNaN(neutralPercentage) ? 0 : neutralPercentage}%)
+              </span>
+            </div>
+
+            {/* Distracting */}
+            <div className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-meta-red-50 dark:bg-meta-red-500/10 border border-meta-red-200 dark:border-meta-red-500/30">
+              <div className="h-2.5 w-2.5 rounded-full bg-meta-red-500 dark:bg-meta-red-400"></div>
+              <span className="text-sm font-medium text-meta-red-700 dark:text-meta-red-300">
+                {Math.floor(distractingTime / 3600)}h {Math.floor((distractingTime % 3600) / 60)}m
+              </span>
+              <span className="text-xs text-meta-red-600 dark:text-meta-red-400">
+                ({isNaN(distractingPercentage) ? 0 : distractingPercentage}%)
+              </span>
+            </div>
+          </div>
+
+          {/* Contextual Insight */}
+          {totalTimeSeconds > 0 && (
+            <div className="mt-3 pt-3 border-t border-meta-gray-200 dark:border-dark-border-primary">
+              <p className="text-xs text-meta-gray-600 dark:text-dark-text-secondary">
+                {distractingPercentage > 40 ? (
+                  <>
+                    <span className="font-medium text-meta-red-600 dark:text-meta-red-400">💡 Tip:</span>{' '}
+                    You spent {distractingPercentage}% on distracting apps. Try blocking them during focus hours.
+                  </>
+                ) : productivePercentage >= 70 ? (
+                  <>
+                    <span className="font-medium text-meta-green-600 dark:text-meta-green-400">🎉 Great job!</span>{' '}
+                    You're staying focused with {productivePercentage}% productive time.
+                  </>
+                ) : (
+                  <>
+                    <span className="font-medium text-meta-orange-600 dark:text-meta-orange-400">📊 Insight:</span>{' '}
+                    Balance your time - {neutralPercentage}% was neutral activity.
+                  </>
+                )}
+              </p>
+            </div>
+          )}
         </div>
 
         {/* Charts Section - Extra Compact */}
