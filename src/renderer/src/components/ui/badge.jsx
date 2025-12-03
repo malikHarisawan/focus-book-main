@@ -4,16 +4,16 @@ import { cva } from 'class-variance-authority'
 import { cn } from '../../lib/utils'
 
 const badgeVariants = cva(
-  'inline-flex items-center rounded-full border px-2.5 py-0.5 text-xs font-semibold transition-colors focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2',
+  'inline-flex items-center rounded-full border px-2.5 py-0.5 text-xs font-semibold transition-colors focus:outline-none focus:ring-2 focus:ring-meta-blue-500/30 focus:ring-offset-2',
   {
     variants: {
       variant: {
-        default: 'border-transparent bg-cyan-600 text-white hover:bg-cyan-700 dark:bg-cyan-600 dark:text-white dark:hover:bg-cyan-700',
+        default: 'border-transparent bg-meta-blue-500 text-white hover:bg-meta-blue-600',
         secondary:
-          'border-transparent bg-gray-200 dark:bg-gray-700 text-cyan-700 dark:text-cyan-400 hover:bg-gray-300 dark:hover:bg-gray-600',
+          'border-transparent bg-meta-gray-100 dark:bg-meta-gray-700 text-meta-gray-700 dark:text-meta-gray-200 hover:bg-meta-gray-200 dark:hover:bg-meta-gray-600',
         destructive:
-          'border-transparent bg-red-600 text-white hover:bg-red-700 dark:bg-red-600 dark:text-white dark:hover:bg-red-700',
-        outline: 'text-cyan-600 dark:text-cyan-400 border-cyan-500 dark:border-cyan-400'
+          'border-transparent bg-meta-red-500 text-white hover:bg-meta-red-600',
+        outline: 'text-meta-gray-700 dark:text-meta-gray-300 border-meta-gray-300 dark:border-meta-gray-600'
       }
     },
     defaultVariants: {

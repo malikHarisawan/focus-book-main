@@ -1,4 +1,4 @@
-import React, { useState } from 'react'
+import React, { useRef } from 'react'
 import { ChevronLeft, ChevronRight, Calendar, Home } from 'lucide-react'
 import { useDate } from '../../context/DateContext'
 import { useTheme } from '../../context/ThemeContext'
@@ -13,7 +13,7 @@ const SmartDatePicker = ({ zoomLevel = 'hour', onDateChange, className = '' }) =
     goToToday,
     getFormattedDateRange
   } = useDate()
-  const [showDateInput, setShowDateInput] = useState(false)
+  const dateInputRef = useRef(null)
 
   const handlePrevious = () => {
     goToPrevious(zoomLevel)
@@ -33,7 +33,10 @@ const SmartDatePicker = ({ zoomLevel = 'hour', onDateChange, className = '' }) =
   const handleDirectDateChange = (e) => {
     handleDateChange(e.target.value)
     onDateChange?.()
-    setShowDateInput(false)
+  }
+
+  const openDatePicker = () => {
+    dateInputRef.current?.showPicker()
   }
 
   const getNavigationLabel = () => {
@@ -78,8 +81,8 @@ const SmartDatePicker = ({ zoomLevel = 'hour', onDateChange, className = '' }) =
         onClick={handlePrevious}
         className={`flex items-center justify-center w-8 h-8 rounded transition-all duration-200 ${
           theme === 'dark'
-            ? 'text-slate-400 hover:text-cyan-400 hover:bg-slate-700'
-            : 'text-slate-600 hover:text-cyan-600 hover:bg-gray-100'
+            ? 'text-meta-gray-400 hover:text-meta-blue-400 hover:bg-meta-gray-700'
+            : 'text-meta-gray-500 hover:text-meta-blue-600 hover:bg-meta-gray-100'
         }`}
         title={`Previous ${getNavigationLabel()}`}
       >
@@ -88,38 +91,28 @@ const SmartDatePicker = ({ zoomLevel = 'hour', onDateChange, className = '' }) =
 
       {/* Date Display/Picker */}
       <div className="relative">
-        {showDateInput ? (
-          <div className="relative flex items-center">
-            <input
-              type="date"
-              value={selectedDate}
-              onChange={handleDirectDateChange}
-              onBlur={() => setShowDateInput(false)}
-              autoFocus
-              className={`border rounded px-3 py-2 text-sm outline-none ${
-                theme === 'dark'
-                  ? 'bg-slate-800 text-cyan-400 border-cyan-500/50 focus:border-cyan-400'
-                  : 'bg-white text-cyan-600 border-cyan-500/50 focus:border-cyan-600'
-              }`}
-              style={{
-                colorScheme: theme === 'dark' ? 'dark' : 'light'
-              }}
-            />
-          </div>
-        ) : (
-          <button
-            onClick={() => setShowDateInput(true)}
-            className={`flex items-center gap-2 border rounded px-3 py-2 text-sm transition-all duration-200 min-w-0 ${
-              theme === 'dark'
-                ? 'bg-slate-800/50 text-cyan-400 border-cyan-500/50 hover:bg-slate-800 hover:border-cyan-400'
-                : 'bg-gray-50 text-cyan-600 border-cyan-500/30 hover:bg-white hover:border-cyan-600'
-            }`}
-            title="Click to select specific date"
-          >
-            <span className="truncate">{getFormattedDateRange(zoomLevel)}</span>
-            <Calendar size={14} className="flex-shrink-0" />
-          </button>
-        )}
+        {/* Hidden date input */}
+        <input
+          ref={dateInputRef}
+          type="date"
+          value={selectedDate}
+          onChange={handleDirectDateChange}
+          className="absolute opacity-0 w-0 h-0 pointer-events-none"
+          style={{ colorScheme: theme === 'dark' ? 'dark' : 'light' }}
+        />
+        {/* Visible button */}
+        <button
+          onClick={openDatePicker}
+          className={`flex items-center gap-2 border rounded px-3 py-2 text-sm transition-all duration-200 min-w-0 ${
+            theme === 'dark'
+              ? 'bg-meta-gray-700 text-dark-text-primary border-meta-gray-600 hover:bg-meta-gray-600 hover:border-meta-blue-400'
+              : 'bg-meta-gray-50 text-meta-gray-700 border-meta-gray-300 hover:bg-white hover:border-meta-blue-500'
+          }`}
+          title="Click to select specific date"
+        >
+          <span className="truncate">{getFormattedDateRange(zoomLevel)}</span>
+          <Calendar size={14} className="flex-shrink-0" />
+        </button>
       </div>
 
       {/* Next Button */}
@@ -127,8 +120,8 @@ const SmartDatePicker = ({ zoomLevel = 'hour', onDateChange, className = '' }) =
         onClick={handleNext}
         className={`flex items-center justify-center w-8 h-8 rounded transition-all duration-200 ${
           theme === 'dark'
-            ? 'text-slate-400 hover:text-cyan-400 hover:bg-slate-700'
-            : 'text-slate-600 hover:text-cyan-600 hover:bg-gray-100'
+            ? 'text-meta-gray-400 hover:text-meta-blue-400 hover:bg-meta-gray-700'
+            : 'text-meta-gray-500 hover:text-meta-blue-600 hover:bg-meta-gray-100'
         }`}
         title={`Next ${getNavigationLabel()}`}
       >
@@ -141,8 +134,8 @@ const SmartDatePicker = ({ zoomLevel = 'hour', onDateChange, className = '' }) =
           onClick={handleToday}
           className={`flex items-center justify-center w-8 h-8 rounded transition-all duration-200 ${
             theme === 'dark'
-              ? 'text-slate-400 hover:text-cyan-400 hover:bg-slate-700'
-              : 'text-slate-600 hover:text-cyan-600 hover:bg-gray-100'
+              ? 'text-meta-gray-400 hover:text-meta-blue-400 hover:bg-meta-gray-700'
+              : 'text-meta-gray-500 hover:text-meta-blue-600 hover:bg-meta-gray-100'
           }`}
           title="Go to today"
         >
@@ -151,7 +144,7 @@ const SmartDatePicker = ({ zoomLevel = 'hour', onDateChange, className = '' }) =
       )}
 
       {/* Current period indicator */}
-      <div className={`text-xs hidden sm:block ${theme === 'dark' ? 'text-slate-500' : 'text-slate-500'}`}>
+      <div className={`text-xs hidden sm:block ${theme === 'dark' ? 'text-meta-gray-500' : 'text-meta-gray-500'}`}>
         {zoomLevel.charAt(0).toUpperCase() + zoomLevel.slice(1)} view
       </div>
     </div>

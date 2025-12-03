@@ -67,13 +67,17 @@ const ProductiveAreaChart = ({
   // Get current theme
   const { resolvedTheme } = useTheme()
 
-  // Theme-aware colors
+  // Theme-aware colors - Meta-inspired professional palette
   const chartColors = {
-    productive: resolvedTheme === 'dark' ? '#82ca9d' : '#10b981', // green
-    unproductive: resolvedTheme === 'dark' ? '#ff6b6b' : '#ef4444', // red
-    selection: resolvedTheme === 'dark' ? '#06b6d4' : '#0891b2', // cyan
-    grid: resolvedTheme === 'dark' ? '#475569' : '#cbd5e1', // slate
-    text: resolvedTheme === 'dark' ? '#ffffff' : '#1e293b', // white/slate
+    productive: resolvedTheme === 'dark' ? '#4bc793' : '#31a24c', // Meta green
+    unproductive: resolvedTheme === 'dark' ? '#ff7567' : '#fa383e', // Meta red
+    neutral: resolvedTheme === 'dark' ? '#ffab47' : '#f5a623', // Meta orange
+    selection: resolvedTheme === 'dark' ? '#4599ff' : '#1877f2', // Meta blue
+    grid: resolvedTheme === 'dark' ? '#3e4042' : '#dadde1', // Meta gray borders
+    text: resolvedTheme === 'dark' ? '#e4e6eb' : '#1c1e21', // Meta text colors
+    bg: resolvedTheme === 'dark' ? '#242526' : '#ffffff', // Background
+    bgSecondary: resolvedTheme === 'dark' ? '#3a3b3c' : '#f7f8fa', // Secondary bg
+    border: resolvedTheme === 'dark' ? '#3e4042' : '#dadde1', // Border color
   }
 
   // State management using custom hooks
@@ -272,21 +276,21 @@ const ProductiveAreaChart = ({
   // Loading state
   if (!currentData || currentData.length === 0) {
     return (
-      <div className="bg-slate-100 dark:bg-gray-800 p-4 rounded-md h-[250px] flex items-center justify-center">
+      <div className="bg-white dark:bg-meta-gray-800 p-4 rounded-xl h-[250px] flex items-center justify-center border border-meta-gray-200 dark:border-meta-gray-700">
         {isLoading ? (
-          <div className="flex items-center gap-2 text-cyan-600 dark:text-cyan-400">
-            <div className="animate-spin w-4 h-4 border-2 border-cyan-600 dark:border-cyan-400 border-t-transparent rounded-full"></div>
+          <div className="flex items-center gap-2 text-meta-blue-500">
+            <div className="animate-spin w-4 h-4 border-2 border-meta-blue-500 border-t-transparent rounded-full"></div>
             <span>Loading data...</span>
           </div>
         ) : (
-          <span className="text-gray-600 dark:text-gray-500">No data available</span>
+          <span className="text-meta-gray-500">No data available</span>
         )}
       </div>
     )
   }
 
   return (
-    <div ref={containerRef} className="bg-slate-100 dark:bg-gray-800 p-4 rounded-md" tabIndex={0}>
+    <div ref={containerRef} className="bg-white dark:bg-meta-gray-800 p-4 rounded-xl border border-meta-gray-200 dark:border-meta-gray-700" tabIndex={0}>
       <div className="space-y-3 mb-4">
         <ChartHeader
           zoomLevelLabel={zoomLevelDisplay.label}
@@ -327,6 +331,7 @@ const ProductiveAreaChart = ({
           onMouseDown={onMouseDown}
           onMouseMove={onMouseMove}
           onMouseUp={onMouseUp}
+          style={{ backgroundColor: chartColors.bg }}
         >
           <defs>
             <linearGradient id="colorProductive" x1="0" y1="0" x2="0" y2="1">
@@ -341,7 +346,12 @@ const ProductiveAreaChart = ({
           <XAxis
             dataKey="day"
             stroke={chartColors.text}
+            tick={{ fill: chartColors.text }}
             style={{ userSelect: 'none', WebkitUserSelect: 'none', MozUserSelect: 'none' }}
+          />
+          <YAxis 
+            stroke={chartColors.grid}
+            tick={{ fill: chartColors.text }}
           />
           <CartesianGrid strokeDasharray="3 3" stroke={chartColors.grid} />
           <Tooltip

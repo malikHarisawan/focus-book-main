@@ -16,13 +16,17 @@ const ProductiveAreaChart = ({ data, rawData, selectedDate, onZoomLevelChange })
   // Get current theme
   const { resolvedTheme } = useTheme()
 
-  // Theme-aware colors
+  // Theme-aware colors - Meta-inspired professional palette
   const chartColors = {
-    productive: resolvedTheme === 'dark' ? '#82ca9d' : '#10b981', // green
-    unproductive: resolvedTheme === 'dark' ? '#ff6b6b' : '#ef4444', // red
-    selection: resolvedTheme === 'dark' ? '#06b6d4' : '#0891b2', // cyan
-    grid: resolvedTheme === 'dark' ? '#475569' : '#cbd5e1', // slate
-    text: resolvedTheme === 'dark' ? '#ffffff' : '#1e293b', // white/slate
+    productive: resolvedTheme === 'dark' ? '#4bc793' : '#31a24c', // Meta green
+    unproductive: resolvedTheme === 'dark' ? '#ff7567' : '#fa383e', // Meta red
+    neutral: resolvedTheme === 'dark' ? '#ffab47' : '#f5a623', // Meta orange
+    selection: resolvedTheme === 'dark' ? '#4599ff' : '#1877f2', // Meta blue
+    grid: resolvedTheme === 'dark' ? '#3e4042' : '#dadde1', // Meta gray borders
+    text: resolvedTheme === 'dark' ? '#e4e6eb' : '#1c1e21', // Meta text colors
+    bg: resolvedTheme === 'dark' ? '#242526' : '#ffffff', // Background
+    bgSecondary: resolvedTheme === 'dark' ? '#3a3b3c' : '#f7f8fa', // Secondary bg
+    border: resolvedTheme === 'dark' ? '#3e4042' : '#dadde1', // Border color
   }
   const [selectedRange, setSelectedRange] = useState(null)
   const [aggregatedData, setAggregatedData] = useState({ productive: 0, unproductive: 0, total: 0 })
@@ -286,27 +290,27 @@ const ProductiveAreaChart = ({ data, rawData, selectedDate, onZoomLevelChange })
           : 0
 
       return (
-        <div className="bg-gray-800 p-3 rounded border border-gray-700">
-          <p className="text-gray-200 font-medium mb-2">{getTooltipTitle()}</p>
-          <div className="text-xs text-gray-400 mb-2">{getZoomLevelDisplay().detail}</div>
+        <div className="bg-white dark:bg-meta-gray-800 p-3 rounded-lg border border-meta-gray-200 dark:border-meta-gray-700 shadow-lg">
+          <p className="text-meta-gray-900 dark:text-meta-gray-100 font-medium mb-2">{getTooltipTitle()}</p>
+          <div className="text-xs text-meta-gray-500 dark:text-meta-gray-400 mb-2">{getZoomLevelDisplay().detail}</div>
           <div className="space-y-1">
             <div className="flex items-center gap-2">
-              <div className="w-3 h-3 rounded-full bg-green-500" />
-              <span className="text-gray-300">Productive: </span>
-              <span className="text-white">{productiveTime}</span>
+              <div className="w-3 h-3 rounded-full bg-meta-green-500" />
+              <span className="text-meta-gray-600 dark:text-meta-gray-300">Productive: </span>
+              <span className="text-meta-gray-900 dark:text-white">{productiveTime}</span>
             </div>
             <div className="flex items-center gap-2">
-              <div className="w-3 h-3 rounded-full bg-red-500" />
-              <span className="text-gray-300">Unproductive: </span>
-              <span className="text-white">{unproductiveTime}</span>
+              <div className="w-3 h-3 rounded-full bg-meta-red-500" />
+              <span className="text-meta-gray-600 dark:text-meta-gray-300">Unproductive: </span>
+              <span className="text-meta-gray-900 dark:text-white">{unproductiveTime}</span>
             </div>
-            <div className="flex items-center gap-2 pt-1 border-t border-gray-600">
-              <span className="text-gray-300">Total: </span>
-              <span className="text-cyan-400 font-medium">{totalTime}</span>
+            <div className="flex items-center gap-2 pt-1 border-t border-meta-gray-200 dark:border-meta-gray-600">
+              <span className="text-meta-gray-600 dark:text-meta-gray-300">Total: </span>
+              <span className="text-meta-blue-600 dark:text-meta-blue-400 font-medium">{totalTime}</span>
             </div>
             <div className="flex items-center gap-2">
-              <span className="text-gray-300">Productivity: </span>
-              <span className="text-green-400 font-medium">{productivePercentage}%</span>
+              <span className="text-meta-gray-600 dark:text-meta-gray-300">Productivity: </span>
+              <span className="text-meta-green-600 dark:text-meta-green-400 font-medium">{productivePercentage}%</span>
             </div>
           </div>
         </div>
@@ -317,32 +321,32 @@ const ProductiveAreaChart = ({ data, rawData, selectedDate, onZoomLevelChange })
 
   if (!currentData || currentData.length === 0) {
     return (
-      <div className="bg-gray-800 p-4 rounded-md h-[250px] flex items-center justify-center">
+      <div className="bg-white dark:bg-meta-gray-800 p-4 rounded-xl h-[250px] flex items-center justify-center border border-meta-gray-200 dark:border-meta-gray-700">
         {isLoading ? (
-          <div className="flex items-center gap-2 text-cyan-400">
-            <div className="animate-spin w-4 h-4 border-2 border-cyan-400 border-t-transparent rounded-full"></div>
+          <div className="flex items-center gap-2 text-meta-blue-500">
+            <div className="animate-spin w-4 h-4 border-2 border-meta-blue-500 border-t-transparent rounded-full"></div>
             <span>Loading data...</span>
           </div>
         ) : (
-          <span className="text-gray-500">No data available</span>
+          <span className="text-meta-gray-500">No data available</span>
         )}
       </div>
     )
   }
 
   return (
-    <div ref={containerRef} className="bg-gray-800 p-4 rounded-md" tabIndex={0}>
+    <div ref={containerRef} className="bg-white dark:bg-meta-gray-800 p-4 rounded-xl border border-meta-gray-200 dark:border-meta-gray-700" tabIndex={0}>
       <div className="space-y-3 mb-4">
         <div className="flex justify-between items-center">
           <div className="flex items-center gap-3">
-            <h3 className="text-white text-sm font-medium">Productivity Over Time</h3>
+            <h3 className="text-meta-gray-900 dark:text-white text-sm font-medium">Productivity Over Time</h3>
             <div className="flex items-center gap-2">
-              <span className="text-xs text-gray-400 bg-gray-700 px-2 py-1 rounded">
+              <span className="text-xs text-meta-gray-500 dark:text-meta-gray-400 bg-meta-gray-100 dark:bg-meta-gray-700 px-2 py-1 rounded-md">
                 {getZoomLevelDisplay().label}
               </span>
               <button
                 onClick={() => setShowHelp(!showHelp)}
-                className="text-gray-400 hover:text-cyan-400 transition-colors"
+                className="text-meta-gray-400 hover:text-meta-blue-500 transition-colors"
                 title="Help & Controls"
               >
                 <HelpCircle size={14} />
@@ -353,7 +357,7 @@ const ProductiveAreaChart = ({ data, rawData, selectedDate, onZoomLevelChange })
             <button
               onClick={zoomIn}
               disabled={zoomLevel === 'hour'}
-              className="text-cyan-400 hover:text-cyan-300 disabled:text-gray-500 disabled:cursor-not-allowed text-xs p-2 rounded border border-cyan-400 hover:border-cyan-300 disabled:border-gray-500 transition-all duration-200 hover:bg-cyan-400 hover:bg-opacity-10"
+              className="text-meta-blue-500 hover:text-meta-blue-600 disabled:text-meta-gray-400 disabled:cursor-not-allowed text-xs p-2 rounded-lg border border-meta-blue-500 hover:border-meta-blue-600 disabled:border-meta-gray-300 dark:disabled:border-meta-gray-600 transition-all duration-200 hover:bg-meta-blue-50 dark:hover:bg-meta-blue-500/10"
               title="Zoom In (+) - More detailed view"
             >
               <ZoomIn size={12} />
@@ -361,14 +365,14 @@ const ProductiveAreaChart = ({ data, rawData, selectedDate, onZoomLevelChange })
             <button
               onClick={zoomOut}
               disabled={zoomLevel === 'month'}
-              className="text-cyan-400 hover:text-cyan-300 disabled:text-gray-500 disabled:cursor-not-allowed text-xs p-2 rounded border border-cyan-400 hover:border-cyan-300 disabled:border-gray-500 transition-all duration-200 hover:bg-cyan-400 hover:bg-opacity-10"
+              className="text-meta-blue-500 hover:text-meta-blue-600 disabled:text-meta-gray-400 disabled:cursor-not-allowed text-xs p-2 rounded-lg border border-meta-blue-500 hover:border-meta-blue-600 disabled:border-meta-gray-300 dark:disabled:border-meta-gray-600 transition-all duration-200 hover:bg-meta-blue-50 dark:hover:bg-meta-blue-500/10"
               title="Zoom Out (-) - Broader time view"
             >
               <ZoomOut size={12} />
             </button>
             <button
               onClick={resetZoom}
-              className="text-cyan-400 hover:text-cyan-300 text-xs p-2 rounded border border-cyan-400 hover:border-cyan-300 transition-all duration-200 hover:bg-cyan-400 hover:bg-opacity-10"
+              className="text-meta-blue-500 hover:text-meta-blue-600 text-xs p-2 rounded-lg border border-meta-blue-500 hover:border-meta-blue-600 transition-all duration-200 hover:bg-meta-blue-50 dark:hover:bg-meta-blue-500/10"
               title="Reset to default view (0)"
             >
               <RotateCcw size={12} />
@@ -376,7 +380,7 @@ const ProductiveAreaChart = ({ data, rawData, selectedDate, onZoomLevelChange })
             {selectedRange && (
               <button
                 onClick={clearSelection}
-                className="text-cyan-400 hover:text-cyan-300 text-xs px-3 py-1 rounded border border-cyan-400 hover:border-cyan-300 transition-colors"
+                className="text-meta-blue-500 hover:text-meta-blue-600 text-xs px-3 py-1 rounded-lg border border-meta-blue-500 hover:border-meta-blue-600 transition-colors"
               >
                 Clear Selection
               </button>
@@ -386,7 +390,7 @@ const ProductiveAreaChart = ({ data, rawData, selectedDate, onZoomLevelChange })
 
         {/* Breadcrumb navigation */}
         <div className="flex items-center gap-2">
-          <span className="text-xs text-gray-500">View:</span>
+          <span className="text-xs text-meta-gray-500">View:</span>
           {getBreadcrumbPath().map((level, index) => (
             <div key={level} className="flex items-center gap-1">
               <button
@@ -395,16 +399,16 @@ const ProductiveAreaChart = ({ data, rawData, selectedDate, onZoomLevelChange })
                   onZoomLevelChange?.(level)
                   clearSelection()
                 }}
-                className={`text-xs px-2 py-1 rounded transition-colors ${
+                className={`text-xs px-2 py-1 rounded-md transition-colors ${
                   level === zoomLevel
-                    ? 'bg-cyan-500 text-white'
-                    : 'text-gray-400 hover:text-cyan-400 hover:bg-gray-700'
+                    ? 'bg-meta-blue-500 text-white'
+                    : 'text-meta-gray-500 dark:text-meta-gray-400 hover:text-meta-blue-500 hover:bg-meta-gray-100 dark:hover:bg-meta-gray-700'
                 }`}
               >
                 {level.charAt(0).toUpperCase() + level.slice(1)}
               </button>
               {index < getBreadcrumbPath().length - 1 && (
-                <ChevronRight size={12} className="text-gray-600" />
+                <ChevronRight size={12} className="text-meta-gray-400" />
               )}
             </div>
           ))}
@@ -412,29 +416,29 @@ const ProductiveAreaChart = ({ data, rawData, selectedDate, onZoomLevelChange })
 
         {/* Zoom progress indicator */}
         <div className="flex items-center gap-2">
-          <span className="text-xs text-gray-500">Detail Level:</span>
-          <div className="flex-1 h-1 bg-gray-700 rounded-full overflow-hidden">
+          <span className="text-xs text-meta-gray-500">Detail Level:</span>
+          <div className="flex-1 h-1 bg-meta-gray-200 dark:bg-meta-gray-700 rounded-full overflow-hidden">
             <div
-              className="h-full bg-gradient-to-r from-cyan-500 to-cyan-400 transition-all duration-300 ease-out"
+              className="h-full bg-gradient-to-r from-meta-blue-500 to-meta-blue-400 transition-all duration-300 ease-out"
               style={{ width: `${getZoomProgress()}%` }}
             />
           </div>
-          <span className="text-xs text-gray-400">{Math.round(getZoomProgress())}%</span>
+          <span className="text-xs text-meta-gray-500">{Math.round(getZoomProgress())}%</span>
         </div>
 
         {/* Help panel */}
         {showHelp && (
-          <div className="bg-gray-700 border border-gray-600 rounded p-3 text-xs space-y-2">
-            <div className="text-cyan-400 font-medium">Chart Controls:</div>
-            <div className="text-gray-300 space-y-1">
+          <div className="bg-meta-gray-50 dark:bg-meta-gray-700 border border-meta-gray-200 dark:border-meta-gray-600 rounded-lg p-3 text-xs space-y-2">
+            <div className="text-meta-blue-600 dark:text-meta-blue-400 font-medium">Chart Controls:</div>
+            <div className="text-meta-gray-600 dark:text-meta-gray-300 space-y-1">
               <div>
-                • <kbd className="bg-gray-600 px-1 rounded">Mouse Wheel</kbd> - Zoom in/out
+                • <kbd className="bg-meta-gray-200 dark:bg-meta-gray-600 px-1 rounded">Mouse Wheel</kbd> - Zoom in/out
               </div>
               <div>
-                • <kbd className="bg-gray-600 px-1 rounded">+/-</kbd> keys - Zoom in/out
+                • <kbd className="bg-meta-gray-200 dark:bg-meta-gray-600 px-1 rounded">+/-</kbd> keys - Zoom in/out
               </div>
               <div>
-                • <kbd className="bg-gray-600 px-1 rounded">0</kbd> key - Reset to default
+                • <kbd className="bg-meta-gray-200 dark:bg-meta-gray-600 px-1 rounded">0</kbd> key - Reset to default
               </div>
               <div>
                 • <strong>Click & Drag</strong> on chart to select time range
@@ -442,7 +446,7 @@ const ProductiveAreaChart = ({ data, rawData, selectedDate, onZoomLevelChange })
               <div>• Click breadcrumb buttons to jump between views</div>
               <div>• Hover chart for detailed tooltip information</div>
             </div>
-            <div className="text-cyan-400 font-medium mt-2">
+            <div className="text-meta-blue-600 dark:text-meta-blue-400 font-medium mt-2">
               Current View: {getZoomLevelDisplay().detail}
             </div>
           </div>
@@ -456,6 +460,7 @@ const ProductiveAreaChart = ({ data, rawData, selectedDate, onZoomLevelChange })
           onMouseDown={handleMouseDown}
           onMouseMove={handleMouseMove}
           onMouseUp={handleMouseUp}
+          style={{ backgroundColor: chartColors.bg }}
         >
           <defs>
             <linearGradient id="colorProductive" x1="0" y1="0" x2="0" y2="1">
@@ -470,7 +475,12 @@ const ProductiveAreaChart = ({ data, rawData, selectedDate, onZoomLevelChange })
           <XAxis
             dataKey="day"
             stroke={chartColors.text}
+            tick={{ fill: chartColors.text }}
             style={{ userSelect: 'none', WebkitUserSelect: 'none', MozUserSelect: 'none' }}
+          />
+          <YAxis 
+            stroke={chartColors.grid}
+            tick={{ fill: chartColors.text }}
           />
           <CartesianGrid strokeDasharray="3 3" stroke={chartColors.grid} />
           <Tooltip content={<CustomTooltip />} />

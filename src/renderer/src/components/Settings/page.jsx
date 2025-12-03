@@ -125,18 +125,18 @@ export default function SettingsPage() {
 
   return (
     <div className="grid gap-6">
-      <div className="bg-white dark:bg-slate-900/50 border border-gray-200 dark:border-slate-700/50 backdrop-blur-sm rounded-lg overflow-hidden">
-        <div className="border-b border-gray-200 dark:border-slate-700/50 pb-3 p-6">
-          <h2 className="text-gray-900 dark:text-slate-100 flex items-center text-xl font-semibold">
-            <Settings className="mr-2 h-5 w-5 text-cyan-500" />
+      <div className="bg-white dark:bg-meta-gray-800 border border-meta-gray-200 dark:border-meta-gray-700 backdrop-blur-sm rounded-lg overflow-hidden">
+        <div className="border-b border-meta-gray-200 dark:border-meta-gray-700 pb-3 p-6">
+          <h2 className="text-meta-gray-900 dark:text-meta-gray-100 flex items-center text-xl font-semibold">
+            <Settings className="mr-2 h-5 w-5 text-meta-blue-500" />
             Settings
           </h2>
-          <p className="text-gray-600 dark:text-slate-400 mt-1">Configure your productivity dashboard preferences</p>
+          <p className="text-meta-gray-600 dark:text-meta-gray-400 mt-1">Configure your productivity dashboard preferences</p>
         </div>
 
         <div className="grid grid-cols-12 min-h-[600px]">
           {/* Settings Navigation */}
-          <div className="col-span-12 md:col-span-3 border-r border-gray-200 dark:border-slate-700/50">
+          <div className="col-span-12 md:col-span-3 border-r border-meta-gray-200 dark:border-meta-gray-700">
             <nav className="p-4">
               <ul className="space-y-1">
                 {[
@@ -154,8 +154,8 @@ export default function SettingsPage() {
                       onClick={() => setActiveTab(item.id)}
                       className={`w-full text-left px-4 py-3 rounded-md flex items-center transition-colors ${
                         activeTab === item.id
-                          ? 'bg-cyan-500/10 text-cyan-600 dark:text-cyan-400 border-l-2 border-cyan-500'
-                          : 'text-gray-600 dark:text-slate-400 hover:bg-gray-100 dark:hover:bg-slate-800/50 hover:text-gray-900 dark:hover:text-slate-200'
+                          ? 'bg-meta-blue-500/10 text-meta-blue-600 dark:text-meta-blue-400 border-l-2 border-meta-blue-500'
+                          : 'text-meta-gray-600 dark:text-meta-gray-400 hover:bg-meta-gray-100 dark:hover:bg-meta-gray-700 hover:text-meta-gray-900 dark:hover:text-meta-gray-200'
                       }`}
                     >
                       <item.icon className="h-4 w-4 mr-3" />
@@ -172,16 +172,16 @@ export default function SettingsPage() {
             {/* Profile Settings */}
             {activeTab === 'profile' && (
               <div className="space-y-6 animate-fadeIn">
-                <h3 className="text-lg font-medium text-gray-900 dark:text-slate-200 border-b border-gray-200 dark:border-slate-700/50 pb-2">
+                <h3 className="text-lg font-medium text-meta-gray-900 dark:text-meta-gray-200 border-b border-meta-gray-200 dark:border-meta-gray-700 pb-2">
                   User Profile
                 </h3>
 
                 <div className="flex items-start space-x-6">
                   <div className="relative group">
-                    <div className="w-24 h-24 rounded-full bg-gradient-to-br from-cyan-500 to-purple-600 flex items-center justify-center text-2xl font-bold text-white">
+                    <div className="w-24 h-24 rounded-full bg-gradient-to-br from-meta-blue-500 to-meta-blue-600 flex items-center justify-center text-2xl font-bold text-white">
                       JD
                     </div>
-                    <button className="absolute bottom-0 right-0 bg-gray-200 dark:bg-slate-800 p-1.5 rounded-full border border-gray-300 dark:border-slate-600 text-cyan-600 dark:text-cyan-400 hover:bg-gray-300 dark:hover:bg-slate-700 transition-colors">
+                    <button className="absolute bottom-0 right-0 bg-meta-gray-200 dark:bg-meta-gray-800 p-1.5 rounded-full border border-meta-gray-300 dark:border-meta-gray-600 text-meta-blue-600 dark:text-meta-blue-400 hover:bg-meta-gray-300 dark:hover:bg-meta-gray-700 transition-colors">
                       <RefreshCw className="h-4 w-4" />
                     </button>
                     <div className="absolute inset-0 rounded-full bg-black/50 opacity-0 group-hover:opacity-100 flex items-center justify-center transition-opacity">
@@ -192,81 +192,81 @@ export default function SettingsPage() {
                   <div className="flex-1 space-y-4">
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                       <div>
-                        <label className="block text-sm font-medium text-gray-700 dark:text-slate-400 mb-1">
+                        <label className="block text-sm font-medium text-meta-gray-700 dark:text-meta-gray-400 mb-1">
                           Full Name
                         </label>
                         <input
                           type="text"
                           defaultValue="John Doe"
-                          className="w-full bg-gray-50 dark:bg-slate-800/50 border border-gray-300 dark:border-slate-700 rounded-md px-3 py-2 text-gray-900 dark:text-slate-200 focus:outline-none focus:ring-1 focus:ring-cyan-500 focus:border-cyan-500"
+                          className="w-full bg-meta-gray-50 dark:bg-meta-gray-800 border border-meta-gray-300 dark:border-meta-gray-700 rounded-md px-3 py-2 text-meta-gray-900 dark:text-meta-gray-200 focus:outline-none focus:ring-1 focus:ring-meta-blue-500 focus:border-meta-blue-500"
                         />
                       </div>
                       <div>
-                        <label className="block text-sm font-medium text-gray-700 dark:text-slate-400 mb-1">
+                        <label className="block text-sm font-medium text-meta-gray-700 dark:text-meta-gray-400 mb-1">
                           Display Name
                         </label>
                         <input
                           type="text"
                           defaultValue="JohnD"
-                          className="w-full bg-gray-50 dark:bg-slate-800/50 border border-gray-300 dark:border-slate-700 rounded-md px-3 py-2 text-gray-900 dark:text-slate-200 focus:outline-none focus:ring-1 focus:ring-cyan-500 focus:border-cyan-500"
+                          className="w-full bg-meta-gray-50 dark:bg-meta-gray-800 border border-meta-gray-300 dark:border-meta-gray-700 rounded-md px-3 py-2 text-meta-gray-900 dark:text-meta-gray-200 focus:outline-none focus:ring-1 focus:ring-meta-blue-500 focus:border-meta-blue-500"
                         />
                       </div>
                     </div>
 
                     <div>
-                      <label className="block text-sm font-medium text-gray-700 dark:text-slate-400 mb-1">Email</label>
+                      <label className="block text-sm font-medium text-meta-gray-700 dark:text-meta-gray-400 mb-1">Email</label>
                       <input
                         type="email"
                         defaultValue="john.doe@example.com"
-                        className="w-full bg-gray-50 dark:bg-slate-800/50 border border-gray-300 dark:border-slate-700 rounded-md px-3 py-2 text-gray-900 dark:text-slate-200 focus:outline-none focus:ring-1 focus:ring-cyan-500 focus:border-cyan-500"
+                        className="w-full bg-meta-gray-50 dark:bg-meta-gray-800 border border-meta-gray-300 dark:border-meta-gray-700 rounded-md px-3 py-2 text-meta-gray-900 dark:text-meta-gray-200 focus:outline-none focus:ring-1 focus:ring-meta-blue-500 focus:border-meta-blue-500"
                       />
                     </div>
 
                     <div>
-                      <label className="block text-sm font-medium text-gray-700 dark:text-slate-400 mb-1">Bio</label>
+                      <label className="block text-sm font-medium text-meta-gray-700 dark:text-meta-gray-400 mb-1">Bio</label>
                       <textarea
                         defaultValue="Software developer focused on productivity and time management."
                         rows={3}
-                        className="w-full bg-gray-50 dark:bg-slate-800/50 border border-gray-300 dark:border-slate-700 rounded-md px-3 py-2 text-gray-900 dark:text-slate-200 focus:outline-none focus:ring-1 focus:ring-cyan-500 focus:border-cyan-500"
+                        className="w-full bg-meta-gray-50 dark:bg-meta-gray-800 border border-meta-gray-300 dark:border-meta-gray-700 rounded-md px-3 py-2 text-meta-gray-900 dark:text-meta-gray-200 focus:outline-none focus:ring-1 focus:ring-meta-blue-500 focus:border-meta-blue-500"
                       />
                     </div>
                   </div>
                 </div>
 
-                <div className="pt-4 border-t border-slate-700/50">
-                  <h4 className="text-md font-medium text-gray-800 dark:text-slate-300 mb-3">Account Settings</h4>
+                <div className="pt-4 border-t border-meta-gray-700">
+                  <h4 className="text-md font-medium text-meta-gray-800 dark:text-meta-gray-300 mb-3">Account Settings</h4>
 
                   <div className="space-y-4">
                     <div>
-                      <label className="block text-sm font-medium text-gray-700 dark:text-slate-400 mb-1">
+                      <label className="block text-sm font-medium text-meta-gray-700 dark:text-meta-gray-400 mb-1">
                         Current Password
                       </label>
                       <input
                         type="password"
                         placeholder="••••••••"
-                        className="w-full bg-gray-50 dark:bg-slate-800/50 border border-gray-300 dark:border-slate-700 rounded-md px-3 py-2 text-gray-900 dark:text-slate-200 focus:outline-none focus:ring-1 focus:ring-cyan-500 focus:border-cyan-500"
+                        className="w-full bg-meta-gray-50 dark:bg-meta-gray-800 border border-meta-gray-300 dark:border-meta-gray-700 rounded-md px-3 py-2 text-meta-gray-900 dark:text-meta-gray-200 focus:outline-none focus:ring-1 focus:ring-meta-blue-500 focus:border-meta-blue-500"
                       />
                     </div>
 
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                       <div>
-                        <label className="block text-sm font-medium text-gray-700 dark:text-slate-400 mb-1">
+                        <label className="block text-sm font-medium text-meta-gray-700 dark:text-meta-gray-400 mb-1">
                           New Password
                         </label>
                         <input
                           type="password"
                           placeholder="••••••••"
-                          className="w-full bg-gray-50 dark:bg-slate-800/50 border border-gray-300 dark:border-slate-700 rounded-md px-3 py-2 text-gray-900 dark:text-slate-200 focus:outline-none focus:ring-1 focus:ring-cyan-500 focus:border-cyan-500"
+                          className="w-full bg-meta-gray-50 dark:bg-meta-gray-800 border border-meta-gray-300 dark:border-meta-gray-700 rounded-md px-3 py-2 text-meta-gray-900 dark:text-meta-gray-200 focus:outline-none focus:ring-1 focus:ring-meta-blue-500 focus:border-meta-blue-500"
                         />
                       </div>
                       <div>
-                        <label className="block text-sm font-medium text-gray-700 dark:text-slate-400 mb-1">
+                        <label className="block text-sm font-medium text-meta-gray-700 dark:text-meta-gray-400 mb-1">
                           Confirm New Password
                         </label>
                         <input
                           type="password"
                           placeholder="••••••••"
-                          className="w-full bg-gray-50 dark:bg-slate-800/50 border border-gray-300 dark:border-slate-700 rounded-md px-3 py-2 text-gray-900 dark:text-slate-200 focus:outline-none focus:ring-1 focus:ring-cyan-500 focus:border-cyan-500"
+                          className="w-full bg-meta-gray-50 dark:bg-meta-gray-800 border border-meta-gray-300 dark:border-meta-gray-700 rounded-md px-3 py-2 text-meta-gray-900 dark:text-meta-gray-200 focus:outline-none focus:ring-1 focus:ring-meta-blue-500 focus:border-meta-blue-500"
                         />
                       </div>
                     </div>
@@ -278,28 +278,28 @@ export default function SettingsPage() {
             {/* Appearance Settings */}
             {activeTab === 'appearance' && (
               <div className="space-y-6 animate-fadeIn">
-                <h3 className="text-lg font-medium text-gray-900 dark:text-slate-200 border-b border-gray-200 dark:border-slate-700/50 pb-2">
+                <h3 className="text-lg font-medium text-meta-gray-900 dark:text-meta-gray-200 border-b border-meta-gray-200 dark:border-meta-gray-700 pb-2">
                   Appearance
                 </h3>
 
                 <div className="space-y-4">
                   <div>
-                    <h4 className="text-md font-medium text-gray-800 dark:text-slate-300 mb-3">Theme</h4>
+                    <h4 className="text-md font-medium text-meta-gray-800 dark:text-meta-gray-300 mb-3">Theme</h4>
                     <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                       <button
                         onClick={() => setThemeMode('dark')}
                         className={`p-4 rounded-lg border ${
                           theme === 'dark'
-                            ? 'border-cyan-500 bg-cyan-50 dark:bg-slate-800/80 ring-1 ring-cyan-500/50'
-                            : 'border-gray-300 dark:border-slate-700 bg-gray-100 dark:bg-slate-800/30 hover:bg-gray-200 dark:hover:bg-slate-800/50'
+                            ? 'border-meta-blue-500 bg-meta-blue-50 dark:bg-meta-gray-800 ring-1 ring-meta-blue-500/50'
+                            : 'border-meta-gray-300 dark:border-meta-gray-700 bg-meta-gray-100 dark:bg-meta-gray-800/50 hover:bg-meta-gray-200 dark:hover:bg-meta-gray-700'
                         } transition-all`}
                       >
                         <div className="flex justify-center mb-2">
-                          <Moon className="h-8 w-8 text-cyan-400" />
+                          <Moon className="h-8 w-8 text-meta-blue-400" />
                         </div>
                         <div className="text-center">
-                          <div className="font-medium text-slate-200">Dark</div>
-                          <div className="text-xs text-slate-400">Default dark theme</div>
+                          <div className="font-medium text-meta-gray-200">Dark</div>
+                          <div className="text-xs text-meta-gray-400">Default dark theme</div>
                         </div>
                       </button>
 
@@ -307,16 +307,16 @@ export default function SettingsPage() {
                         onClick={() => setThemeMode('light')}
                         className={`p-4 rounded-lg border ${
                           theme === 'light'
-                            ? 'border-cyan-500 bg-cyan-50 dark:bg-slate-800/80 ring-1 ring-cyan-500/50'
-                            : 'border-gray-300 dark:border-slate-700 bg-gray-100 dark:bg-slate-800/30 hover:bg-gray-200 dark:hover:bg-slate-800/50'
+                            ? 'border-meta-blue-500 bg-meta-blue-50 dark:bg-meta-gray-800 ring-1 ring-meta-blue-500/50'
+                            : 'border-meta-gray-300 dark:border-meta-gray-700 bg-meta-gray-100 dark:bg-meta-gray-800/50 hover:bg-meta-gray-200 dark:hover:bg-meta-gray-700'
                         } transition-all`}
                       >
                         <div className="flex justify-center mb-2">
                           <Sun className="h-8 w-8 text-amber-400" />
                         </div>
                         <div className="text-center">
-                          <div className="font-medium text-slate-200">Light</div>
-                          <div className="text-xs text-slate-400">Bright mode</div>
+                          <div className="font-medium text-meta-gray-200">Light</div>
+                          <div className="text-xs text-meta-gray-400">Bright mode</div>
                         </div>
                       </button>
 
@@ -324,41 +324,41 @@ export default function SettingsPage() {
                         onClick={() => setThemeMode('system')}
                         className={`p-4 rounded-lg border ${
                           theme === 'system'
-                            ? 'border-cyan-500 bg-cyan-50 dark:bg-slate-800/80 ring-1 ring-cyan-500/50'
-                            : 'border-gray-300 dark:border-slate-700 bg-gray-100 dark:bg-slate-800/30 hover:bg-gray-200 dark:hover:bg-slate-800/50'
+                            ? 'border-meta-blue-500 bg-meta-blue-50 dark:bg-meta-gray-800 ring-1 ring-meta-blue-500/50'
+                            : 'border-meta-gray-300 dark:border-meta-gray-700 bg-meta-gray-100 dark:bg-meta-gray-800/50 hover:bg-meta-gray-200 dark:hover:bg-meta-gray-700'
                         } transition-all`}
                       >
                         <div className="flex justify-center mb-2">
-                          <div className="h-8 w-8 rounded-full bg-gradient-to-r from-slate-300 to-slate-800 flex items-center justify-center">
-                            <Settings className="h-5 w-5 text-slate-900" />
+                          <div className="h-8 w-8 rounded-full bg-gradient-to-r from-meta-gray-300 to-meta-gray-800 flex items-center justify-center">
+                            <Settings className="h-5 w-5 text-meta-gray-900" />
                           </div>
                         </div>
                         <div className="text-center">
-                          <div className="font-medium text-slate-200">System</div>
-                          <div className="text-xs text-slate-400">Follow system</div>
+                          <div className="font-medium text-meta-gray-200">System</div>
+                          <div className="text-xs text-meta-gray-400">Follow system</div>
                         </div>
                       </button>
                     </div>
                   </div>
 
-                  <div className="pt-4 border-t border-slate-700/50">
-                    <h4 className="text-md font-medium text-gray-800 dark:text-slate-300 mb-3">Accent Color</h4>
+                  <div className="pt-4 border-t border-meta-gray-700">
+                    <h4 className="text-md font-medium text-meta-gray-800 dark:text-meta-gray-300 mb-3">Accent Color</h4>
                     <div className="flex flex-wrap gap-3">
                       {[
-                        { color: 'cyan', bg: 'bg-cyan-500', ring: 'ring-cyan-500/50' },
-                        { color: 'blue', bg: 'bg-blue-500', ring: 'ring-blue-500/50' },
+                        { color: 'blue', bg: 'bg-meta-blue-500', ring: 'ring-meta-blue-500/50' },
                         { color: 'indigo', bg: 'bg-indigo-500', ring: 'ring-indigo-500/50' },
                         { color: 'purple', bg: 'bg-purple-500', ring: 'ring-purple-500/50' },
                         { color: 'pink', bg: 'bg-pink-500', ring: 'ring-pink-500/50' },
-                        { color: 'green', bg: 'bg-green-500', ring: 'ring-green-500/50' },
+                        { color: 'green', bg: 'bg-meta-green-500', ring: 'ring-meta-green-500/50' },
                         { color: 'amber', bg: 'bg-amber-500', ring: 'ring-amber-500/50' },
-                        { color: 'red', bg: 'bg-red-500', ring: 'ring-red-500/50' }
+                        { color: 'orange', bg: 'bg-meta-orange-500', ring: 'ring-meta-orange-500/50' },
+                        { color: 'red', bg: 'bg-meta-red-500', ring: 'ring-meta-red-500/50' }
                       ].map((item) => (
                         <button
                           key={item.color}
                           className={`w-8 h-8 rounded-full ${item.bg} ${
-                            item.color === 'cyan'
-                              ? 'ring-2 ring-offset-2 ring-offset-slate-900 ' + item.ring
+                            item.color === 'blue'
+                              ? 'ring-2 ring-offset-2 ring-offset-meta-gray-900 ' + item.ring
                               : ''
                           }`}
                           aria-label={`${item.color} accent color`}
@@ -367,42 +367,42 @@ export default function SettingsPage() {
                     </div>
                   </div>
 
-                  <div className="pt-4 border-t border-slate-700/50">
-                    <h4 className="text-md font-medium text-gray-800 dark:text-slate-300 mb-3">Interface Density</h4>
+                  <div className="pt-4 border-t border-meta-gray-700">
+                    <h4 className="text-md font-medium text-meta-gray-800 dark:text-meta-gray-300 mb-3">Interface Density</h4>
                     <div className="flex space-x-4">
                       <label className="flex items-center">
                         <input
                           type="radio"
                           name="density"
                           defaultChecked
-                          className="h-4 w-4 text-cyan-500 focus:ring-cyan-500 border-gray-300 dark:border-slate-600 bg-gray-50 dark:bg-slate-800"
+                          className="h-4 w-4 text-meta-blue-500 focus:ring-meta-blue-500 border-meta-gray-300 dark:border-meta-gray-600 bg-meta-gray-50 dark:bg-meta-gray-800"
                         />
-                        <span className="ml-2 text-slate-300">Comfortable</span>
+                        <span className="ml-2 text-meta-gray-300">Comfortable</span>
                       </label>
                       <label className="flex items-center">
                         <input
                           type="radio"
                           name="density"
-                          className="h-4 w-4 text-cyan-500 focus:ring-cyan-500 border-gray-300 dark:border-slate-600 bg-gray-50 dark:bg-slate-800"
+                          className="h-4 w-4 text-meta-blue-500 focus:ring-meta-blue-500 border-meta-gray-300 dark:border-meta-gray-600 bg-meta-gray-50 dark:bg-meta-gray-800"
                         />
-                        <span className="ml-2 text-slate-300">Compact</span>
+                        <span className="ml-2 text-meta-gray-300">Compact</span>
                       </label>
                     </div>
                   </div>
 
-                  <div className="pt-4 border-t border-slate-700/50">
-                    <h4 className="text-md font-medium text-gray-800 dark:text-slate-300 mb-3">Focus Mode</h4>
+                  <div className="pt-4 border-t border-meta-gray-700">
+                    <h4 className="text-md font-medium text-meta-gray-800 dark:text-meta-gray-300 mb-3">Focus Mode</h4>
                     <div className="flex items-center justify-between">
                       <div>
-                        <div className="text-slate-300">Enable Focus Mode</div>
-                        <div className="text-sm text-slate-400">
+                        <div className="text-meta-gray-300">Enable Focus Mode</div>
+                        <div className="text-sm text-meta-gray-400">
                           Hide distracting elements when focusing
                         </div>
                       </div>
                       <button
                         onClick={() => setFocusMode(!focusMode)}
                         className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
-                          focusMode ? 'bg-cyan-500' : 'bg-gray-300 dark:bg-slate-700'
+                          focusMode ? 'bg-meta-blue-500' : 'bg-meta-gray-300 dark:bg-meta-gray-700'
                         }`}
                       >
                         <span
@@ -420,22 +420,22 @@ export default function SettingsPage() {
             {/* Notifications Settings */}
             {activeTab === 'notifications' && (
               <div className="space-y-6 animate-fadeIn">
-                <h3 className="text-lg font-medium text-gray-900 dark:text-slate-200 border-b border-gray-200 dark:border-slate-700/50 pb-2">
+                <h3 className="text-lg font-medium text-meta-gray-900 dark:text-meta-gray-200 border-b border-meta-gray-200 dark:border-meta-gray-700 pb-2">
                   Notifications
                 </h3>
 
                 <div className="space-y-4">
                   <div className="flex items-center justify-between">
                     <div>
-                      <div className="text-slate-300">Enable Notifications</div>
-                      <div className="text-sm text-slate-400">
+                      <div className="text-meta-gray-300">Enable Notifications</div>
+                      <div className="text-sm text-meta-gray-400">
                         Receive notifications from the app
                       </div>
                     </div>
                     <button
                       onClick={() => setNotifications(!notifications)}
                       className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
-                        notifications ? 'bg-cyan-500' : 'bg-gray-300 dark:bg-slate-700'
+                        notifications ? 'bg-meta-blue-500' : 'bg-meta-gray-300 dark:bg-meta-gray-700'
                       }`}
                     >
                       <span
@@ -446,8 +446,8 @@ export default function SettingsPage() {
                     </button>
                   </div>
 
-                  <div className="pt-4 border-t border-slate-700/50 space-y-3">
-                    <h4 className="text-md font-medium text-slate-300">Notification Types</h4>
+                  <div className="pt-4 border-t border-meta-gray-700 space-y-3">
+                    <h4 className="text-md font-medium text-meta-gray-300">Notification Types</h4>
 
                     {[
                       {
@@ -478,30 +478,30 @@ export default function SettingsPage() {
                     ].map((item) => (
                       <div key={item.id} className="flex items-center justify-between py-2">
                         <div>
-                          <div className="text-slate-300">{item.label}</div>
-                          <div className="text-sm text-slate-400">{item.desc}</div>
+                          <div className="text-meta-gray-300">{item.label}</div>
+                          <div className="text-sm text-meta-gray-400">{item.desc}</div>
                         </div>
                         <label className="relative inline-flex items-center cursor-pointer">
                           <input type="checkbox" defaultChecked className="sr-only peer" />
-                          <div className="w-9 h-5 bg-gray-300 dark:bg-slate-700 peer-focus:outline-none peer-focus:ring-1 peer-focus:ring-cyan-500 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 dark:after:border-slate-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-cyan-500"></div>
+                          <div className="w-9 h-5 bg-meta-gray-300 dark:bg-meta-gray-700 peer-focus:outline-none peer-focus:ring-1 peer-focus:ring-meta-blue-500 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-meta-gray-300 dark:after:border-meta-gray-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-meta-blue-500"></div>
                         </label>
                       </div>
                     ))}
                   </div>
 
-                  <div className="pt-4 border-t border-slate-700/50">
-                    <h4 className="text-md font-medium text-gray-800 dark:text-slate-300 mb-3">Sound Effects</h4>
+                  <div className="pt-4 border-t border-meta-gray-700">
+                    <h4 className="text-md font-medium text-meta-gray-800 dark:text-meta-gray-300 mb-3">Sound Effects</h4>
                     <div className="flex items-center justify-between">
                       <div>
-                        <div className="text-slate-300">Enable Sound Effects</div>
-                        <div className="text-sm text-slate-400">
+                        <div className="text-meta-gray-300">Enable Sound Effects</div>
+                        <div className="text-sm text-meta-gray-400">
                           Play sounds for notifications and events
                         </div>
                       </div>
                       <button
                         onClick={() => setSoundEffects(!soundEffects)}
                         className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
-                          soundEffects ? 'bg-cyan-500' : 'bg-gray-300 dark:bg-slate-700'
+                          soundEffects ? 'bg-meta-blue-500' : 'bg-meta-gray-300 dark:bg-meta-gray-700'
                         }`}
                       >
                         <span
@@ -513,16 +513,16 @@ export default function SettingsPage() {
                     </div>
                   </div>
 
-                  <div className="pt-4 border-t border-slate-700/50">
-                    <h4 className="text-md font-medium text-gray-800 dark:text-slate-300 mb-3">Do Not Disturb</h4>
+                  <div className="pt-4 border-t border-meta-gray-700">
+                    <h4 className="text-md font-medium text-meta-gray-800 dark:text-meta-gray-300 mb-3">Do Not Disturb</h4>
                     <div>
-                      <div className="text-slate-300 mb-2">Quiet Hours</div>
+                      <div className="text-meta-gray-300 mb-2">Quiet Hours</div>
                       <div className="grid grid-cols-2 gap-4">
                         <div>
-                          <label className="block text-sm font-medium text-gray-700 dark:text-slate-400 mb-1">
+                          <label className="block text-sm font-medium text-meta-gray-700 dark:text-meta-gray-400 mb-1">
                             From
                           </label>
-                          <select className="w-full bg-gray-50 dark:bg-slate-800/50 border border-gray-300 dark:border-slate-700 rounded-md px-3 py-2 text-gray-900 dark:text-slate-200 focus:outline-none focus:ring-1 focus:ring-cyan-500 focus:border-cyan-500">
+                          <select className="w-full bg-meta-gray-50 dark:bg-meta-gray-800 border border-meta-gray-300 dark:border-meta-gray-700 rounded-md px-3 py-2 text-meta-gray-900 dark:text-meta-gray-200 focus:outline-none focus:ring-1 focus:ring-meta-blue-500 focus:border-meta-blue-500">
                             {Array.from({ length: 24 }).map((_, i) => (
                               <option key={i} value={i}>
                                 {i.toString().padStart(2, '0')}:00
@@ -531,10 +531,10 @@ export default function SettingsPage() {
                           </select>
                         </div>
                         <div>
-                          <label className="block text-sm font-medium text-gray-700 dark:text-slate-400 mb-1">
+                          <label className="block text-sm font-medium text-meta-gray-700 dark:text-meta-gray-400 mb-1">
                             To
                           </label>
-                          <select className="w-full bg-gray-50 dark:bg-slate-800/50 border border-gray-300 dark:border-slate-700 rounded-md px-3 py-2 text-gray-900 dark:text-slate-200 focus:outline-none focus:ring-1 focus:ring-cyan-500 focus:border-cyan-500">
+                          <select className="w-full bg-meta-gray-50 dark:bg-meta-gray-800 border border-meta-gray-300 dark:border-meta-gray-700 rounded-md px-3 py-2 text-meta-gray-900 dark:text-meta-gray-200 focus:outline-none focus:ring-1 focus:ring-meta-blue-500 focus:border-meta-blue-500">
                             {Array.from({ length: 24 }).map((_, i) => (
                               <option key={i} value={i}>
                                 {i.toString().padStart(2, '0')}:00
@@ -552,15 +552,15 @@ export default function SettingsPage() {
             {/* Privacy Settings */}
             {activeTab === 'Categories Management' && (
               <div className="space-y-6 animate-fadeIn">
-                <h3 className="text-lg font-medium text-gray-900 dark:text-slate-200 border-b border-gray-200 dark:border-slate-700/50 pb-2">
+                <h3 className="text-lg font-medium text-meta-gray-900 dark:text-meta-gray-200 border-b border-meta-gray-200 dark:border-meta-gray-700 pb-2">
                   Manage Categories
                 </h3>
                 <div className="space-y-4">
-                  <div className="pt-4 border-t border-slate-700/50">
+                  <div className="pt-4 border-t border-meta-gray-700">
                     <div className="space-y-3">
                       <div>
-                        <div className="pt-4 border-t border-slate-700/50">
-                          <h4 className="text-md font-medium text-gray-800 dark:text-slate-300 mb-3">
+                        <div className="pt-4 border-t border-meta-gray-700">
+                          <h4 className="text-md font-medium text-meta-gray-800 dark:text-meta-gray-300 mb-3">
                             Manage Productive Categories
                           </h4>
 
@@ -568,12 +568,12 @@ export default function SettingsPage() {
                             {productiveCategories.map((app) => (
                               <div
                                 key={app}
-                                className="bg-gray-200 dark:bg-slate-800 text-gray-700 dark:text-slate-300 px-3 py-1 rounded-full text-sm flex items-center"
+                                className="bg-meta-gray-200 dark:bg-meta-gray-800 text-meta-gray-700 dark:text-meta-gray-300 px-3 py-1 rounded-full text-sm flex items-center"
                               >
                                 {app}
                                 <button
                                   onClick={() => removeCategory(app)}
-                                  className="ml-2 text-slate-400 hover:text-slate-200"
+                                  className="ml-2 text-meta-gray-400 hover:text-meta-gray-200"
                                 >
                                   <svg
                                     xmlns="http://www.w3.org/2000/svg"
@@ -592,11 +592,11 @@ export default function SettingsPage() {
                             ))}
                           </div>
 
-                          <div className="flex bg-gray-50 dark:bg-slate-800 border border-gray-300 dark:border-slate-700 rounded-l-md">
+                          <div className="flex bg-meta-gray-50 dark:bg-meta-gray-800 border border-meta-gray-300 dark:border-meta-gray-700 rounded-l-md">
                             <select
                               value={newProCategory}
                               onChange={(e) => setNewProCategory(e.target.value)}
-                              className="flex-1 bg-gray-50 dark:bg-slate-800 border border-gray-300 dark:border-slate-700 rounded-l-md px-3 py-2 text-gray-900 dark:text-slate-200 focus:outline-none focus:ring-1 focus:ring-cyan-500 focus:border-cyan-500"
+                              className="flex-1 bg-meta-gray-50 dark:bg-meta-gray-800 border border-meta-gray-300 dark:border-meta-gray-700 rounded-l-md px-3 py-2 text-meta-gray-900 dark:text-meta-gray-200 focus:outline-none focus:ring-1 focus:ring-meta-blue-500 focus:border-meta-blue-500"
                             >
                               <option value="">Select Category</option>
                               {allCategories.map((cat, idx) => (
@@ -607,7 +607,7 @@ export default function SettingsPage() {
                             </select>
                             <button
                               onClick={loadproCategories}
-                              className="bg-cyan-600 hover:bg-cyan-700 text-white px-4 py-2 rounded-r-md transition-colors"
+                              className="bg-meta-blue-600 hover:bg-meta-blue-700 text-white px-4 py-2 rounded-r-md transition-colors"
                             >
                               Add
                             </button>
@@ -617,8 +617,8 @@ export default function SettingsPage() {
                     </div>
                   </div>
 
-                  <div className="pt-4 border-t border-slate-700/50">
-                    <h4 className="text-md font-medium text-gray-800 dark:text-slate-300 mb-3">
+                  <div className="pt-4 border-t border-meta-gray-700">
+                    <h4 className="text-md font-medium text-meta-gray-800 dark:text-meta-gray-300 mb-3">
                       Manage Distracted Categories
                     </h4>
 
@@ -626,12 +626,12 @@ export default function SettingsPage() {
                       {distractedCategories.map((app) => (
                         <div
                           key={app}
-                          className="bg-gray-200 dark:bg-slate-800 text-gray-700 dark:text-slate-300 px-3 py-1 rounded-full text-sm flex items-center"
+                          className="bg-meta-gray-200 dark:bg-meta-gray-800 text-meta-gray-700 dark:text-meta-gray-300 px-3 py-1 rounded-full text-sm flex items-center"
                         >
                           {app}
                           <button
                             onClick={() => removedisCategory(app)}
-                            className="ml-2 text-slate-400 hover:text-slate-200"
+                            className="ml-2 text-meta-gray-400 hover:text-meta-gray-200"
                           >
                             <svg
                               xmlns="http://www.w3.org/2000/svg"
@@ -654,7 +654,7 @@ export default function SettingsPage() {
                       <select
                         value={newDisCategory}
                         onChange={(e) => setNewDisCategory(e.target.value)}
-                        className="flex-1 bg-gray-50 dark:bg-slate-800 border border-gray-300 dark:border-slate-700 rounded-l-md px-3 py-2 text-gray-900 dark:text-slate-200 focus:outline-none focus:ring-1 focus:ring-cyan-500 focus:border-cyan-500"
+                        className="flex-1 bg-meta-gray-50 dark:bg-meta-gray-800 border border-meta-gray-300 dark:border-meta-gray-700 rounded-l-md px-3 py-2 text-meta-gray-900 dark:text-meta-gray-200 focus:outline-none focus:ring-1 focus:ring-meta-blue-500 focus:border-meta-blue-500"
                       >
                         <option value="">Select Category</option>
                         {allCategories.map((cat, idx) => (
@@ -665,7 +665,7 @@ export default function SettingsPage() {
                       </select>
                       <button
                         onClick={loaddisCategories}
-                        className="bg-cyan-600 hover:bg-cyan-700 text-white px-4 py-2 rounded-r-md transition-colors"
+                        className="bg-meta-blue-600 hover:bg-meta-blue-700 text-white px-4 py-2 rounded-r-md transition-colors"
                       >
                         Add
                       </button>
@@ -678,31 +678,31 @@ export default function SettingsPage() {
             {/* AI Assistant Settings */}
             {activeTab === 'ai' && (
               <div className="space-y-6 animate-fadeIn">
-                <h3 className="text-lg font-medium text-gray-900 dark:text-slate-200 border-b border-gray-200 dark:border-slate-700/50 pb-2">
+                <h3 className="text-lg font-medium text-meta-gray-900 dark:text-meta-gray-200 border-b border-meta-gray-200 dark:border-meta-gray-700 pb-2">
                   AI Assistant Configuration
                 </h3>
 
                 <div className="space-y-6">
                   {/* AI Provider and API Key Configuration */}
-                  <div className="bg-gray-50 dark:bg-slate-800/50 border border-gray-300 dark:border-slate-700 rounded-lg p-4">
-                    <h4 className="text-md font-medium text-slate-300 mb-2 flex items-center">
-                      <Bot className="h-4 w-4 mr-2 text-cyan-500" />
+                  <div className="bg-meta-gray-50 dark:bg-meta-gray-800 border border-meta-gray-300 dark:border-meta-gray-700 rounded-lg p-4">
+                    <h4 className="text-md font-medium text-meta-gray-300 mb-2 flex items-center">
+                      <Bot className="h-4 w-4 mr-2 text-meta-blue-500" />
                       AI Assistant Configuration
                     </h4>
-                    <p className="text-slate-400 text-sm mb-4">
+                    <p className="text-meta-gray-400 text-sm mb-4">
                       Configure your AI provider and API key to enable AI-powered insights and analysis of your productivity data.
                     </p>
 
                     <div className="space-y-4">
                       {/* AI Provider Selection */}
                       <div>
-                        <label className="block text-sm font-medium text-slate-300 mb-2">
+                        <label className="block text-sm font-medium text-meta-gray-300 mb-2">
                           AI Provider
                         </label>
                         <select
                           value={aiProvider}
                           onChange={(e) => setAiProvider(e.target.value)}
-                          className="w-full px-3 py-2 bg-gray-50 dark:bg-slate-900/50 border border-gray-300 dark:border-slate-700 rounded-md text-gray-900 dark:text-slate-200 focus:outline-none focus:ring-2 focus:ring-cyan-500"
+                          className="w-full px-3 py-2 bg-meta-gray-50 dark:bg-meta-gray-900 border border-meta-gray-300 dark:border-meta-gray-700 rounded-md text-meta-gray-900 dark:text-meta-gray-200 focus:outline-none focus:ring-2 focus:ring-meta-blue-500"
                         >
                           <option value="openai">OpenAI (GPT-4o)</option>
                           <option value="gemini">Google Gemini (gemini-2.5-flash)</option>
@@ -712,7 +712,7 @@ export default function SettingsPage() {
                       {/* OpenAI API Key */}
                       {aiProvider === 'openai' && (
                         <div>
-                          <label className="block text-sm font-medium text-slate-300 mb-2">
+                          <label className="block text-sm font-medium text-meta-gray-300 mb-2">
                             OpenAI API Key
                           </label>
                           <div className="flex gap-2">
@@ -721,7 +721,7 @@ export default function SettingsPage() {
                               value={openaiApiKey}
                               onChange={(e) => setOpenaiApiKey(e.target.value)}
                               placeholder="Enter your OpenAI API key (sk-...)"
-                              className="flex-1 px-3 py-2 bg-gray-50 dark:bg-slate-900/50 border border-gray-300 dark:border-slate-700 rounded-md text-gray-900 dark:text-slate-200 placeholder-gray-500 dark:placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-cyan-500"
+                              className="flex-1 px-3 py-2 bg-meta-gray-50 dark:bg-meta-gray-900 border border-meta-gray-300 dark:border-meta-gray-700 rounded-md text-meta-gray-900 dark:text-meta-gray-200 placeholder-meta-gray-500 dark:placeholder-meta-gray-500 focus:outline-none focus:ring-2 focus:ring-meta-blue-500"
                             />
                             <button
                               onClick={async () => {
@@ -744,7 +744,7 @@ export default function SettingsPage() {
                                   setIsApiKeyValid(false)
                                 }
                               }}
-                              className="bg-cyan-600 hover:bg-cyan-700 text-white px-4 py-2 rounded-md transition-colors"
+                              className="bg-meta-blue-600 hover:bg-meta-blue-700 text-white px-4 py-2 rounded-md transition-colors"
                             >
                               Test
                             </button>
@@ -753,10 +753,10 @@ export default function SettingsPage() {
                             <p className="text-green-400 text-sm mt-2">✓ API key is valid</p>
                           )}
 
-                          <div className="bg-gray-100 dark:bg-slate-900/50 border border-gray-300 dark:border-slate-700 rounded-md p-3 mt-3">
-                            <h5 className="text-sm font-medium text-slate-300 mb-2">How to get an OpenAI API key:</h5>
-                            <ol className="text-sm text-slate-400 space-y-1">
-                              <li>1. Visit <a href="https://platform.openai.com/api-keys" className="text-cyan-400 hover:underline" target="_blank" rel="noopener noreferrer">OpenAI API Keys</a></li>
+                          <div className="bg-meta-gray-100 dark:bg-meta-gray-900 border border-meta-gray-300 dark:border-meta-gray-700 rounded-md p-3 mt-3">
+                            <h5 className="text-sm font-medium text-meta-gray-300 mb-2">How to get an OpenAI API key:</h5>
+                            <ol className="text-sm text-meta-gray-400 space-y-1">
+                              <li>1. Visit <a href="https://platform.openai.com/api-keys" className="text-meta-blue-400 hover:underline" target="_blank" rel="noopener noreferrer">OpenAI API Keys</a></li>
                               <li>2. Sign in to your OpenAI account</li>
                               <li>3. Click "Create new secret key"</li>
                               <li>4. Copy the key and paste it above</li>
@@ -768,7 +768,7 @@ export default function SettingsPage() {
                       {/* Gemini API Key */}
                       {aiProvider === 'gemini' && (
                         <div>
-                          <label className="block text-sm font-medium text-slate-300 mb-2">
+                          <label className="block text-sm font-medium text-meta-gray-300 mb-2">
                             Google Gemini API Key
                           </label>
                           <div className="flex gap-2">
@@ -777,7 +777,7 @@ export default function SettingsPage() {
                               value={geminiApiKey}
                               onChange={(e) => setGeminiApiKey(e.target.value)}
                               placeholder="Enter your Gemini API key (AIza...)"
-                              className="flex-1 px-3 py-2 bg-gray-50 dark:bg-slate-900/50 border border-gray-300 dark:border-slate-700 rounded-md text-gray-900 dark:text-slate-200 placeholder-gray-500 dark:placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-cyan-500"
+                              className="flex-1 px-3 py-2 bg-meta-gray-50 dark:bg-meta-gray-900 border border-meta-gray-300 dark:border-meta-gray-700 rounded-md text-meta-gray-900 dark:text-meta-gray-200 placeholder-meta-gray-500 dark:placeholder-meta-gray-500 focus:outline-none focus:ring-2 focus:ring-meta-blue-500"
                             />
                             <button
                               onClick={async () => {
@@ -800,7 +800,7 @@ export default function SettingsPage() {
                                   setIsApiKeyValid(false)
                                 }
                               }}
-                              className="bg-cyan-600 hover:bg-cyan-700 text-white px-4 py-2 rounded-md transition-colors"
+                              className="bg-meta-blue-600 hover:bg-meta-blue-700 text-white px-4 py-2 rounded-md transition-colors"
                             >
                               Test
                             </button>
@@ -809,10 +809,10 @@ export default function SettingsPage() {
                             <p className="text-green-400 text-sm mt-2">✓ API key is valid</p>
                           )}
 
-                          <div className="bg-gray-100 dark:bg-slate-900/50 border border-gray-300 dark:border-slate-700 rounded-md p-3 mt-3">
-                            <h5 className="text-sm font-medium text-slate-300 mb-2">How to get a Gemini API key:</h5>
-                            <ol className="text-sm text-slate-400 space-y-1">
-                              <li>1. Visit <a href="https://aistudio.google.com/apikey" className="text-cyan-400 hover:underline" target="_blank" rel="noopener noreferrer">Google AI Studio</a></li>
+                          <div className="bg-meta-gray-100 dark:bg-meta-gray-900 border border-meta-gray-300 dark:border-meta-gray-700 rounded-md p-3 mt-3">
+                            <h5 className="text-sm font-medium text-meta-gray-300 mb-2">How to get a Gemini API key:</h5>
+                            <ol className="text-sm text-meta-gray-400 space-y-1">
+                              <li>1. Visit <a href="https://aistudio.google.com/apikey" className="text-meta-blue-400 hover:underline" target="_blank" rel="noopener noreferrer">Google AI Studio</a></li>
                               <li>2. Sign in with your Google account</li>
                               <li>3. Click "Get API Key" or "Create API Key"</li>
                               <li>4. Copy the key and paste it above</li>
@@ -858,25 +858,25 @@ export default function SettingsPage() {
                   </div>
 
                   {/* Service Status */}
-                  <div className="bg-gray-50 dark:bg-slate-800/50 border border-gray-300 dark:border-slate-700 rounded-lg p-4">
-                    <h4 className="text-md font-medium text-slate-300 mb-2 flex items-center">
-                      <RefreshCw className="h-4 w-4 mr-2 text-cyan-500" />
+                  <div className="bg-meta-gray-50 dark:bg-meta-gray-800 border border-meta-gray-300 dark:border-meta-gray-700 rounded-lg p-4">
+                    <h4 className="text-md font-medium text-meta-gray-300 mb-2 flex items-center">
+                      <RefreshCw className="h-4 w-4 mr-2 text-meta-blue-500" />
                       Service Status
                     </h4>
                     <div className="space-y-3">
                       <div className="flex items-center justify-between">
-                        <span className="text-sm text-slate-400">AI Service</span>
+                        <span className="text-sm text-meta-gray-400">AI Service</span>
                         <div className="flex items-center gap-2">
-                          <div className={`w-2 h-2 rounded-full ${aiServiceStatus.isRunning ? 'bg-green-500' : 'bg-red-500'}`}></div>
-                          <span className="text-sm text-slate-300">
+                          <div className={`w-2 h-2 rounded-full ${aiServiceStatus.isRunning ? 'bg-meta-green-500' : 'bg-meta-red-500'}`}></div>
+                          <span className="text-sm text-meta-gray-300">
                             {aiServiceStatus.isRunning ? `Running (Port ${aiServiceStatus.port})` : 'Offline'}
                           </span>
                         </div>
                       </div>
                       
                       {aiServiceStatus.error && (
-                        <div className="bg-red-900/30 border border-red-700/50 rounded-md p-3">
-                          <p className="text-red-400 text-sm">Error: {aiServiceStatus.error}</p>
+                        <div className="bg-meta-red-900/30 border border-meta-red-700/50 rounded-md p-3">
+                          <p className="text-meta-red-400 text-sm">Error: {aiServiceStatus.error}</p>
                         </div>
                       )}
                       
@@ -888,7 +888,7 @@ export default function SettingsPage() {
                             console.error('Error restarting AI service:', error)
                           }
                         }}
-                        className="bg-gray-300 hover:bg-gray-400 dark:bg-slate-700 dark:hover:bg-slate-600 text-gray-900 dark:text-white px-4 py-2 rounded-md transition-colors flex items-center text-sm"
+                        className="bg-meta-gray-300 hover:bg-meta-gray-400 dark:bg-meta-gray-700 dark:hover:bg-meta-gray-600 text-meta-gray-900 dark:text-white px-4 py-2 rounded-md transition-colors flex items-center text-sm"
                       >
                         <RefreshCw className="h-4 w-4 mr-2" />
                         Restart Service
@@ -902,17 +902,17 @@ export default function SettingsPage() {
             {/* Data Management Settings */}
             {activeTab === 'data' && (
               <div className="space-y-6 animate-fadeIn">
-                <h3 className="text-lg font-medium text-gray-900 dark:text-slate-200 border-b border-gray-200 dark:border-slate-700/50 pb-2">
+                <h3 className="text-lg font-medium text-meta-gray-900 dark:text-meta-gray-200 border-b border-meta-gray-200 dark:border-meta-gray-700 pb-2">
                   Data Management
                 </h3>
 
                 <div className="space-y-6">
-                  <div className="bg-gray-50 dark:bg-slate-800/50 border border-gray-300 dark:border-slate-700 rounded-lg p-4">
-                    <h4 className="text-md font-medium text-slate-300 mb-2 flex items-center">
-                      <Download className="h-4 w-4 mr-2 text-cyan-500" />
+                  <div className="bg-meta-gray-50 dark:bg-meta-gray-800 border border-meta-gray-300 dark:border-meta-gray-700 rounded-lg p-4">
+                    <h4 className="text-md font-medium text-meta-gray-300 mb-2 flex items-center">
+                      <Download className="h-4 w-4 mr-2 text-meta-blue-500" />
                       Export Data
                     </h4>
-                    <p className="text-sm text-slate-400 mb-3">
+                    <p className="text-sm text-meta-gray-400 mb-3">
                       Download your productivity data in various formats
                     </p>
 
@@ -924,112 +924,112 @@ export default function SettingsPage() {
                       ].map((item) => (
                         <button
                           key={item.format}
-                          className="flex flex-col items-center justify-center p-4 bg-gray-100 dark:bg-slate-800 hover:bg-gray-200 dark:hover:bg-slate-700 border border-gray-300 dark:border-slate-700 rounded-lg transition-colors"
+                          className="flex flex-col items-center justify-center p-4 bg-meta-gray-100 dark:bg-meta-gray-800 hover:bg-meta-gray-200 dark:hover:bg-meta-gray-700 border border-meta-gray-300 dark:border-meta-gray-700 rounded-lg transition-colors"
                         >
                           <div className="text-2xl mb-2">{item.icon}</div>
-                          <div className="font-medium text-slate-200">{item.format}</div>
-                          <div className="text-xs text-slate-400">{item.desc}</div>
+                          <div className="font-medium text-meta-gray-200">{item.format}</div>
+                          <div className="text-xs text-meta-gray-400">{item.desc}</div>
                         </button>
                       ))}
                     </div>
                   </div>
 
-                  <div className="bg-gray-50 dark:bg-slate-800/50 border border-gray-300 dark:border-slate-700 rounded-lg p-4">
-                    <h4 className="text-md font-medium text-slate-300 mb-2 flex items-center">
-                      <Upload className="h-4 w-4 mr-2 text-cyan-500" />
+                  <div className="bg-meta-gray-50 dark:bg-meta-gray-800 border border-meta-gray-300 dark:border-meta-gray-700 rounded-lg p-4">
+                    <h4 className="text-md font-medium text-meta-gray-300 mb-2 flex items-center">
+                      <Upload className="h-4 w-4 mr-2 text-meta-blue-500" />
                       Import Data
                     </h4>
-                    <p className="text-sm text-slate-400 mb-3">
+                    <p className="text-sm text-meta-gray-400 mb-3">
                       Import productivity data from other sources
                     </p>
 
-                    <div className="border-2 border-dashed border-slate-700 rounded-lg p-6 text-center">
+                    <div className="border-2 border-dashed border-meta-gray-700 rounded-lg p-6 text-center">
                       <div className="flex justify-center mb-2">
-                        <Upload className="h-8 w-8 text-slate-500" />
+                        <Upload className="h-8 w-8 text-meta-gray-500" />
                       </div>
-                      <p className="text-slate-300 mb-1">Drag and drop files here</p>
-                      <p className="text-sm text-slate-400 mb-3">or</p>
-                      <button className="bg-cyan-600 hover:bg-cyan-700 text-white px-4 py-2 rounded-md transition-colors">
+                      <p className="text-meta-gray-300 mb-1">Drag and drop files here</p>
+                      <p className="text-sm text-meta-gray-400 mb-3">or</p>
+                      <button className="bg-meta-blue-600 hover:bg-meta-blue-700 text-white px-4 py-2 rounded-md transition-colors">
                         Browse Files
                       </button>
-                      <p className="text-xs text-slate-500 mt-3">
+                      <p className="text-xs text-meta-gray-500 mt-3">
                         Supports CSV, JSON, and compatible formats
                       </p>
                     </div>
                   </div>
 
-                  <div className="bg-gray-50 dark:bg-slate-800/50 border border-gray-300 dark:border-slate-700 rounded-lg p-4">
-                    <h4 className="text-md font-medium text-slate-300 mb-2 flex items-center">
-                      <Trash2 className="h-4 w-4 mr-2 text-red-500" />
+                  <div className="bg-meta-gray-50 dark:bg-meta-gray-800 border border-meta-gray-300 dark:border-meta-gray-700 rounded-lg p-4">
+                    <h4 className="text-md font-medium text-meta-gray-300 mb-2 flex items-center">
+                      <Trash2 className="h-4 w-4 mr-2 text-meta-red-500" />
                       Delete Data
                     </h4>
-                    <p className="text-sm text-slate-400 mb-3">
+                    <p className="text-sm text-meta-gray-400 mb-3">
                       Permanently delete your productivity data
                     </p>
 
                     <div className="space-y-3">
-                      <button className="w-full flex justify-between items-center p-3 bg-gray-100 dark:bg-slate-800 hover:bg-gray-200 dark:hover:bg-slate-700 border border-gray-300 dark:border-slate-700 rounded-lg transition-colors">
-                        <span className="text-slate-300">Clear activity history</span>
-                        <span className="text-xs bg-gray-200 dark:bg-slate-700 text-gray-700 dark:text-slate-300 px-2 py-1 rounded">
+                      <button className="w-full flex justify-between items-center p-3 bg-meta-gray-100 dark:bg-meta-gray-800 hover:bg-meta-gray-200 dark:hover:bg-meta-gray-700 border border-meta-gray-300 dark:border-meta-gray-700 rounded-lg transition-colors">
+                        <span className="text-meta-gray-300">Clear activity history</span>
+                        <span className="text-xs bg-meta-gray-200 dark:bg-meta-gray-700 text-meta-gray-700 dark:text-meta-gray-300 px-2 py-1 rounded">
                           Last 30 days
                         </span>
                       </button>
 
-                      <button className="w-full flex justify-between items-center p-3 bg-gray-100 dark:bg-slate-800 hover:bg-gray-200 dark:hover:bg-slate-700 border border-gray-300 dark:border-slate-700 rounded-lg transition-colors">
-                        <span className="text-slate-300">Reset all statistics</span>
-                        <span className="text-xs bg-gray-200 dark:bg-slate-700 text-gray-700 dark:text-slate-300 px-2 py-1 rounded">
+                      <button className="w-full flex justify-between items-center p-3 bg-meta-gray-100 dark:bg-meta-gray-800 hover:bg-meta-gray-200 dark:hover:bg-meta-gray-700 border border-meta-gray-300 dark:border-meta-gray-700 rounded-lg transition-colors">
+                        <span className="text-meta-gray-300">Reset all statistics</span>
+                        <span className="text-xs bg-meta-gray-200 dark:bg-meta-gray-700 text-meta-gray-700 dark:text-meta-gray-300 px-2 py-1 rounded">
                           All time
                         </span>
                       </button>
 
-                      <button className="w-full flex justify-between items-center p-3 bg-red-900/20 hover:bg-red-900/30 border border-red-900/50 rounded-lg transition-colors">
-                        <span className="text-red-400">Delete account and all data</span>
-                        <span className="text-xs bg-red-900/50 text-red-300 px-2 py-1 rounded">
+                      <button className="w-full flex justify-between items-center p-3 bg-meta-red-900/20 hover:bg-meta-red-900/30 border border-meta-red-900/50 rounded-lg transition-colors">
+                        <span className="text-meta-red-400">Delete account and all data</span>
+                        <span className="text-xs bg-meta-red-900/50 text-meta-red-300 px-2 py-1 rounded">
                           Permanent
                         </span>
                       </button>
                     </div>
                   </div>
 
-                  <div className="bg-gray-50 dark:bg-slate-800/50 border border-gray-300 dark:border-slate-700 rounded-lg p-4">
-                    <h4 className="text-md font-medium text-slate-300 mb-2 flex items-center">
-                      <Database className="h-4 w-4 mr-2 text-cyan-500" />
+                  <div className="bg-meta-gray-50 dark:bg-meta-gray-800 border border-meta-gray-300 dark:border-meta-gray-700 rounded-lg p-4">
+                    <h4 className="text-md font-medium text-meta-gray-300 mb-2 flex items-center">
+                      <Database className="h-4 w-4 mr-2 text-meta-blue-500" />
                       Backup & Sync
                     </h4>
-                    <p className="text-sm text-slate-400 mb-3">
+                    <p className="text-sm text-meta-gray-400 mb-3">
                       Configure automatic backups and synchronization
                     </p>
 
                     <div className="space-y-3">
                       <div className="flex items-center justify-between">
                         <div>
-                          <div className="text-slate-300">Automatic Backups</div>
-                          <div className="text-xs text-slate-400">
+                          <div className="text-meta-gray-300">Automatic Backups</div>
+                          <div className="text-xs text-meta-gray-400">
                             Create regular backups of your data
                           </div>
                         </div>
                         <label className="relative inline-flex items-center cursor-pointer">
                           <input type="checkbox" defaultChecked className="sr-only peer" />
-                          <div className="w-9 h-5 bg-gray-300 dark:bg-slate-700 peer-focus:outline-none peer-focus:ring-1 peer-focus:ring-cyan-500 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 dark:after:border-slate-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-cyan-500"></div>
+                          <div className="w-9 h-5 bg-meta-gray-300 dark:bg-meta-gray-700 peer-focus:outline-none peer-focus:ring-1 peer-focus:ring-meta-blue-500 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-meta-gray-300 dark:after:border-meta-gray-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-meta-blue-500"></div>
                         </label>
                       </div>
 
                       <div className="flex items-center justify-between">
                         <div>
-                          <div className="text-slate-300">Cloud Sync</div>
-                          <div className="text-xs text-slate-400">Sync data across devices</div>
+                          <div className="text-meta-gray-300">Cloud Sync</div>
+                          <div className="text-xs text-meta-gray-400">Sync data across devices</div>
                         </div>
                         <label className="relative inline-flex items-center cursor-pointer">
                           <input type="checkbox" defaultChecked className="sr-only peer" />
-                          <div className="w-9 h-5 bg-gray-300 dark:bg-slate-700 peer-focus:outline-none peer-focus:ring-1 peer-focus:ring-cyan-500 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 dark:after:border-slate-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-cyan-500"></div>
+                          <div className="w-9 h-5 bg-meta-gray-300 dark:bg-meta-gray-700 peer-focus:outline-none peer-focus:ring-1 peer-focus:ring-meta-blue-500 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-meta-gray-300 dark:after:border-meta-gray-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-meta-blue-500"></div>
                         </label>
                       </div>
 
                       <div>
-                        <label className="block text-sm font-medium text-gray-700 dark:text-slate-400 mb-1">
+                        <label className="block text-sm font-medium text-meta-gray-700 dark:text-meta-gray-400 mb-1">
                           Backup Frequency
                         </label>
-                        <select className="w-full bg-gray-50 dark:bg-slate-800/50 border border-gray-300 dark:border-slate-700 rounded-md px-3 py-2 text-gray-900 dark:text-slate-200 focus:outline-none focus:ring-1 focus:ring-cyan-500 focus:border-cyan-500">
+                        <select className="w-full bg-meta-gray-50 dark:bg-meta-gray-800 border border-meta-gray-300 dark:border-meta-gray-700 rounded-md px-3 py-2 text-meta-gray-900 dark:text-meta-gray-200 focus:outline-none focus:ring-1 focus:ring-meta-blue-500 focus:border-meta-blue-500">
                           <option value="daily">Daily</option>
                           <option value="weekly">Weekly</option>
                           <option value="monthly">Monthly</option>
@@ -1044,7 +1044,7 @@ export default function SettingsPage() {
             {/* Integrations Settings */}
             {activeTab === 'integrations' && (
               <div className="space-y-6 animate-fadeIn">
-                <h3 className="text-lg font-medium text-gray-900 dark:text-slate-200 border-b border-gray-200 dark:border-slate-700/50 pb-2">
+                <h3 className="text-lg font-medium text-meta-gray-900 dark:text-meta-gray-200 border-b border-meta-gray-200 dark:border-meta-gray-700 pb-2">
                   Integrations
                 </h3>
 
@@ -1060,15 +1060,15 @@ export default function SettingsPage() {
                     ].map((integration) => (
                       <div
                         key={integration.name}
-                        className="bg-slate-800/50 border border-slate-700 rounded-lg p-4 flex items-center justify-between"
+                        className="bg-meta-gray-800 border border-meta-gray-700 rounded-lg p-4 flex items-center justify-between"
                       >
                         <div className="flex items-center">
-                          <div className="w-10 h-10 rounded-md bg-gray-200 dark:bg-slate-700 flex items-center justify-center text-xl mr-3">
+                          <div className="w-10 h-10 rounded-md bg-meta-gray-200 dark:bg-meta-gray-700 flex items-center justify-center text-xl mr-3">
                             {integration.icon}
                           </div>
                           <div>
-                            <div className="text-slate-200 font-medium">{integration.name}</div>
-                            <div className="text-xs text-slate-400">
+                            <div className="text-meta-gray-200 font-medium">{integration.name}</div>
+                            <div className="text-xs text-meta-gray-400">
                               {integration.connected ? 'Connected' : 'Not connected'}
                             </div>
                           </div>
@@ -1076,8 +1076,8 @@ export default function SettingsPage() {
                         <button
                           className={`px-3 py-1 rounded-md text-sm ${
                             integration.connected
-                              ? 'bg-gray-300 dark:bg-slate-700 text-gray-800 dark:text-slate-300 hover:bg-gray-400 dark:hover:bg-slate-600'
-                              : 'bg-cyan-600 text-white hover:bg-cyan-700'
+                              ? 'bg-meta-gray-300 dark:bg-meta-gray-700 text-meta-gray-800 dark:text-meta-gray-300 hover:bg-meta-gray-400 dark:hover:bg-meta-gray-600'
+                              : 'bg-meta-blue-600 text-white hover:bg-meta-blue-700'
                           } transition-colors`}
                         >
                           {integration.connected ? 'Disconnect' : 'Connect'}
@@ -1086,15 +1086,15 @@ export default function SettingsPage() {
                     ))}
                   </div>
 
-                  <div className="bg-gray-50 dark:bg-slate-800/50 border border-gray-300 dark:border-slate-700 rounded-lg p-4">
-                    <h4 className="text-md font-medium text-gray-800 dark:text-slate-300 mb-3">API Access</h4>
-                    <p className="text-sm text-slate-400 mb-4">
+                  <div className="bg-meta-gray-50 dark:bg-meta-gray-800 border border-meta-gray-300 dark:border-meta-gray-700 rounded-lg p-4">
+                    <h4 className="text-md font-medium text-meta-gray-800 dark:text-meta-gray-300 mb-3">API Access</h4>
+                    <p className="text-sm text-meta-gray-400 mb-4">
                       Generate API keys to integrate with other services
                     </p>
 
                     <div className="space-y-4">
                       <div>
-                        <label className="block text-sm font-medium text-gray-700 dark:text-slate-400 mb-1">
+                        <label className="block text-sm font-medium text-meta-gray-700 dark:text-meta-gray-400 mb-1">
                           API Key
                         </label>
                         <div className="flex">
@@ -1102,45 +1102,45 @@ export default function SettingsPage() {
                             type="text"
                             value="••••••••••••••••••••••••••••••"
                             readOnly
-                            className="flex-1 bg-gray-50 dark:bg-slate-800/50 border border-gray-300 dark:border-slate-700 rounded-l-md px-3 py-2 text-gray-900 dark:text-slate-200 focus:outline-none"
+                            className="flex-1 bg-meta-gray-50 dark:bg-meta-gray-800 border border-meta-gray-300 dark:border-meta-gray-700 rounded-l-md px-3 py-2 text-meta-gray-900 dark:text-meta-gray-200 focus:outline-none"
                           />
-                          <button className="bg-gray-300 hover:bg-gray-400 dark:bg-slate-700 dark:hover:bg-slate-600 text-gray-800 dark:text-slate-300 px-4 py-2 rounded-r-md transition-colors">
+                          <button className="bg-meta-gray-300 hover:bg-meta-gray-400 dark:bg-meta-gray-700 dark:hover:bg-meta-gray-600 text-meta-gray-800 dark:text-meta-gray-300 px-4 py-2 rounded-r-md transition-colors">
                             Show
                           </button>
                         </div>
                       </div>
 
                       <div className="flex space-x-3">
-                        <button className="bg-cyan-600 hover:bg-cyan-700 text-white px-4 py-2 rounded-md transition-colors flex-1">
+                        <button className="bg-meta-blue-600 hover:bg-meta-blue-700 text-white px-4 py-2 rounded-md transition-colors flex-1">
                           Generate New Key
                         </button>
-                        <button className="bg-gray-300 hover:bg-gray-400 dark:bg-slate-700 dark:hover:bg-slate-600 text-gray-800 dark:text-slate-300 px-4 py-2 rounded-md transition-colors flex-1">
+                        <button className="bg-meta-gray-300 hover:bg-meta-gray-400 dark:bg-meta-gray-700 dark:hover:bg-meta-gray-600 text-meta-gray-800 dark:text-meta-gray-300 px-4 py-2 rounded-md transition-colors flex-1">
                           Copy Key
                         </button>
                       </div>
                     </div>
                   </div>
 
-                  <div className="bg-gray-50 dark:bg-slate-800/50 border border-gray-300 dark:border-slate-700 rounded-lg p-4">
-                    <h4 className="text-md font-medium text-gray-800 dark:text-slate-300 mb-3">Webhooks</h4>
-                    <p className="text-sm text-slate-400 mb-4">
+                  <div className="bg-meta-gray-50 dark:bg-meta-gray-800 border border-meta-gray-300 dark:border-meta-gray-700 rounded-lg p-4">
+                    <h4 className="text-md font-medium text-meta-gray-800 dark:text-meta-gray-300 mb-3">Webhooks</h4>
+                    <p className="text-sm text-meta-gray-400 mb-4">
                       Configure webhooks to notify external services
                     </p>
 
                     <div className="space-y-3">
                       <div>
-                        <label className="block text-sm font-medium text-gray-700 dark:text-slate-400 mb-1">
+                        <label className="block text-sm font-medium text-meta-gray-700 dark:text-meta-gray-400 mb-1">
                           Webhook URL
                         </label>
                         <input
                           type="text"
                           placeholder="https://"
-                          className="w-full bg-gray-50 dark:bg-slate-800/50 border border-gray-300 dark:border-slate-700 rounded-md px-3 py-2 text-gray-900 dark:text-slate-200 focus:outline-none focus:ring-1 focus:ring-cyan-500 focus:border-cyan-500"
+                          className="w-full bg-meta-gray-50 dark:bg-meta-gray-800 border border-meta-gray-300 dark:border-meta-gray-700 rounded-md px-3 py-2 text-meta-gray-900 dark:text-meta-gray-200 focus:outline-none focus:ring-1 focus:ring-meta-blue-500 focus:border-meta-blue-500"
                         />
                       </div>
 
                       <div>
-                        <label className="block text-sm font-medium text-gray-700 dark:text-slate-400 mb-1">
+                        <label className="block text-sm font-medium text-meta-gray-700 dark:text-meta-gray-400 mb-1">
                           Events
                         </label>
                         <div className="space-y-2">
@@ -1154,15 +1154,15 @@ export default function SettingsPage() {
                             <label key={event} className="flex items-center">
                               <input
                                 type="checkbox"
-                                className="h-4 w-4 text-cyan-500 focus:ring-cyan-500 border-gray-300 dark:border-slate-600 bg-gray-50 dark:bg-slate-800 rounded"
+                                className="h-4 w-4 text-meta-blue-500 focus:ring-meta-blue-500 border-meta-gray-300 dark:border-meta-gray-600 bg-meta-gray-50 dark:bg-meta-gray-800 rounded"
                               />
-                              <span className="ml-2 text-slate-300 text-sm">{event}</span>
+                              <span className="ml-2 text-meta-gray-300 text-sm">{event}</span>
                             </label>
                           ))}
                         </div>
                       </div>
 
-                      <button className="mt-2 bg-cyan-600 hover:bg-cyan-700 text-white px-4 py-2 rounded-md transition-colors">
+                      <button className="mt-2 bg-meta-blue-600 hover:bg-meta-blue-700 text-white px-4 py-2 rounded-md transition-colors">
                         Save Webhook
                       </button>
                     </div>
@@ -1174,18 +1174,18 @@ export default function SettingsPage() {
             {/* Preferences Settings */}
             {activeTab === 'preferences' && (
               <div className="space-y-6 animate-fadeIn">
-                <h3 className="text-lg font-medium text-gray-900 dark:text-slate-200 border-b border-gray-200 dark:border-slate-700/50 pb-2">
+                <h3 className="text-lg font-medium text-meta-gray-900 dark:text-meta-gray-200 border-b border-meta-gray-200 dark:border-meta-gray-700 pb-2">
                   Preferences
                 </h3>
 
                 <div className="space-y-6">
-                  <div className="bg-gray-50 dark:bg-slate-800/50 border border-gray-300 dark:border-slate-700 rounded-lg p-4">
-                    <h4 className="text-md font-medium text-gray-800 dark:text-slate-300 mb-3">Focus Timer</h4>
+                  <div className="bg-meta-gray-50 dark:bg-meta-gray-800 border border-meta-gray-300 dark:border-meta-gray-700 rounded-lg p-4">
+                    <h4 className="text-md font-medium text-meta-gray-800 dark:text-meta-gray-300 mb-3">Focus Timer</h4>
 
                     <div className="space-y-4">
                       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                         <div>
-                          <label className="block text-sm font-medium text-gray-700 dark:text-slate-400 mb-1">
+                          <label className="block text-sm font-medium text-meta-gray-700 dark:text-meta-gray-400 mb-1">
                             Focus Duration (minutes)
                           </label>
                           <input
@@ -1193,12 +1193,12 @@ export default function SettingsPage() {
                             defaultValue={25}
                             min={1}
                             max={120}
-                            className="w-full bg-gray-50 dark:bg-slate-800/50 border border-gray-300 dark:border-slate-700 rounded-md px-3 py-2 text-gray-900 dark:text-slate-200 focus:outline-none focus:ring-1 focus:ring-cyan-500 focus:border-cyan-500"
+                            className="w-full bg-meta-gray-50 dark:bg-meta-gray-800 border border-meta-gray-300 dark:border-meta-gray-700 rounded-md px-3 py-2 text-meta-gray-900 dark:text-meta-gray-200 focus:outline-none focus:ring-1 focus:ring-meta-blue-500 focus:border-meta-blue-500"
                           />
                         </div>
 
                         <div>
-                          <label className="block text-sm font-medium text-gray-700 dark:text-slate-400 mb-1">
+                          <label className="block text-sm font-medium text-meta-gray-700 dark:text-meta-gray-400 mb-1">
                             Break Duration (minutes)
                           </label>
                           <input
@@ -1206,14 +1206,14 @@ export default function SettingsPage() {
                             defaultValue={5}
                             min={1}
                             max={60}
-                            className="w-full bg-gray-50 dark:bg-slate-800/50 border border-gray-300 dark:border-slate-700 rounded-md px-3 py-2 text-gray-900 dark:text-slate-200 focus:outline-none focus:ring-1 focus:ring-cyan-500 focus:border-cyan-500"
+                            className="w-full bg-meta-gray-50 dark:bg-meta-gray-800 border border-meta-gray-300 dark:border-meta-gray-700 rounded-md px-3 py-2 text-meta-gray-900 dark:text-meta-gray-200 focus:outline-none focus:ring-1 focus:ring-meta-blue-500 focus:border-meta-blue-500"
                           />
                         </div>
                       </div>
 
                       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                         <div>
-                          <label className="block text-sm font-medium text-gray-700 dark:text-slate-400 mb-1">
+                          <label className="block text-sm font-medium text-meta-gray-700 dark:text-meta-gray-400 mb-1">
                             Long Break Duration (minutes)
                           </label>
                           <input
@@ -1221,12 +1221,12 @@ export default function SettingsPage() {
                             defaultValue={15}
                             min={1}
                             max={120}
-                            className="w-full bg-gray-50 dark:bg-slate-800/50 border border-gray-300 dark:border-slate-700 rounded-md px-3 py-2 text-gray-900 dark:text-slate-200 focus:outline-none focus:ring-1 focus:ring-cyan-500 focus:border-cyan-500"
+                            className="w-full bg-meta-gray-50 dark:bg-meta-gray-800 border border-meta-gray-300 dark:border-meta-gray-700 rounded-md px-3 py-2 text-meta-gray-900 dark:text-meta-gray-200 focus:outline-none focus:ring-1 focus:ring-meta-blue-500 focus:border-meta-blue-500"
                           />
                         </div>
 
                         <div>
-                          <label className="block text-sm font-medium text-gray-700 dark:text-slate-400 mb-1">
+                          <label className="block text-sm font-medium text-meta-gray-700 dark:text-meta-gray-400 mb-1">
                             Sessions Before Long Break
                           </label>
                           <input
@@ -1234,22 +1234,22 @@ export default function SettingsPage() {
                             defaultValue={4}
                             min={1}
                             max={10}
-                            className="w-full bg-gray-50 dark:bg-slate-800/50 border border-gray-300 dark:border-slate-700 rounded-md px-3 py-2 text-gray-900 dark:text-slate-200 focus:outline-none focus:ring-1 focus:ring-cyan-500 focus:border-cyan-500"
+                            className="w-full bg-meta-gray-50 dark:bg-meta-gray-800 border border-meta-gray-300 dark:border-meta-gray-700 rounded-md px-3 py-2 text-meta-gray-900 dark:text-meta-gray-200 focus:outline-none focus:ring-1 focus:ring-meta-blue-500 focus:border-meta-blue-500"
                           />
                         </div>
                       </div>
 
                       <div className="flex items-center justify-between">
                         <div>
-                          <div className="text-slate-300">Auto-start Breaks</div>
-                          <div className="text-sm text-slate-400">
+                          <div className="text-meta-gray-300">Auto-start Breaks</div>
+                          <div className="text-sm text-meta-gray-400">
                             Automatically start breaks after focus sessions
                           </div>
                         </div>
                         <button
                           onClick={() => setAutoStartBreaks(!autoStartBreaks)}
                           className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
-                            autoStartBreaks ? 'bg-cyan-500' : 'bg-gray-300 dark:bg-slate-700'
+                            autoStartBreaks ? 'bg-meta-blue-500' : 'bg-meta-gray-300 dark:bg-meta-gray-700'
                           }`}
                         >
                           <span
@@ -1262,12 +1262,12 @@ export default function SettingsPage() {
                     </div>
                   </div>
 
-                  <div className="bg-gray-50 dark:bg-slate-800/50 border border-gray-300 dark:border-slate-700 rounded-lg p-4">
-                    <h4 className="text-md font-medium text-gray-800 dark:text-slate-300 mb-3">Date & Time</h4>
+                  <div className="bg-meta-gray-50 dark:bg-meta-gray-800 border border-meta-gray-300 dark:border-meta-gray-700 rounded-lg p-4">
+                    <h4 className="text-md font-medium text-meta-gray-800 dark:text-meta-gray-300 mb-3">Date & Time</h4>
 
                     <div className="space-y-4">
                       <div>
-                        <label className="block text-sm font-medium text-gray-700 dark:text-slate-400 mb-1">
+                        <label className="block text-sm font-medium text-meta-gray-700 dark:text-meta-gray-400 mb-1">
                           Time Format
                         </label>
                         <div className="flex space-x-4">
@@ -1277,9 +1277,9 @@ export default function SettingsPage() {
                               name="timeFormat"
                               checked={timeFormat === '12h'}
                               onChange={() => setTimeFormat('12h')}
-                              className="h-4 w-4 text-cyan-500 focus:ring-cyan-500 border-gray-300 dark:border-slate-600 bg-gray-50 dark:bg-slate-800"
+                              className="h-4 w-4 text-meta-blue-500 focus:ring-meta-blue-500 border-meta-gray-300 dark:border-meta-gray-600 bg-meta-gray-50 dark:bg-meta-gray-800"
                             />
-                            <span className="ml-2 text-slate-300">12-hour (1:30 PM)</span>
+                            <span className="ml-2 text-meta-gray-300">12-hour (1:30 PM)</span>
                           </label>
                           <label className="flex items-center">
                             <input
@@ -1287,21 +1287,21 @@ export default function SettingsPage() {
                               name="timeFormat"
                               checked={timeFormat === '24h'}
                               onChange={() => setTimeFormat('24h')}
-                              className="h-4 w-4 text-cyan-500 focus:ring-cyan-500 border-gray-300 dark:border-slate-600 bg-gray-50 dark:bg-slate-800"
+                              className="h-4 w-4 text-meta-blue-500 focus:ring-meta-blue-500 border-meta-gray-300 dark:border-meta-gray-600 bg-meta-gray-50 dark:bg-meta-gray-800"
                             />
-                            <span className="ml-2 text-slate-300">24-hour (13:30)</span>
+                            <span className="ml-2 text-meta-gray-300">24-hour (13:30)</span>
                           </label>
                         </div>
                       </div>
 
                       <div>
-                        <label className="block text-sm font-medium text-gray-700 dark:text-slate-400 mb-1">
+                        <label className="block text-sm font-medium text-meta-gray-700 dark:text-meta-gray-400 mb-1">
                           First Day of Week
                         </label>
                         <select
                           value={weekStart}
                           onChange={(e) => setWeekStart(e.target.value)}
-                          className="w-full bg-gray-50 dark:bg-slate-800/50 border border-gray-300 dark:border-slate-700 rounded-md px-3 py-2 text-gray-900 dark:text-slate-200 focus:outline-none focus:ring-1 focus:ring-cyan-500 focus:border-cyan-500"
+                          className="w-full bg-meta-gray-50 dark:bg-meta-gray-800 border border-meta-gray-300 dark:border-meta-gray-700 rounded-md px-3 py-2 text-meta-gray-900 dark:text-meta-gray-200 focus:outline-none focus:ring-1 focus:ring-meta-blue-500 focus:border-meta-blue-500"
                         >
                           <option value="monday">Monday</option>
                           <option value="sunday">Sunday</option>
@@ -1310,10 +1310,10 @@ export default function SettingsPage() {
                       </div>
 
                       <div>
-                        <label className="block text-sm font-medium text-gray-700 dark:text-slate-400 mb-1">
+                        <label className="block text-sm font-medium text-meta-gray-700 dark:text-meta-gray-400 mb-1">
                           Date Format
                         </label>
-                        <select className="w-full bg-gray-50 dark:bg-slate-800/50 border border-gray-300 dark:border-slate-700 rounded-md px-3 py-2 text-gray-900 dark:text-slate-200 focus:outline-none focus:ring-1 focus:ring-cyan-500 focus:border-cyan-500">
+                        <select className="w-full bg-meta-gray-50 dark:bg-meta-gray-800 border border-meta-gray-300 dark:border-meta-gray-700 rounded-md px-3 py-2 text-meta-gray-900 dark:text-meta-gray-200 focus:outline-none focus:ring-1 focus:ring-meta-blue-500 focus:border-meta-blue-500">
                           <option value="MM/DD/YYYY">MM/DD/YYYY</option>
                           <option value="DD/MM/YYYY">DD/MM/YYYY</option>
                           <option value="YYYY-MM-DD">YYYY-MM-DD</option>
@@ -1322,18 +1322,18 @@ export default function SettingsPage() {
                     </div>
                   </div>
 
-                  <div className="bg-gray-50 dark:bg-slate-800/50 border border-gray-300 dark:border-slate-700 rounded-lg p-4">
-                    <h4 className="text-md font-medium text-gray-800 dark:text-slate-300 mb-3">Language & Region</h4>
+                  <div className="bg-meta-gray-50 dark:bg-meta-gray-800 border border-meta-gray-300 dark:border-meta-gray-700 rounded-lg p-4">
+                    <h4 className="text-md font-medium text-meta-gray-800 dark:text-meta-gray-300 mb-3">Language & Region</h4>
 
                     <div className="space-y-4">
                       <div>
-                        <label className="block text-sm font-medium text-gray-700 dark:text-slate-400 mb-1">
+                        <label className="block text-sm font-medium text-meta-gray-700 dark:text-meta-gray-400 mb-1">
                           Language
                         </label>
                         <select
                           value={language}
                           onChange={(e) => setLanguage(e.target.value)}
-                          className="w-full bg-gray-50 dark:bg-slate-800/50 border border-gray-300 dark:border-slate-700 rounded-md px-3 py-2 text-gray-900 dark:text-slate-200 focus:outline-none focus:ring-1 focus:ring-cyan-500 focus:border-cyan-500"
+                          className="w-full bg-meta-gray-50 dark:bg-meta-gray-800 border border-meta-gray-300 dark:border-meta-gray-700 rounded-md px-3 py-2 text-meta-gray-900 dark:text-meta-gray-200 focus:outline-none focus:ring-1 focus:ring-meta-blue-500 focus:border-meta-blue-500"
                         >
                           <option value="english">English</option>
                           <option value="spanish">Spanish</option>
@@ -1345,10 +1345,10 @@ export default function SettingsPage() {
                       </div>
 
                       <div>
-                        <label className="block text-sm font-medium text-gray-700 dark:text-slate-400 mb-1">
+                        <label className="block text-sm font-medium text-meta-gray-700 dark:text-meta-gray-400 mb-1">
                           Timezone
                         </label>
-                        <select className="w-full bg-gray-50 dark:bg-slate-800/50 border border-gray-300 dark:border-slate-700 rounded-md px-3 py-2 text-gray-900 dark:text-slate-200 focus:outline-none focus:ring-1 focus:ring-cyan-500 focus:border-cyan-500">
+                        <select className="w-full bg-meta-gray-50 dark:bg-meta-gray-800 border border-meta-gray-300 dark:border-meta-gray-700 rounded-md px-3 py-2 text-meta-gray-900 dark:text-meta-gray-200 focus:outline-none focus:ring-1 focus:ring-meta-blue-500 focus:border-meta-blue-500">
                           <option value="auto">Auto-detect (System)</option>
                           <option value="utc">UTC</option>
                           <option value="est">Eastern Time (EST/EDT)</option>
@@ -1359,42 +1359,42 @@ export default function SettingsPage() {
                     </div>
                   </div>
 
-                  <div className="bg-gray-50 dark:bg-slate-800/50 border border-gray-300 dark:border-slate-700 rounded-lg p-4">
-                    <h4 className="text-md font-medium text-gray-800 dark:text-slate-300 mb-3">Accessibility</h4>
+                  <div className="bg-meta-gray-50 dark:bg-meta-gray-800 border border-meta-gray-300 dark:border-meta-gray-700 rounded-lg p-4">
+                    <h4 className="text-md font-medium text-meta-gray-800 dark:text-meta-gray-300 mb-3">Accessibility</h4>
 
                     <div className="space-y-3">
                       <div className="flex items-center justify-between">
                         <div>
-                          <div className="text-slate-300">Reduce Animations</div>
-                          <div className="text-sm text-slate-400">Minimize motion effects</div>
+                          <div className="text-meta-gray-300">Reduce Animations</div>
+                          <div className="text-sm text-meta-gray-400">Minimize motion effects</div>
                         </div>
                         <label className="relative inline-flex items-center cursor-pointer">
                           <input type="checkbox" className="sr-only peer" />
-                          <div className="w-9 h-5 bg-gray-300 dark:bg-slate-700 peer-focus:outline-none peer-focus:ring-1 peer-focus:ring-cyan-500 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 dark:after:border-slate-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-cyan-500"></div>
+                          <div className="w-9 h-5 bg-meta-gray-300 dark:bg-meta-gray-700 peer-focus:outline-none peer-focus:ring-1 peer-focus:ring-meta-blue-500 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-meta-gray-300 dark:after:border-meta-gray-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-meta-blue-500"></div>
                         </label>
                       </div>
 
                       <div className="flex items-center justify-between">
                         <div>
-                          <div className="text-slate-300">High Contrast Mode</div>
-                          <div className="text-sm text-slate-400">Increase visual contrast</div>
+                          <div className="text-meta-gray-300">High Contrast Mode</div>
+                          <div className="text-sm text-meta-gray-400">Increase visual contrast</div>
                         </div>
                         <label className="relative inline-flex items-center cursor-pointer">
                           <input type="checkbox" className="sr-only peer" />
-                          <div className="w-9 h-5 bg-gray-300 dark:bg-slate-700 peer-focus:outline-none peer-focus:ring-1 peer-focus:ring-cyan-500 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 dark:after:border-slate-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-cyan-500"></div>
+                          <div className="w-9 h-5 bg-meta-gray-300 dark:bg-meta-gray-700 peer-focus:outline-none peer-focus:ring-1 peer-focus:ring-meta-blue-500 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-meta-gray-300 dark:after:border-meta-gray-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-meta-blue-500"></div>
                         </label>
                       </div>
 
                       <div className="flex items-center justify-between">
                         <div>
-                          <div className="text-slate-300">Screen Reader Optimizations</div>
-                          <div className="text-sm text-slate-400">
+                          <div className="text-meta-gray-300">Screen Reader Optimizations</div>
+                          <div className="text-sm text-meta-gray-400">
                             Improve screen reader compatibility
                           </div>
                         </div>
                         <label className="relative inline-flex items-center cursor-pointer">
                           <input type="checkbox" defaultChecked className="sr-only peer" />
-                          <div className="w-9 h-5 bg-gray-300 dark:bg-slate-700 peer-focus:outline-none peer-focus:ring-1 peer-focus:ring-cyan-500 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 dark:after:border-slate-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-cyan-500"></div>
+                          <div className="w-9 h-5 bg-meta-gray-300 dark:bg-meta-gray-700 peer-focus:outline-none peer-focus:ring-1 peer-focus:ring-meta-blue-500 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-meta-gray-300 dark:after:border-meta-gray-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-meta-blue-500"></div>
                         </label>
                       </div>
                     </div>
@@ -1416,7 +1416,7 @@ export default function SettingsPage() {
                     console.error('Error saving settings:', error)
                   }
                 }}
-                className="bg-cyan-600 hover:bg-cyan-700 text-white px-4 py-2 rounded-md transition-colors flex items-center"
+                className="bg-meta-blue-600 hover:bg-meta-blue-700 text-white px-4 py-2 rounded-md transition-colors flex items-center"
               >
                 <Save className="h-4 w-4 mr-2" />
                 Save Settings

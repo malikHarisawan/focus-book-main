@@ -39,12 +39,12 @@ export function TitleBar() {
 
   return (
     <div
-      className="h-8 flex items-center justify-between px-4 select-none backdrop-blur-md transition-all bg-white/80 border-b border-neon-cyan-500/30 dark:bg-black/80 dark:border-b dark:border-neon-cyan-500/20"
+      className="h-10 flex items-center justify-between px-4 select-none backdrop-blur-md transition-all bg-white/90 border-b border-meta-gray-200 dark:bg-dark-bg-secondary/90 dark:border-dark-border-primary"
       style={{ WebkitAppRegion: 'drag' }}
     >
       {/* App Title */}
       <div className="flex items-center gap-2">
-        <span className="text-xs font-heading font-bold tracking-widest uppercase text-neon-cyan-600 dark:text-neon-cyan-500 dark:neon-glow">
+        <span className="text-sm font-semibold tracking-wide text-meta-blue-600 dark:text-meta-blue-400">
           FocusBook
         </span>
       </div>
@@ -53,21 +53,21 @@ export function TitleBar() {
       <div className="flex items-center" style={{ WebkitAppRegion: 'no-drag' }}>
         <button
           onClick={handleMinimize}
-          className="h-8 w-10 flex items-center justify-center transition-all duration-200 text-slate-600 hover:text-neon-cyan-600 hover:bg-neon-cyan-500/10 dark:text-slate-400 dark:hover:text-neon-cyan-500 dark:hover:bg-neon-cyan-500/10"
+          className="h-8 w-10 flex items-center justify-center transition-all duration-200 text-meta-gray-500 hover:text-meta-gray-700 hover:bg-meta-gray-100 dark:text-meta-gray-400 dark:hover:text-meta-gray-200 dark:hover:bg-meta-gray-700 rounded"
           title="Minimize"
         >
           <Minus size={14} />
         </button>
         <button
           onClick={handleMaximize}
-          className="h-8 w-10 flex items-center justify-center transition-all duration-200 text-slate-600 hover:text-neon-cyan-600 hover:bg-neon-cyan-500/10 dark:text-slate-400 dark:hover:text-neon-cyan-500 dark:hover:bg-neon-cyan-500/10"
+          className="h-8 w-10 flex items-center justify-center transition-all duration-200 text-meta-gray-500 hover:text-meta-gray-700 hover:bg-meta-gray-100 dark:text-meta-gray-400 dark:hover:text-meta-gray-200 dark:hover:bg-meta-gray-700 rounded"
           title={isMaximized ? 'Restore' : 'Maximize'}
         >
           {isMaximized ? <Minimize2 size={14} /> : <Maximize2 size={14} />}
         </button>
         <button
           onClick={handleClose}
-          className="h-8 w-10 flex items-center justify-center transition-all duration-200 text-slate-600 hover:text-white hover:bg-neon-pink-500/80 dark:text-slate-400 dark:hover:text-white dark:hover:bg-neon-pink-600/80 dark:hover:neon-border-pink"
+          className="h-8 w-10 flex items-center justify-center transition-all duration-200 text-meta-gray-500 hover:text-white hover:bg-meta-red-500 dark:text-meta-gray-400 dark:hover:text-white dark:hover:bg-meta-red-500 rounded"
           title="Close"
         >
           <X size={14} />

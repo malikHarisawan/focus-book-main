@@ -27,27 +27,27 @@ const CustomTooltip = ({ active, aggregatedData, hasSelection, zoomLevel, zoomLe
       : 0
 
   return (
-    <div className="bg-white dark:bg-gray-800 p-3 rounded border border-slate-300 dark:border-gray-700">
-      <p className="text-slate-800 dark:text-gray-200 font-medium mb-2">{getTooltipTitle(hasSelection, zoomLevel)}</p>
-      <div className="text-xs text-slate-600 dark:text-gray-400 mb-2">{zoomLevelDetail}</div>
+    <div className="bg-white dark:bg-meta-gray-800 p-3 rounded-lg border border-meta-gray-200 dark:border-meta-gray-700 shadow-lg">
+      <p className="text-meta-gray-900 dark:text-meta-gray-100 font-medium mb-2">{getTooltipTitle(hasSelection, zoomLevel)}</p>
+      <div className="text-xs text-meta-gray-500 dark:text-meta-gray-400 mb-2">{zoomLevelDetail}</div>
       <div className="space-y-1">
         <div className="flex items-center gap-2">
-          <div className="w-3 h-3 rounded-full bg-green-500" />
-          <span className="text-slate-700 dark:text-gray-300">Productive: </span>
-          <span className="text-slate-900 dark:text-white">{productiveTime}</span>
+          <div className="w-3 h-3 rounded-full bg-meta-green-500" />
+          <span className="text-meta-gray-600 dark:text-meta-gray-300">Productive: </span>
+          <span className="text-meta-gray-900 dark:text-white">{productiveTime}</span>
         </div>
         <div className="flex items-center gap-2">
-          <div className="w-3 h-3 rounded-full bg-red-500" />
-          <span className="text-slate-700 dark:text-gray-300">Unproductive: </span>
-          <span className="text-slate-900 dark:text-white">{unproductiveTime}</span>
+          <div className="w-3 h-3 rounded-full bg-meta-red-500" />
+          <span className="text-meta-gray-600 dark:text-meta-gray-300">Unproductive: </span>
+          <span className="text-meta-gray-900 dark:text-white">{unproductiveTime}</span>
         </div>
-        <div className="flex items-center gap-2 pt-1 border-t border-slate-300 dark:border-gray-600">
-          <span className="text-slate-700 dark:text-gray-300">Total: </span>
-          <span className="text-cyan-600 dark:text-cyan-400 font-medium">{totalTime}</span>
+        <div className="flex items-center gap-2 pt-1 border-t border-meta-gray-200 dark:border-meta-gray-600">
+          <span className="text-meta-gray-600 dark:text-meta-gray-300">Total: </span>
+          <span className="text-meta-blue-600 dark:text-meta-blue-400 font-medium">{totalTime}</span>
         </div>
         <div className="flex items-center gap-2">
-          <span className="text-slate-700 dark:text-gray-300">Productivity: </span>
-          <span className="text-green-600 dark:text-green-400 font-medium">{productivePercentage}%</span>
+          <span className="text-meta-gray-600 dark:text-meta-gray-300">Productivity: </span>
+          <span className="text-meta-green-600 dark:text-meta-green-400 font-medium">{productivePercentage}%</span>
         </div>
       </div>
     </div>

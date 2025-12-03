@@ -4,7 +4,7 @@ import { cn } from '../../lib/utils' // Utility for merging classnames
 const Card = React.forwardRef(({ className, ...props }, ref) => (
   <div
     ref={ref}
-    className={cn('rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-900 dark:text-white shadow-sm', className)}
+    className={cn('rounded-xl border border-meta-gray-200 dark:border-meta-gray-700 bg-white dark:bg-meta-gray-800 text-meta-gray-900 dark:text-meta-gray-100 shadow-sm', className)}
     {...props}
   />
 ))
@@ -18,14 +18,14 @@ CardHeader.displayName = 'CardHeader'
 const CardTitle = React.forwardRef(({ className, ...props }, ref) => (
   <div
     ref={ref}
-    className={cn('text-2xl font-semibold leading-none tracking-tight text-gray-900 dark:text-white', className)}
+    className={cn('text-xl font-semibold leading-none tracking-tight text-meta-gray-900 dark:text-meta-gray-100', className)}
     {...props}
   />
 ))
 CardTitle.displayName = 'CardTitle'
 
 const CardDescription = React.forwardRef(({ className, ...props }, ref) => (
-  <div ref={ref} className={cn('text-sm text-gray-600 dark:text-gray-400', className)} {...props} />
+  <div ref={ref} className={cn('text-sm text-meta-gray-500 dark:text-meta-gray-400', className)} {...props} />
 ))
 CardDescription.displayName = 'CardDescription'
 

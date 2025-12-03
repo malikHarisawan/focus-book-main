@@ -1,13 +1,13 @@
-@import url('https://fonts.googleapis.com/css2?family=Orbitron:wght@400;500;600;700;800;900&family=IBM+Plex+Sans:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500;600;700&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap');
 
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
 
-/* Retro-Futuristic Base Styles */
+/* Professional Meta-inspired Base Styles */
 @layer base {
   body {
-    font-family: 'IBM Plex Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
     font-feature-settings: 'cv11', 'ss01';
     font-weight: 400;
     -webkit-font-smoothing: antialiased;
@@ -15,18 +15,18 @@
   }
 
   h1, h2, h3, h4, h5, h6 {
-    font-family: 'Orbitron', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
-    font-weight: 700;
-    letter-spacing: 0.01em;
+    font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    font-weight: 600;
+    letter-spacing: -0.02em;
   }
 
   h1 {
-    font-weight: 800;
-    letter-spacing: 0.02em;
+    font-weight: 700;
+    letter-spacing: -0.025em;
   }
 
   h2 {
-    font-weight: 700;
+    font-weight: 600;
   }
 
   h3, h4, h5, h6 {
@@ -34,99 +34,55 @@
   }
 
   code, pre, .font-mono {
-    font-family: 'JetBrains Mono', 'Courier New', monospace;
+    font-family: 'SF Mono', 'JetBrains Mono', 'Courier New', monospace;
     font-feature-settings: 'liga' 1, 'calt' 1;
   }
 }
 
-/* Retro-Futuristic Grid Background */
-.retro-grid {
+/* Subtle Background Pattern */
+.subtle-grid {
   background-image:
-    linear-gradient(rgba(0, 255, 255, 0.03) 1px, transparent 1px),
-    linear-gradient(90deg, rgba(0, 255, 255, 0.03) 1px, transparent 1px);
-  background-size: 50px 50px;
+    linear-gradient(rgba(24, 119, 242, 0.02) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(24, 119, 242, 0.02) 1px, transparent 1px);
+  background-size: 40px 40px;
   background-position: 0 0, 0 0;
-  animation: gridScroll 20s linear infinite;
 }
 
-@keyframes gridScroll {
-  0% {
-    background-position: 0 0, 0 0;
-  }
-  100% {
-    background-position: 50px 50px, 50px 50px;
-  }
-}
-
-/* Scan Line Effect */
-.scan-lines::before {
-  content: '';
-  position: absolute;
-  top: 0;
-  left: 0;
-  right: 0;
-  bottom: 0;
+/* Smooth Gradient Overlay */
+.gradient-overlay {
   background: linear-gradient(
-    to bottom,
+    135deg,
+    rgba(24, 119, 242, 0.03) 0%,
     transparent 50%,
-    rgba(0, 255, 255, 0.02) 50%
+    rgba(49, 162, 76, 0.02) 100%
   );
-  background-size: 100% 4px;
-  pointer-events: none;
-  z-index: 1;
-  animation: scanlineMove 8s linear infinite;
 }
 
-@keyframes scanlineMove {
-  0% {
-    transform: translateY(0);
-  }
-  100% {
-    transform: translateY(4px);
-  }
-}
-
-/* Neon Glow Effects */
-.neon-glow {
-  text-shadow:
-    0 0 10px rgba(0, 255, 255, 0.5),
-    0 0 20px rgba(0, 255, 255, 0.3),
-    0 0 30px rgba(0, 255, 255, 0.2);
-}
-
-.neon-border {
+/* Professional Shadow Effects */
+.card-shadow {
   box-shadow:
-    0 0 10px rgba(0, 255, 255, 0.3),
-    0 0 20px rgba(0, 255, 255, 0.1),
-    inset 0 0 10px rgba(0, 255, 255, 0.05);
+    0 1px 2px rgba(0, 0, 0, 0.04),
+    0 4px 8px rgba(0, 0, 0, 0.04),
+    0 8px 16px rgba(0, 0, 0, 0.04);
 }
 
-.neon-border-pink {
+.card-shadow-hover {
   box-shadow:
-    0 0 10px rgba(255, 0, 255, 0.3),
-    0 0 20px rgba(255, 0, 255, 0.1),
-    inset 0 0 10px rgba(255, 0, 255, 0.05);
+    0 2px 4px rgba(0, 0, 0, 0.06),
+    0 8px 16px rgba(0, 0, 0, 0.08),
+    0 16px 32px rgba(0, 0, 0, 0.06);
 }
 
-/* Terminal Flicker Animation */
-.terminal-flicker {
-  animation: flicker 0.15s infinite alternate;
-}
-
-@keyframes flicker {
-  0%, 100% {
-    opacity: 1;
-  }
-  50% {
-    opacity: 0.97;
-  }
+/* Subtle Focus Ring */
+.focus-ring {
+  box-shadow: 0 0 0 2px rgba(24, 119, 242, 0.2);
 }
 
 /* Page Load Stagger Animations */
 @keyframes fadeInUp {
   from {
     opacity: 0;
-    transform: translateY(20px);
+    transform: translateY(12px);
   }
   to {
     opacity: 1;
@@ -137,7 +93,7 @@
 @keyframes fadeInLeft {
   from {
     opacity: 0;
-    transform: translateX(-20px);
+    transform: translateX(-12px);
   }
   to {
     opacity: 1;
@@ -148,7 +104,7 @@
 @keyframes fadeInScale {
   from {
     opacity: 0;
-    transform: scale(0.95);
+    transform: scale(0.98);
   }
   to {
     opacity: 1;
@@ -156,68 +112,55 @@
   }
 }
 
-@keyframes glitchPulse {
-  0%, 100% {
-    opacity: 1;
-  }
-  50% {
-    opacity: 0.8;
-    text-shadow:
-      2px 0 #00ffff,
-      -2px 0 #ff00ff;
-  }
-}
-
 /* Stagger delays for different elements */
 .stagger-1 {
-  animation: fadeInUp 0.6s ease-out 0.1s both;
+  animation: fadeInUp 0.4s ease-out 0.05s both;
 }
 
 .stagger-2 {
-  animation: fadeInUp 0.6s ease-out 0.2s both;
+  animation: fadeInUp 0.4s ease-out 0.1s both;
 }
 
 .stagger-3 {
-  animation: fadeInUp 0.6s ease-out 0.3s both;
+  animation: fadeInUp 0.4s ease-out 0.15s both;
 }
 
 .stagger-4 {
-  animation: fadeInUp 0.6s ease-out 0.4s both;
+  animation: fadeInUp 0.4s ease-out 0.2s both;
 }
 
 .stagger-5 {
-  animation: fadeInUp 0.6s ease-out 0.5s both;
+  animation: fadeInUp 0.4s ease-out 0.25s both;
 }
 
 .stagger-left {
-  animation: fadeInLeft 0.6s ease-out 0.1s both;
+  animation: fadeInLeft 0.4s ease-out 0.05s both;
 }
 
 /* Hover Effects */
 .hover-lift {
-  transition: transform 0.3s cubic-bezier(0.34, 1.56, 0.64, 1), box-shadow 0.3s ease;
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
 }
 
 .hover-lift:hover {
-  transform: translateY(-4px) scale(1.02);
+  transform: translateY(-2px);
 }
 
 .hover-glow:hover {
   box-shadow:
-    0 0 20px rgba(0, 255, 255, 0.4),
-    0 0 40px rgba(0, 255, 255, 0.2),
-    0 4px 20px rgba(0, 0, 0, 0.3);
+    0 4px 12px rgba(24, 119, 242, 0.15),
+    0 8px 24px rgba(24, 119, 242, 0.1);
 }
 
 /* Gradient Text */
 .gradient-text {
-  background: linear-gradient(135deg, #00ffff 0%, #ff00ff 100%);
+  background: linear-gradient(135deg, #1877f2 0%, #166fe5 100%);
   -webkit-background-clip: text;
   background-clip: text;
   -webkit-text-fill-color: transparent;
 }
 
-/* Vignette Effect */
+/* Subtle Vignette Effect */
 .vignette::after {
   content: '';
   position: fixed;
@@ -229,7 +172,7 @@
   background: radial-gradient(
     ellipse at center,
     transparent 0%,
-    rgba(0, 0, 0, 0.4) 100%
+    rgba(0, 0, 0, 0.15) 100%
   );
   z-index: 9999;
 }
@@ -242,32 +185,28 @@
 }
 
 ::-webkit-scrollbar-track {
-  background: rgba(0, 0, 0, 0.3);
-  border-radius: 0;
-  border-left: 1px solid rgba(0, 255, 255, 0.1);
+  background: rgba(0, 0, 0, 0.05);
+  border-radius: 4px;
 }
 
 ::-webkit-scrollbar-thumb {
-  background: linear-gradient(180deg, rgba(0, 255, 255, 0.3) 0%, rgba(0, 255, 255, 0.5) 100%);
-  border-radius: 0;
-  border: 1px solid rgba(0, 255, 255, 0.2);
-  transition: all 0.3s ease;
+  background: rgba(101, 103, 107, 0.4);
+  border-radius: 4px;
+  transition: all 0.2s ease;
 }
 
 ::-webkit-scrollbar-thumb:hover {
-  background: linear-gradient(180deg, rgba(0, 255, 255, 0.5) 0%, rgba(0, 255, 255, 0.7) 100%);
-  box-shadow: 0 0 10px rgba(0, 255, 255, 0.5);
+  background: rgba(101, 103, 107, 0.6);
 }
 
 ::-webkit-scrollbar-thumb:active {
-  background: linear-gradient(180deg, rgba(0, 255, 255, 0.7) 0%, rgba(0, 255, 255, 0.9) 100%);
-  box-shadow: 0 0 15px rgba(0, 255, 255, 0.7);
+  background: rgba(101, 103, 107, 0.8);
 }
 
 /* Firefox */
 html {
   scrollbar-width: thin;
-  scrollbar-color: rgba(0, 255, 255, 0.4) rgba(0, 0, 0, 0.3);
+  scrollbar-color: rgba(101, 103, 107, 0.4) rgba(0, 0, 0, 0.05);
 }
 
 /* Custom scrollbar for specific components */
@@ -277,20 +216,18 @@ html {
 }
 
 .custom-scrollbar::-webkit-scrollbar-track {
-  background: rgba(0, 0, 0, 0.2);
-  border-radius: 0;
+  background: rgba(0, 0, 0, 0.03);
+  border-radius: 3px;
 }
 
 .custom-scrollbar::-webkit-scrollbar-thumb {
-  background: linear-gradient(180deg, rgba(0, 255, 255, 0.2) 0%, rgba(0, 255, 255, 0.4) 100%);
-  border-radius: 0;
-  border: 1px solid rgba(0, 255, 255, 0.15);
+  background: rgba(101, 103, 107, 0.3);
+  border-radius: 3px;
   transition: all 0.2s ease;
 }
 
 .custom-scrollbar::-webkit-scrollbar-thumb:hover {
-  background: linear-gradient(180deg, rgba(0, 255, 255, 0.4) 0%, rgba(0, 255, 255, 0.6) 100%);
-  box-shadow: 0 0 8px rgba(0, 255, 255, 0.4);
+  background: rgba(101, 103, 107, 0.5);
 }
 
 /* Hide scrollbar but keep functionality for specific cases */

@@ -17,10 +17,10 @@ export function Sidebar({ productivityScore, dailyGoalProgress, weeklyGoalProgre
   const [timeLeft, setTimeLeft] = useState(0)
   const [isStarting, setIsStarting] = useState(false)
 
-  // Theme-aware glow colors
-  const glowColors = {
-    green: resolvedTheme === 'dark' ? 'rgba(0, 255, 0, 0.7)' : 'rgba(16, 185, 129, 0.6)',
-    orange: resolvedTheme === 'dark' ? 'rgba(255, 153, 0, 0.7)' : 'rgba(249, 115, 22, 0.6)',
+  // Theme-aware colors
+  const statusColors = {
+    active: resolvedTheme === 'dark' ? 'rgba(49, 162, 76, 0.6)' : 'rgba(49, 162, 76, 0.5)',
+    paused: resolvedTheme === 'dark' ? 'rgba(245, 166, 35, 0.6)' : 'rgba(245, 166, 35, 0.5)',
   }
 
   const loadCurrentSession = async () => {
@@ -100,12 +100,12 @@ export function Sidebar({ productivityScore, dailyGoalProgress, weeklyGoalProgre
   }
 
   return (
-    <Card className="backdrop-blur-md w-full min-w-0 border-0 bg-light-bg-card/80 border border-neon-cyan-500/20 dark:bg-dark-bg-card/40 dark:neon-border">
+    <Card className="backdrop-blur-sm w-full min-w-0 border border-meta-gray-200 bg-white/95 dark:bg-dark-bg-secondary/95 dark:border-dark-border-primary shadow-sm">
       <CardContent className="p-3 sm:p-4 md:p-5 min-w-0">
         <div className="flex items-center space-x-2.5 mb-6 sm:mb-8 min-w-0 stagger-1">
-          <Hexagon className="h-5 w-5 sm:h-6 sm:w-6 flex-shrink-0 text-neon-cyan-600 dark:text-neon-cyan-500" />
-          <span className="text-sm sm:text-base font-heading font-black tracking-widest truncate min-w-0 uppercase gradient-text dark:neon-glow">
-            FOCUS BOOK
+          <Hexagon className="h-5 w-5 sm:h-6 sm:w-6 flex-shrink-0 text-meta-blue-500" />
+          <span className="text-sm sm:text-base font-semibold tracking-tight truncate min-w-0 text-meta-gray-900 dark:text-dark-text-primary">
+            Focus Book
           </span>
         </div>
 
@@ -129,43 +129,43 @@ export function Sidebar({ productivityScore, dailyGoalProgress, weeklyGoalProgre
         </nav>
 
         {/* Focus Session Status - Always visible */}
-        <div className="mt-6 sm:mt-8 pt-5 sm:pt-6 border-t border-neon-cyan-500/30 dark:border-neon-cyan-500/20">
-          <div className="text-xs mb-3 uppercase tracking-widest font-heading font-bold text-neon-cyan-600 dark:text-neon-cyan-500">Focus Session</div>
-          <div className="rounded-none p-3 sm:p-4 space-y-3 transition-all duration-300 bg-light-bg-secondary border border-neon-cyan-500/20 hover:border-neon-cyan-500/40 dark:bg-dark-bg-tertiary/50 dark:border-neon-cyan-500/20 dark:hover:border-neon-cyan-500/40">
+        <div className="mt-6 sm:mt-8 pt-5 sm:pt-6 border-t border-meta-gray-200 dark:border-dark-border-primary">
+          <div className="text-xs mb-3 uppercase tracking-wide font-semibold text-meta-gray-500 dark:text-dark-text-tertiary">Focus Session</div>
+          <div className="rounded-lg p-3 sm:p-4 space-y-3 transition-all duration-200 bg-meta-gray-50 border border-meta-gray-200 hover:border-meta-gray-300 dark:bg-dark-bg-tertiary dark:border-dark-border-primary dark:hover:border-dark-border-secondary">
             {currentSession && (currentSession.status === 'active' || currentSession.status === 'paused') ? (
               <>
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-2">
                     {currentSession.status === 'active' ? (
                       <>
-                        <div className="w-2 h-2 rounded-full bg-neon-green-500 animate-pulse" style={{boxShadow: `0 0 10px ${glowColors.green}`}}></div>
-                        <span className="text-xs font-heading font-semibold uppercase tracking-wider text-neon-green-600 dark:text-neon-green-400">Active</span>
+                        <div className="w-2 h-2 rounded-full bg-meta-green-500 animate-pulse" style={{boxShadow: `0 0 8px ${statusColors.active}`}}></div>
+                        <span className="text-xs font-semibold uppercase tracking-wide text-meta-green-600 dark:text-meta-green-400">Active</span>
                       </>
                     ) : (
                       <>
-                        <div className="w-2 h-2 rounded-full bg-neon-orange-500" style={{boxShadow: `0 0 10px ${glowColors.orange}`}}></div>
-                        <span className="text-xs font-heading font-semibold uppercase tracking-wider text-neon-orange-600 dark:text-neon-orange-400">Paused</span>
+                        <div className="w-2 h-2 rounded-full bg-meta-orange-500" style={{boxShadow: `0 0 8px ${statusColors.paused}`}}></div>
+                        <span className="text-xs font-semibold uppercase tracking-wide text-meta-orange-600 dark:text-meta-orange-400">Paused</span>
                       </>
                     )}
                   </div>
-                  <span className="text-xs capitalize font-heading font-medium tracking-wide text-neon-purple-600 dark:text-neon-purple-400">{currentSession.type}</span>
+                  <span className="text-xs capitalize font-medium tracking-wide text-meta-blue-600 dark:text-meta-blue-400">{currentSession.type}</span>
                 </div>
-                <div className="text-3xl font-heading font-black tracking-tight text-neon-cyan-600 dark:text-neon-cyan-400 dark:neon-glow">{formatTime(timeLeft)}</div>
-                <div className="text-xs font-body font-medium tracking-wide text-slate-600 dark:text-slate-400">
+                <div className="text-3xl font-bold tracking-tight text-meta-gray-900 dark:text-dark-text-primary">{formatTime(timeLeft)}</div>
+                <div className="text-xs font-medium tracking-wide text-meta-gray-500 dark:text-dark-text-tertiary">
                   {currentSession.type === 'focus' ? 'Time Remaining' : 'Break Time'}
                 </div>
               </>
             ) : (
               <>
                 <div className="flex items-center gap-2">
-                  <div className="w-2 h-2 rounded-full bg-gray-400 dark:bg-slate-600"></div>
-                  <span className="text-xs font-heading font-medium uppercase tracking-wider text-slate-600 dark:text-slate-500">No Active Session</span>
+                  <div className="w-2 h-2 rounded-full bg-meta-gray-400 dark:bg-meta-gray-600"></div>
+                  <span className="text-xs font-medium uppercase tracking-wide text-meta-gray-500 dark:text-dark-text-tertiary">No Active Session</span>
                 </div>
-                <div className="text-3xl font-heading font-black tracking-tight text-slate-400 dark:text-slate-600">00:00</div>
+                <div className="text-3xl font-bold tracking-tight text-meta-gray-300 dark:text-meta-gray-600">00:00</div>
                 <div className="flex flex-col gap-2 mt-1 w-full">
                   <Button
                     size="sm"
-                    className="w-full text-xs font-heading font-semibold tracking-wider uppercase transition-all duration-300 hover-lift bg-neon-cyan-500 text-white border border-neon-cyan-600 hover:bg-neon-cyan-600 dark:bg-neon-cyan-500/20 dark:text-neon-cyan-400 dark:border-neon-cyan-500/50 dark:hover:bg-neon-cyan-500/30 dark:hover:border-neon-cyan-500 dark:neon-border"
+                    className="w-full text-xs font-semibold tracking-wide transition-all duration-200 hover-lift bg-meta-blue-500 text-white hover:bg-meta-blue-600 shadow-sm"
                     onClick={startQuickFocusSession}
                     disabled={isStarting}
                   >
@@ -176,7 +176,7 @@ export function Sidebar({ productivityScore, dailyGoalProgress, weeklyGoalProgre
                     size="sm"
                     variant="outline"
                     asChild
-                    className="w-full font-heading font-medium tracking-wider uppercase transition-all duration-300 hover-lift border-neon-pink-500 text-neon-pink-600 hover:bg-neon-pink-50 dark:border-neon-pink-500/50 dark:text-neon-pink-400 dark:hover:bg-neon-pink-500/10 dark:hover:border-neon-pink-500"
+                    className="w-full font-medium tracking-wide transition-all duration-200 hover-lift border-meta-gray-300 text-meta-gray-600 hover:bg-meta-gray-100 dark:border-meta-gray-600 dark:text-meta-gray-300 dark:hover:bg-meta-gray-700"
                   >
                     <Link to="/focus" className="flex items-center justify-center">
                       <Timer className="w-3.5 h-3.5 mr-1.5" />
@@ -199,15 +199,15 @@ function NavItem({ icon: Icon, label, active, href }) {
     <Button
       variant="ghost"
       asChild
-      className={`w-full justify-start text-sm px-3 py-2.5 min-w-0 font-body font-medium rounded-none transition-all duration-300 hover-lift group 
+      className={`w-full justify-start text-sm px-3 py-2.5 min-w-0 font-medium rounded-lg transition-all duration-200 group 
         ${active 
-          ? 'bg-neon-cyan-50 text-neon-cyan-700 border-l-2 border-neon-cyan-500 hover:bg-neon-cyan-100 dark:bg-neon-cyan-500/10 dark:text-neon-cyan-400 dark:border-l-2 dark:border-neon-cyan-500 dark:hover:bg-neon-cyan-500/20 dark:neon-border' 
-          : 'text-slate-600 hover:text-neon-cyan-600 hover:bg-neon-cyan-50 border-l-2 border-transparent hover:border-neon-cyan-500/50 dark:text-slate-400 dark:hover:text-neon-cyan-400 dark:hover:bg-neon-cyan-500/5 dark:border-l-2 dark:border-transparent dark:hover:border-neon-cyan-500/50'
+          ? 'bg-meta-blue-50 text-meta-blue-600 border-l-2 border-meta-blue-500 hover:bg-meta-blue-100 dark:bg-meta-blue-500/10 dark:text-meta-blue-400 dark:border-l-2 dark:border-meta-blue-500 dark:hover:bg-meta-blue-500/20' 
+          : 'text-meta-gray-600 hover:text-meta-gray-900 hover:bg-meta-gray-100 border-l-2 border-transparent hover:border-meta-blue-300 dark:text-dark-text-secondary dark:hover:text-dark-text-primary dark:hover:bg-meta-gray-700 dark:border-l-2 dark:border-transparent dark:hover:border-meta-blue-400'
       }`}
     >
       <Link to={href} className="flex items-center min-w-0 w-full gap-2.5">
-        <Icon className={`h-4 w-4 flex-shrink-0 transition-transform duration-300 ${active ? 'scale-110' : 'group-hover:scale-110'}`} />
-        <span className="truncate text-left font-body font-medium tracking-wide">{label}</span>
+        <Icon className={`h-4 w-4 flex-shrink-0 transition-transform duration-200 ${active ? 'scale-105' : 'group-hover:scale-105'}`} />
+        <span className="truncate text-left font-medium tracking-normal">{label}</span>
       </Link>
     </Button>
   )
