@@ -1320,9 +1320,14 @@ contextBridge.exposeInMainWorld('activeWindow', {
     })
   },
   onCategoryUpdated: (callback) => {
-    ipcRenderer.on('app-category-updated', (event, data) => {
+    const handler = (event, data) => {
       callback(data)
-    })
+    }
+    ipcRenderer.on('app-category-updated', handler)
+    // Return a cleanup function to remove the listener
+    return () => {
+      ipcRenderer.removeListener('app-category-updated', handler)
+    }
   },
   loadCategories: () => loadCategories(),
   refreshData: () => loadData(),
@@ -1390,6 +1395,9 @@ async function updateAppCategory(appIdentifier, category, selectedDate, appKey) 
       console.log('appUsageData[selectedDate]', appUsageData[selectedDate])
     }
     await saveCustomCategoryMappings(customCategoriesMap)
+    
+    // Update the local customCategoryMappings cache so getCategory returns the new category
+    customCategoryMappings = customCategoriesMap
     
     // Notify main process to broadcast category update to all windows
     ipcRenderer.send('app-category-updated', { appIdentifier, category, selectedDate })

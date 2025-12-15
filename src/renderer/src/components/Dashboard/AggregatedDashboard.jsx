@@ -125,11 +125,11 @@ const AggregatedDashboard = () => {
   const getProductivityColor = (productivity) => {
     switch (productivity) {
       case 'Productive':
-        return 'text-green-400'
+        return 'text-cyan-400'
       case 'Neutral':
-        return 'text-amber-400'
+        return 'text-violet-400'
       case 'Un-Productive':
-        return 'text-red-400'
+        return 'text-rose-400'
       default:
         return 'text-slate-400'
     }
@@ -196,10 +196,10 @@ const AggregatedDashboard = () => {
         <Card className="bg-slate-900/50 border-slate-700/50">
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium text-slate-400">Productive</CardTitle>
-            <Target className="h-4 w-4 text-green-400" />
+            <Target className="h-4 w-4 text-cyan-400" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold text-green-400">
+            <div className="text-2xl font-bold text-cyan-400">
               {dashboardData.productivitySummary ? 
                 formatTime(dashboardData.productivitySummary.productive / 1000) : 
                 '0m'
@@ -211,10 +211,10 @@ const AggregatedDashboard = () => {
         <Card className="bg-slate-900/50 border-slate-700/50">
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium text-slate-400">Neutral</CardTitle>
-            <Calendar className="h-4 w-4 text-amber-400" />
+            <Calendar className="h-4 w-4 text-violet-400" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold text-amber-400">
+            <div className="text-2xl font-bold text-violet-400">
               {dashboardData.productivitySummary ? 
                 formatTime(dashboardData.productivitySummary.neutral / 1000) : 
                 '0m'
@@ -226,10 +226,10 @@ const AggregatedDashboard = () => {
         <Card className="bg-slate-900/50 border-slate-700/50">
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium text-slate-400">Un-Productive</CardTitle>
-            <TrendingUp className="h-4 w-4 text-red-400" />
+            <TrendingUp className="h-4 w-4 text-rose-400" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold text-red-400">
+            <div className="text-2xl font-bold text-rose-400">
               {dashboardData.productivitySummary ? 
                 formatTime(dashboardData.productivitySummary.unproductive / 1000) : 
                 '0m'

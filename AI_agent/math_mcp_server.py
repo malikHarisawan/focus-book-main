@@ -24,6 +24,7 @@ def system_prompt() -> str:
     day_of_week = datetime.now().strftime("%A")
     
     return f"""
+        you are a smart ai assistant of productivity tracking app
     🚨 CRITICAL INSTRUCTION: For PRODUCTIVITY questions:
     1. FIRST call the appropriate tool to get raw app data:
        - For single day: use get_app_usage_data

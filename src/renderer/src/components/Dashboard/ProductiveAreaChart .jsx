@@ -16,17 +16,17 @@ const ProductiveAreaChart = ({ data, rawData, selectedDate, onZoomLevelChange })
   // Get current theme
   const { resolvedTheme } = useTheme()
 
-  // Theme-aware colors - Meta-inspired professional palette
+  // Theme-aware colors - Exact Figma color palette
   const chartColors = {
-    productive: resolvedTheme === 'dark' ? '#4bc793' : '#31a24c', // Meta green
-    unproductive: resolvedTheme === 'dark' ? '#ff7567' : '#fa383e', // Meta red
-    neutral: resolvedTheme === 'dark' ? '#ffab47' : '#f5a623', // Meta orange
-    selection: resolvedTheme === 'dark' ? '#4599ff' : '#1877f2', // Meta blue
-    grid: resolvedTheme === 'dark' ? '#3e4042' : '#dadde1', // Meta gray borders
-    text: resolvedTheme === 'dark' ? '#e4e6eb' : '#1c1e21', // Meta text colors
-    bg: resolvedTheme === 'dark' ? '#242526' : '#ffffff', // Background
-    bgSecondary: resolvedTheme === 'dark' ? '#3a3b3c' : '#f7f8fa', // Secondary bg
-    border: resolvedTheme === 'dark' ? '#3e4042' : '#dadde1', // Border color
+    productive: '#5051F9', // Primary purple - for productive time
+    unproductive: '#FF6B6B', // Red/Salmon - for unproductive/distracting time
+    neutral: '#1EA7FF', // Cyan blue - for neutral
+    selection: '#5051F9', // Selection same as primary
+    grid: resolvedTheme === 'dark' ? '#282932' : '#E8EDF1',
+    text: resolvedTheme === 'dark' ? '#898999' : '#768396',
+    bg: resolvedTheme === 'dark' ? '#212329' : '#ffffff',
+    bgSecondary: resolvedTheme === 'dark' ? '#282932' : '#F4F7FE',
+    border: resolvedTheme === 'dark' ? '#282932' : '#E8EDF1',
   }
   const [selectedRange, setSelectedRange] = useState(null)
   const [aggregatedData, setAggregatedData] = useState({ productive: 0, unproductive: 0, total: 0 })
@@ -290,27 +290,27 @@ const ProductiveAreaChart = ({ data, rawData, selectedDate, onZoomLevelChange })
           : 0
 
       return (
-        <div className="bg-white dark:bg-meta-gray-800 p-3 rounded-lg border border-meta-gray-200 dark:border-meta-gray-700 shadow-lg">
-          <p className="text-meta-gray-900 dark:text-meta-gray-100 font-medium mb-2">{getTooltipTitle()}</p>
-          <div className="text-xs text-meta-gray-500 dark:text-meta-gray-400 mb-2">{getZoomLevelDisplay().detail}</div>
+        <div className="bg-white dark:bg-[#252630] p-3 rounded-lg border border-slate-200 dark:border-slate-700/50 shadow-lg backdrop-blur-sm">
+          <p className="text-slate-900 dark:text-white font-medium mb-2">{getTooltipTitle()}</p>
+          <div className="text-xs text-slate-500 dark:text-slate-400 mb-2">{getZoomLevelDisplay().detail}</div>
           <div className="space-y-1">
             <div className="flex items-center gap-2">
-              <div className="w-3 h-3 rounded-full bg-meta-green-500" />
-              <span className="text-meta-gray-600 dark:text-meta-gray-300">Productive: </span>
-              <span className="text-meta-gray-900 dark:text-white">{productiveTime}</span>
+              <div className="w-3 h-3 rounded-full bg-gradient-to-r from-cyan-400 to-cyan-500" />
+              <span className="text-slate-600 dark:text-slate-300">Productive: </span>
+              <span className="text-slate-900 dark:text-white">{productiveTime}</span>
             </div>
             <div className="flex items-center gap-2">
-              <div className="w-3 h-3 rounded-full bg-meta-red-500" />
-              <span className="text-meta-gray-600 dark:text-meta-gray-300">Unproductive: </span>
-              <span className="text-meta-gray-900 dark:text-white">{unproductiveTime}</span>
+              <div className="w-3 h-3 rounded-full bg-gradient-to-r from-violet-400 to-purple-500" />
+              <span className="text-slate-600 dark:text-slate-300">Unproductive: </span>
+              <span className="text-slate-900 dark:text-white">{unproductiveTime}</span>
             </div>
-            <div className="flex items-center gap-2 pt-1 border-t border-meta-gray-200 dark:border-meta-gray-600">
-              <span className="text-meta-gray-600 dark:text-meta-gray-300">Total: </span>
-              <span className="text-meta-blue-600 dark:text-meta-blue-400 font-medium">{totalTime}</span>
+            <div className="flex items-center gap-2 pt-1 border-t border-slate-200 dark:border-slate-700">
+              <span className="text-slate-600 dark:text-slate-300">Total: </span>
+              <span className="text-cyan-600 dark:text-cyan-400 font-medium">{totalTime}</span>
             </div>
             <div className="flex items-center gap-2">
-              <span className="text-meta-gray-600 dark:text-meta-gray-300">Productivity: </span>
-              <span className="text-meta-green-600 dark:text-meta-green-400 font-medium">{productivePercentage}%</span>
+              <span className="text-slate-600 dark:text-slate-300">Productivity: </span>
+              <span className="text-cyan-600 dark:text-cyan-400 font-medium">{productivePercentage}%</span>
             </div>
           </div>
         </div>
@@ -321,32 +321,33 @@ const ProductiveAreaChart = ({ data, rawData, selectedDate, onZoomLevelChange })
 
   if (!currentData || currentData.length === 0) {
     return (
-      <div className="bg-white dark:bg-meta-gray-800 p-4 rounded-xl h-[250px] flex items-center justify-center border border-meta-gray-200 dark:border-meta-gray-700">
+      <div className="bg-white dark:bg-[#1a1b23] p-4 rounded-xl h-[250px] flex items-center justify-center border border-slate-200 dark:border-slate-700/50">
         {isLoading ? (
-          <div className="flex items-center gap-2 text-meta-blue-500">
-            <div className="animate-spin w-4 h-4 border-2 border-meta-blue-500 border-t-transparent rounded-full"></div>
+          <div className="flex items-center gap-2 text-cyan-500">
+            <div className="animate-spin w-4 h-4 border-2 border-cyan-500 border-t-transparent rounded-full"></div>
             <span>Loading data...</span>
           </div>
         ) : (
-          <span className="text-meta-gray-500">No data available</span>
+          <span className="text-slate-500">No data available</span>
         )}
       </div>
     )
   }
 
   return (
-    <div ref={containerRef} className="bg-white dark:bg-meta-gray-800 p-4 rounded-xl border border-meta-gray-200 dark:border-meta-gray-700" tabIndex={0}>
+    
+    <div ref={containerRef} className="bg-white dark:bg-[#1a1b23] p-4 rounded-xl border border-slate-200 dark:border-slate-700/50" tabIndex={0}>
       <div className="space-y-3 mb-4">
         <div className="flex justify-between items-center">
           <div className="flex items-center gap-3">
-            <h3 className="text-meta-gray-900 dark:text-white text-sm font-medium">Productivity Over Time</h3>
+            <h3 className="text-slate-900 dark:text-white text-sm font-medium">Productivity Over Time</h3>
             <div className="flex items-center gap-2">
-              <span className="text-xs text-meta-gray-500 dark:text-meta-gray-400 bg-meta-gray-100 dark:bg-meta-gray-700 px-2 py-1 rounded-md">
+              <span className="text-xs text-slate-500 dark:text-slate-400 bg-slate-100 dark:bg-slate-700/50 px-2 py-1 rounded-md">
                 {getZoomLevelDisplay().label}
               </span>
               <button
                 onClick={() => setShowHelp(!showHelp)}
-                className="text-meta-gray-400 hover:text-meta-blue-500 transition-colors"
+                className="text-slate-400 hover:text-cyan-500 transition-colors"
                 title="Help & Controls"
               >
                 <HelpCircle size={14} />
@@ -357,7 +358,7 @@ const ProductiveAreaChart = ({ data, rawData, selectedDate, onZoomLevelChange })
             <button
               onClick={zoomIn}
               disabled={zoomLevel === 'hour'}
-              className="text-meta-blue-500 hover:text-meta-blue-600 disabled:text-meta-gray-400 disabled:cursor-not-allowed text-xs p-2 rounded-lg border border-meta-blue-500 hover:border-meta-blue-600 disabled:border-meta-gray-300 dark:disabled:border-meta-gray-600 transition-all duration-200 hover:bg-meta-blue-50 dark:hover:bg-meta-blue-500/10"
+              className="text-[#5051F9] hover:text-[#6B6CFA] disabled:text-[#768396] dark:disabled:text-[#898999] disabled:cursor-not-allowed text-xs p-2 rounded-lg border border-[#5051F9]/50 hover:border-[#5051F9] disabled:border-[#E8EDF1] dark:disabled:border-[#282932] transition-all duration-200 hover:bg-[#5051F9]/10"
               title="Zoom In (+) - More detailed view"
             >
               <ZoomIn size={12} />
@@ -365,14 +366,14 @@ const ProductiveAreaChart = ({ data, rawData, selectedDate, onZoomLevelChange })
             <button
               onClick={zoomOut}
               disabled={zoomLevel === 'month'}
-              className="text-meta-blue-500 hover:text-meta-blue-600 disabled:text-meta-gray-400 disabled:cursor-not-allowed text-xs p-2 rounded-lg border border-meta-blue-500 hover:border-meta-blue-600 disabled:border-meta-gray-300 dark:disabled:border-meta-gray-600 transition-all duration-200 hover:bg-meta-blue-50 dark:hover:bg-meta-blue-500/10"
+              className="text-[#5051F9] hover:text-[#6B6CFA] disabled:text-[#768396] dark:disabled:text-[#898999] disabled:cursor-not-allowed text-xs p-2 rounded-lg border border-[#5051F9]/50 hover:border-[#5051F9] disabled:border-[#E8EDF1] dark:disabled:border-[#282932] transition-all duration-200 hover:bg-[#5051F9]/10"
               title="Zoom Out (-) - Broader time view"
             >
               <ZoomOut size={12} />
             </button>
             <button
               onClick={resetZoom}
-              className="text-meta-blue-500 hover:text-meta-blue-600 text-xs p-2 rounded-lg border border-meta-blue-500 hover:border-meta-blue-600 transition-all duration-200 hover:bg-meta-blue-50 dark:hover:bg-meta-blue-500/10"
+              className="text-[#5051F9] hover:text-[#6B6CFA] text-xs p-2 rounded-lg border border-[#5051F9]/50 hover:border-[#5051F9] transition-all duration-200 hover:bg-[#5051F9]/10"
               title="Reset to default view (0)"
             >
               <RotateCcw size={12} />
@@ -380,7 +381,7 @@ const ProductiveAreaChart = ({ data, rawData, selectedDate, onZoomLevelChange })
             {selectedRange && (
               <button
                 onClick={clearSelection}
-                className="text-meta-blue-500 hover:text-meta-blue-600 text-xs px-3 py-1 rounded-lg border border-meta-blue-500 hover:border-meta-blue-600 transition-colors"
+                className="text-[#5051F9] hover:text-[#6B6CFA] text-xs px-3 py-1 rounded-lg border border-[#5051F9]/50 hover:border-[#5051F9] transition-colors"
               >
                 Clear Selection
               </button>
@@ -390,7 +391,7 @@ const ProductiveAreaChart = ({ data, rawData, selectedDate, onZoomLevelChange })
 
         {/* Breadcrumb navigation */}
         <div className="flex items-center gap-2">
-          <span className="text-xs text-meta-gray-500">View:</span>
+          <span className="text-xs text-[#768396] dark:text-[#898999]">View:</span>
           {getBreadcrumbPath().map((level, index) => (
             <div key={level} className="flex items-center gap-1">
               <button
@@ -401,14 +402,14 @@ const ProductiveAreaChart = ({ data, rawData, selectedDate, onZoomLevelChange })
                 }}
                 className={`text-xs px-2 py-1 rounded-md transition-colors ${
                   level === zoomLevel
-                    ? 'bg-meta-blue-500 text-white'
-                    : 'text-meta-gray-500 dark:text-meta-gray-400 hover:text-meta-blue-500 hover:bg-meta-gray-100 dark:hover:bg-meta-gray-700'
+                    ? 'bg-gradient-to-r from-[#5051F9] to-[#6B6CFA] text-white'
+                    : 'text-[#768396] dark:text-[#898999] hover:text-[#5051F9] hover:bg-[#F4F7FE] dark:hover:bg-[#282932]'
                 }`}
               >
                 {level.charAt(0).toUpperCase() + level.slice(1)}
               </button>
               {index < getBreadcrumbPath().length - 1 && (
-                <ChevronRight size={12} className="text-meta-gray-400" />
+                <ChevronRight size={12} className="text-[#768396] dark:text-[#898999]" />
               )}
             </div>
           ))}
@@ -416,29 +417,29 @@ const ProductiveAreaChart = ({ data, rawData, selectedDate, onZoomLevelChange })
 
         {/* Zoom progress indicator */}
         <div className="flex items-center gap-2">
-          <span className="text-xs text-meta-gray-500">Detail Level:</span>
-          <div className="flex-1 h-1 bg-meta-gray-200 dark:bg-meta-gray-700 rounded-full overflow-hidden">
+          <span className="text-xs text-[#768396] dark:text-[#898999]">Detail Level:</span>
+          <div className="flex-1 h-1 bg-[#E8EDF1] dark:bg-[#282932] rounded-full overflow-hidden">
             <div
-              className="h-full bg-gradient-to-r from-meta-blue-500 to-meta-blue-400 transition-all duration-300 ease-out"
+              className="h-full bg-gradient-to-r from-[#5051F9] to-[#6B6CFA] transition-all duration-300 ease-out"
               style={{ width: `${getZoomProgress()}%` }}
             />
           </div>
-          <span className="text-xs text-meta-gray-500">{Math.round(getZoomProgress())}%</span>
+          <span className="text-xs text-[#768396] dark:text-[#898999]">{Math.round(getZoomProgress())}%</span>
         </div>
 
         {/* Help panel */}
         {showHelp && (
-          <div className="bg-meta-gray-50 dark:bg-meta-gray-700 border border-meta-gray-200 dark:border-meta-gray-600 rounded-lg p-3 text-xs space-y-2">
-            <div className="text-meta-blue-600 dark:text-meta-blue-400 font-medium">Chart Controls:</div>
-            <div className="text-meta-gray-600 dark:text-meta-gray-300 space-y-1">
+          <div className="bg-[#F4F7FE] dark:bg-[#282932] border border-[#E8EDF1] dark:border-[#282932] rounded-lg p-3 text-xs space-y-2">
+            <div className="text-[#5051F9] font-medium">Chart Controls:</div>
+            <div className="text-[#232360] dark:text-white space-y-1">
               <div>
-                • <kbd className="bg-meta-gray-200 dark:bg-meta-gray-600 px-1 rounded">Mouse Wheel</kbd> - Zoom in/out
+                • <kbd className="bg-[#E8EDF1] dark:bg-[#1E1F25] px-1 rounded">Mouse Wheel</kbd> - Zoom in/out
               </div>
               <div>
-                • <kbd className="bg-meta-gray-200 dark:bg-meta-gray-600 px-1 rounded">+/-</kbd> keys - Zoom in/out
+                • <kbd className="bg-[#E8EDF1] dark:bg-[#1E1F25] px-1 rounded">+/-</kbd> keys - Zoom in/out
               </div>
               <div>
-                • <kbd className="bg-meta-gray-200 dark:bg-meta-gray-600 px-1 rounded">0</kbd> key - Reset to default
+                • <kbd className="bg-[#E8EDF1] dark:bg-[#1E1F25] px-1 rounded">0</kbd> key - Reset to default
               </div>
               <div>
                 • <strong>Click & Drag</strong> on chart to select time range
@@ -446,57 +447,74 @@ const ProductiveAreaChart = ({ data, rawData, selectedDate, onZoomLevelChange })
               <div>• Click breadcrumb buttons to jump between views</div>
               <div>• Hover chart for detailed tooltip information</div>
             </div>
-            <div className="text-meta-blue-600 dark:text-meta-blue-400 font-medium mt-2">
+            <div className="text-[#5051F9] font-medium mt-2">
               Current View: {getZoomLevelDisplay().detail}
             </div>
           </div>
         )}
       </div>
-      <ResponsiveContainer width="100%" height={250}>
+      <ResponsiveContainer width="100%" height={280}>
         <AreaChart
           ref={chartRef}
           data={currentData}
-          margin={{ top: 10, right: 30, left: 0, bottom: 0 }}
+          margin={{ top: 20, right: 30, left: 10, bottom: 10 }}
           onMouseDown={handleMouseDown}
           onMouseMove={handleMouseMove}
           onMouseUp={handleMouseUp}
-          style={{ backgroundColor: chartColors.bg }}
+          style={{ backgroundColor: 'transparent' }}
         >
           <defs>
+            {/* Productive gradient - Primary Purple #5051F9 */}
             <linearGradient id="colorProductive" x1="0" y1="0" x2="0" y2="1">
-              <stop offset="5%" stopColor={chartColors.productive} stopOpacity={0.8} />
-              <stop offset="95%" stopColor={chartColors.productive} stopOpacity={0} />
+              <stop offset="0%" stopColor="#5051F9" stopOpacity={0.8} />
+              <stop offset="40%" stopColor="#5051F9" stopOpacity={0.5} />
+              <stop offset="100%" stopColor="#5051F9" stopOpacity={0.1} />
             </linearGradient>
+            {/* Unproductive gradient - Red/Salmon #FF6B6B */}
             <linearGradient id="colorUnproductive" x1="0" y1="0" x2="0" y2="1">
-              <stop offset="5%" stopColor={chartColors.unproductive} stopOpacity={0.8} />
-              <stop offset="95%" stopColor={chartColors.unproductive} stopOpacity={0} />
+              <stop offset="0%" stopColor="#FF6B6B" stopOpacity={0.7} />
+              <stop offset="40%" stopColor="#FF6B6B" stopOpacity={0.4} />
+              <stop offset="100%" stopColor="#FF6B6B" stopOpacity={0.1} />
             </linearGradient>
           </defs>
           <XAxis
             dataKey="day"
-            stroke={chartColors.text}
-            tick={{ fill: chartColors.text }}
+            stroke="transparent"
+            tick={{ fill: '#64748b', fontSize: 11, fontWeight: 500 }}
+            tickLine={false}
+            axisLine={false}
+            dy={10}
             style={{ userSelect: 'none', WebkitUserSelect: 'none', MozUserSelect: 'none' }}
           />
           <YAxis 
-            stroke={chartColors.grid}
-            tick={{ fill: chartColors.text }}
+            stroke="transparent"
+            tick={{ fill: '#64748b', fontSize: 11, fontWeight: 500 }}
+            tickLine={false}
+            axisLine={false}
+            dx={-5}
+            tickFormatter={(value) => value >= 1000 ? `${(value/1000).toFixed(0)}k` : value}
           />
-          <CartesianGrid strokeDasharray="3 3" stroke={chartColors.grid} />
+          <CartesianGrid strokeDasharray="0" stroke="rgba(100, 116, 139, 0.1)" vertical={false} />
           <Tooltip content={<CustomTooltip />} />
           <Area
-            type="monotone"
+            type="monotoneX"
             dataKey="productive"
             name="Productive"
-            stroke={chartColors.productive}
+            stroke="#5051F9"
+            strokeWidth={3}
             fill="url(#colorProductive)"
+            dot={{ fill: '#5051F9', stroke: '#fff', strokeWidth: 2, r: 4 }}
+            activeDot={{ fill: '#6B6CFA', stroke: '#fff', strokeWidth: 2, r: 6 }}
           />
           <Area
-            type="monotone"
+            type="monotoneX"
             dataKey="unproductive"
             name="Unproductive"
-            stroke={chartColors.unproductive}
+            stroke="#FF6B6B"
+            strokeWidth={3}
             fill="url(#colorUnproductive)"
+            dot={{ fill: '#FF6B6B', stroke: '#fff', strokeWidth: 2, r: 4 }}
+            activeDot={{ fill: '#FF8A8A', stroke: '#fff', strokeWidth: 2, r: 6 }}
           />
           {isDragging && dragStart && dragEnd && (
             <ReferenceArea
@@ -522,6 +540,7 @@ const ProductiveAreaChart = ({ data, rawData, selectedDate, onZoomLevelChange })
         </AreaChart>
       </ResponsiveContainer>
     </div>
+    
   )
 }
 

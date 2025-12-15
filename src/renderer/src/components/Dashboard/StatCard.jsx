@@ -13,9 +13,9 @@ export default function StatCard({ title, value, percentage, color }) {
   }
 
   return (
-    <div className="bg-slate-800/50 rounded-lg border border-slate-700/50 p-4">
+    <div className="bg-slate-800/50 rounded-lg border border-slate-700/50 p-3">
       <div className="text-sm text-slate-400 mb-1">{title}</div>
-      <div className="text-xl font-mono text-slate-200 mb-2">{value}</div>
+      <div className="text-lg font-mono text-slate-200 mb-1.5">{value}</div>
 
       {percentage != null ? (
         <>
