@@ -7,14 +7,16 @@ import ChatPage from './components/Chat/page'
 import UpdateNotification from './components/UpdateNotification'
 import { DateProvider } from './context/DateContext'
 import { ThemeProvider } from './context/ThemeContext'
+import { SidebarProvider } from './context/SidebarContext'
 import { HashRouter as Router, Routes, Route } from 'react-router-dom'
 import { MainLayout } from './components/layout/main-layout'
 function App() {
   return (
     <ThemeProvider>
-      <DateProvider>
-        <Router>
-          <MainLayout>
+      <SidebarProvider>
+        <DateProvider>
+          <Router>
+            <MainLayout>
             <Routes>
               <Route path="/" element={<ProductivityOverview />} />
               <Route path="/settings" element={<Settings />} />
@@ -26,6 +28,7 @@ function App() {
           <UpdateNotification />
         </Router>
       </DateProvider>
+      </SidebarProvider>
     </ThemeProvider>
   )
 }

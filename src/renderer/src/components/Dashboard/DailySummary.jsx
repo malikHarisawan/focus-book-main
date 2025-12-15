@@ -258,8 +258,8 @@ export default function DailySummary({
 
                 // Color based on productivity type
                 const getColor = () => {
-                  if (category.productivity === 'productive') return 'bg-purple-500'
-                  if (category.productivity === 'neutral') return 'bg-blue-500'
+                  if (category.productivity === 'productive') return 'bg-cyan-500'
+                  if (category.productivity === 'neutral') return 'bg-violet-500'
                   return 'bg-slate-500'
                 }
 

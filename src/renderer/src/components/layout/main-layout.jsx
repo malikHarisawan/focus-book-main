@@ -3,8 +3,12 @@ import { Sidebar } from './sidebar'
 import { Header } from './header'
 import { TitleBar } from './TitleBar'
 import { useTheme } from '../../context/ThemeContext'
+import { useSidebar } from '../../context/SidebarContext'
+import { Menu, ChevronLeft } from 'lucide-react'
+import { Button } from '../ui/button'
 
 export function MainLayout({ children }) {
+  const { isCollapsed, toggleSidebar } = useSidebar()
   const [productivityScore, setProductivityScore] = useState(85)
   const [dailyGoalProgress, setDailyGoalProgress] = useState(68)
   const [weeklyGoalProgress, setWeeklyGoalProgress] = useState(72)
@@ -31,14 +35,14 @@ export function MainLayout({ children }) {
   }, [])
 
   return (
-    <div className="min-h-screen flex flex-col relative transition-colors duration-300 overflow-hidden bg-meta-gray-50 text-meta-gray-900 dark:bg-dark-bg-primary dark:text-dark-text-primary">
-      {/* Professional Background Effects */}
+    <div className="min-h-screen flex flex-col relative transition-colors duration-300 overflow-hidden bg-[#F4F7FE] text-[#2B3674] dark:bg-[#1E1F25] dark:text-white">
+      {/* Background Effects */}
       <div className="fixed inset-0 pointer-events-none z-0">
         {/* Subtle Grid Pattern */}
-        <div className="subtle-grid absolute inset-0 opacity-50 dark:opacity-30" />
+        <div className="subtle-grid absolute inset-0 opacity-30 dark:opacity-20" />
 
         {/* Gradient Overlay for depth */}
-        <div className="absolute inset-0 bg-gradient-to-br from-meta-blue-50/30 via-transparent to-meta-green-50/20 dark:from-meta-blue-900/5 dark:via-transparent dark:to-meta-green-900/5" />
+        <div className="gradient-overlay absolute inset-0" />
       </div>
 
       {/* Content Layer */}
@@ -50,13 +54,13 @@ export function MainLayout({ children }) {
 
         {/* Loading overlay */}
         {isLoading && (
-          <div className="absolute inset-0 flex items-center justify-center z-50 bg-white/95 dark:bg-dark-bg-primary/95 backdrop-blur-sm">
+          <div className="absolute inset-0 flex items-center justify-center z-50 bg-[#F4F7FE]/95 dark:bg-[#0B1437]/95 backdrop-blur-sm">
             <div className="flex flex-col items-center">
               <div className="relative w-16 h-16">
-                <div className="absolute inset-0 border-4 border-meta-blue-100 dark:border-meta-gray-700 rounded-full"></div>
-                <div className="absolute inset-0 border-4 border-t-meta-blue-500 border-r-transparent border-b-transparent border-l-transparent rounded-full animate-spin"></div>
+                <div className="absolute inset-0 border-4 border-[#E2E8F0] dark:border-[#1B254B] rounded-full"></div>
+                <div className="absolute inset-0 border-4 border-t-[#4318FF] dark:border-t-[#7551FF] border-r-transparent border-b-transparent border-l-transparent rounded-full animate-spin"></div>
               </div>
-              <div className="mt-4 text-meta-gray-600 dark:text-meta-gray-400 font-medium text-sm tracking-wide">
+              <div className="mt-4 text-[#A3AED0] font-normal text-sm tracking-wide">
                 Loading productivity data...
               </div>
             </div>
@@ -65,19 +69,24 @@ export function MainLayout({ children }) {
 
         {/* Main content area - fills remaining height */}
         <div className="flex-1 flex min-h-0">
-          {/* Sidebar - Fixed width, sticky, and independently scrollable */}
-          <div className="hidden lg:flex lg:flex-col lg:w-72 xl:w-80 overflow-y-auto custom-scrollbar">
-            <div className="sticky top-0 p-4">
+        
+          <div className={`
+            hidden lg:flex lg:flex-col
+            transition-all duration-300 ease-in-out
+            ${isCollapsed ? 'lg:w-16' : 'lg:w-60 xl:w-64'}
+            overflow-y-auto custom-scrollbar
+          `}>
+            <div className="sticky top-0 p-3">
               <Sidebar
-                productivityScore={85} // Example data
+                collapsed={isCollapsed}
+                productivityScore={85}
                 dailyGoalProgress={68}
                 weeklyGoalProgress={72}
               />
             </div>
           </div>
 
-          {/* Page content - Flexible width and independently scrollable */}
-          <main className="flex-1 overflow-y-auto custom-scrollbar p-4">
+          <main className="flex-1 overflow-y-auto custom-scrollbar p-3">
             <div className="container mx-auto max-w-full">
               {children}
             </div>

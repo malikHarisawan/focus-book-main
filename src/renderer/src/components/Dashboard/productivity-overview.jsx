@@ -54,13 +54,17 @@ export default function ProductivityOverview() {
     document.addEventListener('visibilitychange', handleVisibilityChange)
     
     // Listen for category updates from Activity page
-    window.activeWindow.onCategoryUpdated((data) => {
+    const removeCategoryListener = window.activeWindow.onCategoryUpdated((data) => {
       console.log('Dashboard received category update:', data)
       loadAndProcessData()
     })
     
     return () => {
       document.removeEventListener('visibilitychange', handleVisibilityChange)
+      // Clean up the category update listener
+      if (removeCategoryListener) {
+        removeCategoryListener()
+      }
     }
   }, [selectedDate])
   function handleVisibilityChange() {
@@ -186,114 +190,108 @@ export default function ProductivityOverview() {
   }
 
   return (
-    <Card className="bg-white border-meta-gray-200 shadow-sm dark:bg-dark-bg-secondary dark:border-dark-border-primary backdrop-blur-sm overflow-hidden transition-colors h-full">
-      <CardHeader className="border-b bg-meta-gray-50 border-meta-gray-200 dark:bg-dark-bg-tertiary dark:border-dark-border-primary py-5 px-6 lg:px-8">
-        <div className="flex flex-col lg:flex-row items-start lg:items-center justify-between gap-4">
-          <CardTitle className="text-meta-gray-900 dark:text-dark-text-primary flex items-center text-xl font-semibold tracking-tight">
-            <Activity className="mr-3 h-6 w-6 text-meta-blue-500 flex-shrink-0" />
+    <Card className="bg-white border-[#E8EDF1] shadow-sm dark:bg-[#212329] dark:border-[#282932] backdrop-blur-sm overflow-hidden transition-colors h-full">
+      <CardHeader className="border-b bg-white border-[#E8EDF1] dark:bg-[#212329] dark:border-[#282932] py-3 px-4">
+        <div className="flex flex-col lg:flex-row items-start lg:items-center justify-between gap-3">
+          <CardTitle className="text-[#232360] dark:text-white flex items-center font-medium tracking-tight">
+            <Activity className="mr-2 h-5 w-5 text-[#5051F9] flex-shrink-0" />
             <span>Productivity Overview</span>
           </CardTitle>
-          <div className="flex items-center gap-3 w-full lg:w-auto">
+          <div className="flex items-center gap-2 w-full lg:w-auto">
             <SmartDatePicker zoomLevel={currentZoomLevel} onDateChange={loadAndProcessData} />
             <Button
               onClick={loadAndProcessData}
               variant="ghost"
               size="icon"
-              className="h-10 w-10 text-meta-gray-500 hover:text-meta-gray-900 hover:bg-meta-gray-100 dark:text-dark-text-secondary dark:hover:text-dark-text-primary dark:hover:bg-meta-gray-700 flex-shrink-0 transition-colors"
+              className="h-9 w-9 text-[#768396] hover:text-[#232360] hover:bg-[#F4F7FE] dark:text-[#898999] dark:hover:text-white dark:hover:bg-[#282932] flex-shrink-0 transition-colors"
               title="Refresh data"
             >
-              <RefreshCw className="h-5 w-5" />
+              <RefreshCw className="h-4 w-4" />
             </Button>
           </div>
         </div>
       </CardHeader>
-      <CardContent className="p-3 sm:p-4">
-        {/* Compact Daily Summary */}
-        <div className="mb-4 rounded-xl border bg-white border-meta-gray-200 shadow-sm dark:bg-dark-bg-tertiary dark:border-dark-border-primary p-4">
+      <CardContent className="p-3 dark:bg-[#1E1F25] bg-[#F4F7FE]">
+        {/* Compact Single Row Summary */}
+        <div className="mb-2 rounded-xl p-3 bg-white dark:bg-[#212329] border border-[#E8EDF1] dark:border-[#282932] shadow-sm">
           {/* Header Row: Score + Total Time */}
-          <div className="flex items-center justify-between mb-3">
-            <div className="flex items-center gap-3">
+          <div className="flex items-center justify-between mb-2">
+            <div className="flex items-center gap-2">
               {/* Mini Donut Chart */}
-              <div className="relative w-14 h-14 flex-shrink-0">
-                <svg className="transform -rotate-90 w-14 h-14">
+              <div className="relative w-12 h-12 flex-shrink-0">
+                <svg className="transform -rotate-90 w-12 h-12">
                   <circle
-                    cx="28"
-                    cy="28"
-                    r="24"
+                    cx="24"
+                    cy="24"
+                    r="18"
                     stroke="currentColor"
                     strokeWidth="5"
                     fill="transparent"
-                    className="text-meta-gray-200 dark:text-meta-gray-700"
+                    className="text-[#E8EDF1] dark:text-[#282932]"
                   />
                   <circle
-                    cx="28"
-                    cy="28"
-                    r="24"
-                    stroke="currentColor"
-                    strokeWidth="5"
+                    cx="24"
+                    cy="24"
+                    r="18"
+                    stroke="url(#scoreGradient)"
+                    strokeWidth="4"
                     fill="transparent"
-                    strokeDasharray={`${2 * Math.PI * 24}`}
-                    strokeDashoffset={`${2 * Math.PI * 24 * (1 - (isNaN(productivePercentage) ? 0 : productivePercentage / 100))}`}
-                    className={`transition-all duration-1000 ${
-                      productivePercentage >= 70 ? 'text-meta-green-600 dark:text-meta-green-400' :
-                      productivePercentage >= 40 ? 'text-meta-orange-600 dark:text-meta-orange-400' :
-                      'text-meta-red-600 dark:text-meta-red-400'
-                    }`}
+                    strokeDasharray={`${2 * Math.PI * 18}`}
+                    strokeDashoffset={`${2 * Math.PI * 18 * (1 - (isNaN(productivePercentage) ? 0 : productivePercentage / 100))}`}
                     strokeLinecap="round"
+                    className="transition-all duration-1000"
                   />
+                  <defs>
+                    <linearGradient id="scoreGradient" x1="0%" y1="0%" x2="100%" y2="0%">
+                      <stop offset="0%" stopColor="#5051F9" />
+                      <stop offset="100%" stopColor="#1EA7FF" />
+                    </linearGradient>
+                  </defs>
                 </svg>
                 <div className="absolute inset-0 flex items-center justify-center">
-                  <span className={`text-sm font-bold ${
-                    productivePercentage >= 70 ? 'text-meta-green-700 dark:text-meta-green-300' :
-                    productivePercentage >= 40 ? 'text-meta-orange-700 dark:text-meta-orange-300' :
-                    'text-meta-red-700 dark:text-meta-red-300'
-                  }`}>
+                  <span className="text-sm font-semibold text-[#5051F9]">
                     {isNaN(productivePercentage) ? '0' : productivePercentage}%
                   </span>
                 </div>
               </div>
               {/* Score Label */}
               <div>
-                <div className={`text-lg font-semibold ${
-                  productivePercentage >= 70 ? 'text-meta-green-700 dark:text-meta-green-300' :
-                  productivePercentage >= 40 ? 'text-meta-orange-700 dark:text-meta-orange-300' :
-                  'text-meta-red-700 dark:text-meta-red-300'
-                }`}>
-                  {productivePercentage >= 70 ? 'Excellent Day!' :
+                <div className="text-sm font-medium text-[#232360] dark:text-white">
+                  {productivePercentage >= 70 ? 'Excellent!' :
                    productivePercentage >= 40 ? 'Good Progress' :
                    'Needs Focus'}
                 </div>
-                <div className="text-xs text-meta-gray-500 dark:text-dark-text-tertiary">
+                <div className="text-xs text-[#768396] font-normal">
                   Productivity Score
                 </div>
               </div>
             </div>
             {/* Total Screen Time */}
             <div className="text-right">
-              <div className="text-2xl font-bold text-meta-gray-900 dark:text-dark-text-primary">
+              <div className="text-lg font-semibold text-[#232360] dark:text-white">
                 {totalTimeFormatted}
               </div>
-              <div className="text-xs text-meta-gray-500 dark:text-dark-text-tertiary">
+              <div className="text-xs text-[#768396] font-normal">
                 Total Screen Time
               </div>
             </div>
           </div>
 
           {/* Stacked Progress Bar */}
-          <div className="relative w-full rounded-full h-3 overflow-hidden bg-meta-gray-200 dark:bg-meta-gray-700 mb-3">
+          <div className="relative w-full rounded-full h-2 overflow-hidden bg-[#E8EDF1] dark:bg-[#282932] mb-2">
             <div
-              className="absolute top-0 left-0 h-full bg-meta-green-500 dark:bg-meta-green-400 transition-all duration-500"
+              className="absolute top-0 left-0 h-full bg-gradient-to-r from-[#5051F9] to-[#1EA7FF] transition-all duration-500"
               style={{ width: `${isNaN(productivePercentage) ? 0 : productivePercentage}%` }}
             ></div>
             <div
-              className="absolute top-0 h-full bg-meta-orange-500 dark:bg-meta-orange-400 transition-all duration-500"
+              className="absolute top-0 h-full bg-gradient-to-r from-[#1EA7FF] to-[#5CBBFF] transition-all duration-500"
               style={{
                 left: `${isNaN(productivePercentage) ? 0 : productivePercentage}%`,
                 width: `${isNaN(neutralPercentage) ? 0 : neutralPercentage}%`
               }}
             ></div>
             <div
-              className="absolute top-0 h-full bg-meta-red-500 dark:bg-meta-red-400 transition-all duration-500"
+              className="absolute top-0 h-full bg-gradient-to-r from-[#FF6B6B] to-[#FF9999] transition-all duration-500"
               style={{
                 left: `${(isNaN(productivePercentage) ? 0 : productivePercentage) + (isNaN(neutralPercentage) ? 0 : neutralPercentage)}%`,
                 width: `${isNaN(distractingPercentage) ? 0 : distractingPercentage}%`
@@ -302,104 +300,80 @@ export default function ProductivityOverview() {
           </div>
 
           {/* Time Breakdown - Horizontal Pills */}
-          <div className="flex flex-wrap gap-2 sm:gap-4">
+          <div className="flex flex-wrap gap-2">
             {/* Productive */}
-            <div className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-meta-green-50 dark:bg-meta-green-500/10 border border-meta-green-200 dark:border-meta-green-500/30">
-              <div className="h-2.5 w-2.5 rounded-full bg-meta-green-500 dark:bg-meta-green-400"></div>
-              <span className="text-sm font-medium text-meta-green-700 dark:text-meta-green-300">
+            <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-[#5051F9]/10 border border-[#5051F9]/20">
+              <div className="h-2 w-2 rounded-full bg-[#5051F9]"></div>
+              <span className="text-sm font-medium text-[#5051F9]">
                 {Math.floor(productiveTime / 3600)}h {Math.floor((productiveTime % 3600) / 60)}m
               </span>
-              <span className="text-xs text-meta-green-600 dark:text-meta-green-400">
+              <span className="text-xs text-[#5051F9]/70">
                 ({isNaN(productivePercentage) ? 0 : productivePercentage}%)
               </span>
             </div>
 
             {/* Neutral */}
-            <div className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-meta-orange-50 dark:bg-meta-orange-500/10 border border-meta-orange-200 dark:border-meta-orange-500/30">
-              <div className="h-2.5 w-2.5 rounded-full bg-meta-orange-500 dark:bg-meta-orange-400"></div>
-              <span className="text-sm font-medium text-meta-orange-700 dark:text-meta-orange-300">
+            <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-[#1EA7FF]/10 border border-[#1EA7FF]/20">
+              <div className="h-2 w-2 rounded-full bg-[#1EA7FF]"></div>
+              <span className="text-sm font-medium text-[#1EA7FF]">
                 {Math.floor(neutralTime / 3600)}h {Math.floor((neutralTime % 3600) / 60)}m
               </span>
-              <span className="text-xs text-meta-orange-600 dark:text-meta-orange-400">
+              <span className="text-xs text-[#1EA7FF]/70">
                 ({isNaN(neutralPercentage) ? 0 : neutralPercentage}%)
               </span>
             </div>
 
             {/* Distracting */}
-            <div className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-meta-red-50 dark:bg-meta-red-500/10 border border-meta-red-200 dark:border-meta-red-500/30">
-              <div className="h-2.5 w-2.5 rounded-full bg-meta-red-500 dark:bg-meta-red-400"></div>
-              <span className="text-sm font-medium text-meta-red-700 dark:text-meta-red-300">
+            <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-[#FF6B6B]/10 border border-[#FF6B6B]/20">
+              <div className="h-2 w-2 rounded-full bg-[#FF6B6B]"></div>
+              <span className="text-sm font-medium text-[#FF6B6B]">
                 {Math.floor(distractingTime / 3600)}h {Math.floor((distractingTime % 3600) / 60)}m
               </span>
-              <span className="text-xs text-meta-red-600 dark:text-meta-red-400">
+              <span className="text-xs text-[#FF6B6B]/70">
                 ({isNaN(distractingPercentage) ? 0 : distractingPercentage}%)
               </span>
             </div>
           </div>
-
-          {/* Contextual Insight */}
-          {totalTimeSeconds > 0 && (
-            <div className="mt-3 pt-3 border-t border-meta-gray-200 dark:border-dark-border-primary">
-              <p className="text-xs text-meta-gray-600 dark:text-dark-text-secondary">
-                {distractingPercentage > 40 ? (
-                  <>
-                    <span className="font-medium text-meta-red-600 dark:text-meta-red-400">💡 Tip:</span>{' '}
-                    You spent {distractingPercentage}% on distracting apps. Try blocking them during focus hours.
-                  </>
-                ) : productivePercentage >= 70 ? (
-                  <>
-                    <span className="font-medium text-meta-green-600 dark:text-meta-green-400">🎉 Great job!</span>{' '}
-                    You're staying focused with {productivePercentage}% productive time.
-                  </>
-                ) : (
-                  <>
-                    <span className="font-medium text-meta-orange-600 dark:text-meta-orange-400">📊 Insight:</span>{' '}
-                    Balance your time - {neutralPercentage}% was neutral activity.
-                  </>
-                )}
-              </p>
-            </div>
-          )}
         </div>
 
-        {/* Charts Section - Extra Compact */}
-        <div className="mt-5">
+        {/* Charts Section */}
+        <div className="mt-2">
           <Tabs defaultValue="categories" className="w-full">
-            <div className="flex flex-col lg:flex-row items-start lg:items-center justify-between mb-3 gap-3">
-              <TabsList className="p-0.5 w-full lg:w-auto bg-meta-gray-100 border border-meta-gray-200 dark:bg-dark-bg-tertiary dark:border-dark-border-primary rounded-lg">
+            <div className="flex flex-col lg:flex-row items-start lg:items-center justify-between mb-2 gap-2">
+              <TabsList className="p-0.5 w-full lg:w-auto bg-[#F4F7FE] border border-[#E8EDF1] dark:bg-[#282932] dark:border-[#282932] rounded-lg">
                 <TabsTrigger
                   value="applications"
-                  className="text-xs px-3 py-1.5 rounded-md font-medium transition-all text-meta-gray-600 data-[state=active]:bg-meta-blue-500 data-[state=active]:text-white dark:text-dark-text-secondary dark:data-[state=active]:bg-meta-blue-600 dark:data-[state=active]:text-white"
+                  className="text-xs px-3 py-1.5 rounded-md font-medium transition-all text-[#768396] dark:text-[#898999] data-[state=active]:bg-white data-[state=active]:text-[#5051F9] data-[state=active]:shadow-sm dark:data-[state=active]:bg-[#5051F9] dark:data-[state=active]:text-white"
                 >
                   Apps
                 </TabsTrigger>
                 <TabsTrigger
                   value="categories"
-                  className="text-xs px-3 py-1.5 rounded-md font-medium transition-all text-meta-gray-600 data-[state=active]:bg-meta-blue-500 data-[state=active]:text-white dark:text-dark-text-secondary dark:data-[state=active]:bg-meta-blue-600 dark:data-[state=active]:text-white"
+                  className="text-xs px-3 py-1.5 rounded-md font-medium transition-all text-[#768396] dark:text-[#898999] data-[state=active]:bg-white data-[state=active]:text-[#5051F9] data-[state=active]:shadow-sm dark:data-[state=active]:bg-[#5051F9] dark:data-[state=active]:text-white"
                 >
                   Timeline
                 </TabsTrigger>
               </TabsList>
 
-              <div className="flex items-center gap-2 text-[10px] font-medium w-full lg:w-auto justify-center lg:justify-end text-meta-gray-600 dark:text-dark-text-secondary">
+              <div className="flex items-center gap-3 text-xs font-normal w-full lg:w-auto justify-center lg:justify-end text-[#768396] dark:text-[#898999]">
                 <div className="flex items-center gap-1">
-                  <div className="h-1 w-1 rounded-full bg-meta-green-500"></div>
+                  <div className="h-2 w-2 rounded-full bg-[#5051F9]"></div>
                   <span>Productive</span>
                 </div>
                 <div className="flex items-center gap-1">
-                  <div className="h-1 w-1 rounded-full bg-meta-orange-500"></div>
+                  <div className="h-2 w-2 rounded-full bg-[#1EA7FF]"></div>
                   <span>Neutral</span>
                 </div>
                 <div className="flex items-center gap-1">
-                  <div className="h-1 w-1 rounded-full bg-meta-red-500"></div>
+                  <div className="h-2 w-2 rounded-full bg-[#FF6B6B]"></div>
                   <span>Distracting</span>
                 </div>
               </div>
             </div>
 
             <TabsContent value="applications" className="mt-0">
-              <div className="rounded-xl border overflow-hidden h-56 sm:h-64 lg:h-72 flex flex-col bg-white border-meta-gray-200 dark:bg-dark-bg-tertiary dark:border-dark-border-primary">
-                <div className="grid grid-cols-12 text-xs p-2 sm:p-3 border-b flex-shrink-0 text-meta-gray-600 border-meta-gray-200 bg-meta-gray-50 dark:text-dark-text-secondary dark:border-dark-border-primary dark:bg-dark-bg-secondary">
+              <div className="rounded-2xl border overflow-hidden h-48 sm:h-52 lg:h-56 flex flex-col bg-white border-[#E8EDF1] dark:bg-[#212329] dark:border-[#282932]">
+                <div className="grid grid-cols-12 text-xs p-2 border-b flex-shrink-0 text-[#768396] dark:text-[#898999] font-normal border-[#E8EDF1] bg-[#F4F7FE] dark:border-[#282932] dark:bg-[#282932]">
                   <div className="col-span-4 sm:col-span-5">Application</div>
                   <div className="col-span-2 hidden sm:block">Category</div>
                   <div className="col-span-3 sm:col-span-2">Time Spent</div>
@@ -407,7 +381,7 @@ export default function ProductivityOverview() {
                   <div className="col-span-2 sm:col-span-1">Details</div>
                 </div>
 
-                <div className="divide-y divide-meta-gray-200 dark:divide-dark-border-primary overflow-y-auto flex-1 custom-scrollbar">
+                <div className="divide-y divide-[#E8EDF1] dark:divide-[#282932] overflow-y-auto flex-1 custom-scrollbar">
                   {appsData.map((app) => {
                     const maxAppTime = Math.max(...appsData.map(a => a.time), 1)
                     const timePercent = (app.time / maxAppTime) * 100
@@ -437,7 +411,7 @@ export default function ProductivityOverview() {
             </TabsContent>
 
             <TabsContent value="categories" className="mt-0">
-              <div className="h-80 lg:h-96 w-full relative rounded-xl overflow-hidden border bg-white shadow-sm border-meta-gray-200 dark:bg-dark-bg-tertiary dark:border-dark-border-primary">
+              <div className="h-72 lg:h-80 w-full relative rounded-2xl overflow-hidden bg-white dark:bg-[#212329] border border-[#E8EDF1] dark:border-[#282932]">
                 <ProductiveAreaChart
                   data={productiveData}
                   rawData={rawData}
@@ -543,7 +517,7 @@ function AppUsageRow({ name, category, timeSpent, timePercent = 100, productivit
       {/* Inline Breakdown - Minimalistic */}
       {isExpanded && detailedData.length > 0 && (
         <div className="bg-meta-gray-50 dark:bg-dark-bg-secondary px-4 sm:px-6 py-2 border-t border-meta-gray-200 dark:border-dark-border-primary">
-          <div className="space-y-1 max-h-40 overflow-y-auto custom-scrollbar">
+          <div className="space-y-1 max-h-32 overflow-y-auto custom-scrollbar">
             {detailedData.map((detail, index) => (
               <div key={index} className="flex items-center justify-between py-1.5 text-xs">
                 <div className="flex-1 text-meta-gray-700 dark:text-dark-text-secondary truncate pr-3 pl-4">

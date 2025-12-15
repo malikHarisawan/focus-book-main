@@ -88,13 +88,14 @@ const AppUsageDetails = ({
   const getProductivityColor = (productivity) => {
     switch (productivity) {
       case 'Productive':
-        return 'bg-green-500/10 text-green-400 border-green-500/30'
+        return 'bg-[#5051F9]/10 text-[#5051F9] border-[#5051F9]/30'
       case 'Neutral':
-        return 'bg-amber-500/10 text-amber-400 border-amber-500/30'
+        return 'bg-[#1EA7FF]/10 text-[#1EA7FF] border-[#1EA7FF]/30'
       case 'Un-Productive':
-        return 'bg-red-500/10 text-red-400 border-red-500/30'
+      case 'Distracting':
+        return 'bg-[#FF6B6B]/10 text-[#FF6B6B] border-[#FF6B6B]/30'
       default:
-        return 'bg-slate-500/10 text-slate-400 border-slate-500/30'
+        return 'bg-[#768396]/10 text-[#768396] border-[#768396]/30'
     }
   }
 
@@ -197,21 +198,21 @@ const AppUsageDetails = ({
   }
 
   return (
-    <Card className="bg-white dark:bg-slate-900/50 border-gray-200 dark:border-slate-700/50 backdrop-blur-sm mt-4">
-      <CardHeader className="border-b border-gray-200 dark:border-slate-700/50 pb-3">
+    <Card className="bg-white dark:bg-[#212329] border-[#E8EDF1] dark:border-[#282932] backdrop-blur-sm mt-3">
+      <CardHeader className="border-b border-[#E8EDF1] dark:border-[#282932] pb-2">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2">
-            <Clock className="h-5 w-5 text-cyan-600 dark:text-cyan-500" />
-            <CardTitle className="text-gray-900 dark:text-slate-100">App Usage Details</CardTitle>
+            <Clock className="h-5 w-5 text-[#5051F9]" />
+            <CardTitle className="text-[#232360] dark:text-white text-base">App Usage Details</CardTitle>
             <Badge
               variant="outline"
-              className="text-xs bg-cyan-500/10 text-cyan-600 dark:text-cyan-400 border-cyan-500/30"
+              className="text-xs bg-[#5051F9]/10 text-[#5051F9] border-[#5051F9]/30"
             >
               {getRangeDescription()}
             </Badge>
           </div>
           <div className="flex items-center gap-2">
-            <span className="text-sm text-gray-600 dark:text-slate-400">
+            <span className="text-sm text-[#768396] dark:text-[#898999]">
               {selectedApps.length} app{selectedApps.length !== 1 ? 's' : ''}
             </span>
             {selectedApps.length > 10 && (
@@ -219,7 +220,7 @@ const AppUsageDetails = ({
                 variant="ghost"
                 size="sm"
                 onClick={() => setShowAll(!showAll)}
-                className="text-cyan-600 dark:text-cyan-400 hover:text-cyan-700 dark:hover:text-cyan-300"
+                className="text-[#5051F9] hover:text-[#4142E0] hover:bg-[#5051F9]/10"
               >
                 {showAll ? 'Show Less' : 'Show All'}
               </Button>
@@ -231,7 +232,7 @@ const AppUsageDetails = ({
                 e.stopPropagation()
                 onClose()
               }}
-              className="text-gray-600 dark:text-slate-400 hover:text-gray-800 dark:hover:text-slate-300"
+              className="text-[#768396] dark:text-[#898999] hover:text-[#232360] dark:hover:text-white hover:bg-[#F4F7FE] dark:hover:bg-[#282932]"
               title="Close details panel"
             >
               <ChevronUp className="h-4 w-4" />
@@ -241,26 +242,26 @@ const AppUsageDetails = ({
       </CardHeader>
 
       <CardContent className="p-0">
-          <div className="bg-gray-50 dark:bg-slate-800/30 rounded-b-lg overflow-hidden">
+          <div className="bg-[#F4F7FE] dark:bg-[#1E1F25] rounded-b-lg overflow-hidden">
             {/* Header */}
-            <div className="grid grid-cols-11 text-xs text-gray-600 dark:text-slate-400 p-3 border-b border-gray-200 dark:border-slate-700/50 bg-gray-100 dark:bg-slate-800/50">
+            <div className="grid grid-cols-11 text-xs text-[#768396] dark:text-[#898999] p-2.5 border-b border-[#E8EDF1] dark:border-[#282932] bg-[#F4F7FE] dark:bg-[#282932]">
               <button
                 onClick={() => handleSort('name')}
-                className="col-span-4 flex items-center gap-1 hover:text-cyan-600 dark:hover:text-cyan-400 transition-colors text-left"
+                className="col-span-4 flex items-center gap-1 hover:text-[#5051F9] transition-colors text-left font-medium"
               >
                 Application
                 {getSortIcon('name')}
               </button>
               <button
                 onClick={() => handleSort('category')}
-                className="col-span-2 flex items-center gap-1 hover:text-cyan-600 dark:hover:text-cyan-400 transition-colors text-left"
+                className="col-span-2 flex items-center gap-1 hover:text-[#5051F9] transition-colors text-left font-medium"
               >
                 Category
                 {getSortIcon('category')}
               </button>
               <button
                 onClick={() => handleSort('time')}
-                className="col-span-2 flex items-center gap-1 hover:text-cyan-600 dark:hover:text-cyan-400 transition-colors text-left"
+                className="col-span-2 flex items-center gap-1 hover:text-[#5051F9] transition-colors text-left font-medium"
               >
                 Time Spent
                 {getSortIcon('time')}
@@ -270,35 +271,35 @@ const AppUsageDetails = ({
             </div>
 
             {/* App List */}
-            <div className="divide-y divide-gray-200 dark:divide-slate-700/30 max-h-80 overflow-y-auto custom-scrollbar">
+            <div className="divide-y divide-[#E8EDF1] dark:divide-[#282932] max-h-80 overflow-y-auto custom-scrollbar">
               {sortedApps.map((app, index) => (
                 <div
                   key={`${app.name}-${index}`}
-                  className="grid grid-cols-11 py-3 px-3 text-sm hover:bg-gray-100 dark:hover:bg-slate-800/50 transition-colors"
+                  className="grid grid-cols-11 py-2.5 px-2.5 text-sm hover:bg-white dark:hover:bg-[#212329] transition-colors"
                   onClick={(e) => e.stopPropagation()}
                 >
                   <div className="col-span-4 flex items-center gap-2">
-                    <div className="w-8 h-8 bg-gradient-to-br from-cyan-500/20 to-blue-500/20 rounded-lg flex items-center justify-center">
-                      <span className="text-xs font-medium text-cyan-600 dark:text-cyan-400">
+                    <div className="w-7 h-7 bg-gradient-to-br from-[#5051F9]/20 to-[#1EA7FF]/20 rounded-lg flex items-center justify-center">
+                      <span className="text-xs font-medium text-[#5051F9]">
                         {app.name?.charAt(0)?.toUpperCase() || '?'}
                       </span>
                     </div>
                     <div className="flex-1">
-                      <div className="text-gray-800 dark:text-slate-300 font-medium truncate">
+                      <div className="text-[#232360] dark:text-white font-medium truncate text-sm">
                         {app.name || 'Unknown App'}
                       </div>
                       {app.domain && (
-                        <div className="text-xs text-gray-500 dark:text-slate-500 truncate">{app.domain}</div>
+                        <div className="text-xs text-[#768396] dark:text-[#898999] truncate">{app.domain}</div>
                       )}
                     </div>
                   </div>
 
-                  <div className="col-span-2 text-gray-700 dark:text-slate-400 flex items-center gap-1">
+                  <div className="col-span-2 text-[#232360] dark:text-white flex items-center gap-1">
                     <span className="text-sm">{getCategoryIcon(app.category)}</span>
                     {app.category || 'Unknown'}
                   </div>
 
-                  <div className="col-span-2 text-cyan-600 dark:text-cyan-400 font-medium">
+                  <div className="col-span-2 text-[#5051F9] font-medium">
                     {formatTime(app.timeSpentSeconds || 0)}
                   </div>
 
@@ -318,7 +319,7 @@ const AppUsageDetails = ({
                           <Button
                             variant="ghost"
                             size="icon"
-                            className="h-6 w-6 text-gray-600 dark:text-slate-400 hover:text-gray-800 dark:hover:text-slate-300"
+                            className="h-6 w-6 text-[#768396] dark:text-[#898999] hover:text-[#232360] dark:hover:text-white"
                             onClick={(e) => e.stopPropagation()}
                           >
                             <MoreHorizontal className="h-4 w-4" />
@@ -326,17 +327,17 @@ const AppUsageDetails = ({
                         </DropdownMenuTrigger>
                         <DropdownMenuContent
                           align="end"
-                          className="bg-white dark:bg-slate-900 border-gray-300 dark:border-slate-700 text-gray-900 dark:text-slate-50"
+                          className="bg-white dark:bg-[#212329] border-[#E8EDF1] dark:border-[#282932] text-[#232360] dark:text-white"
                           onClick={(e) => e.stopPropagation()}
                         >
                           <DropdownMenuLabel>Actions</DropdownMenuLabel>
-                          <DropdownMenuSeparator className="bg-gray-300 dark:bg-slate-700" />
+                          <DropdownMenuSeparator className="bg-[#E8EDF1] dark:bg-[#282932]" />
                           <DropdownMenuSub>
                             <DropdownMenuSubTrigger className="flex items-center">
                               <Tag className="h-4 w-4 mr-2" />
                               <span>Change Category</span>
                             </DropdownMenuSubTrigger>
-                            <DropdownMenuSubContent className="bg-white dark:bg-slate-900 border-gray-300 dark:border-slate-700">
+                            <DropdownMenuSubContent className="bg-white dark:bg-[#212329] border-[#E8EDF1] dark:border-[#282932]">
                               {categories.map((category) => (
                                 <DropdownMenuItem
                                   key={category}
@@ -365,8 +366,8 @@ const AppUsageDetails = ({
 
             {/* Footer */}
             {selectedApps.length > 0 && (
-              <div className="p-3 border-t border-gray-200 dark:border-slate-700/50 bg-gray-100 dark:bg-slate-800/30">
-                <div className="flex items-center justify-between text-xs text-gray-600 dark:text-slate-400">
+              <div className="p-2.5 border-t border-[#E8EDF1] dark:border-[#282932] bg-[#F4F7FE] dark:bg-[#282932]">
+                <div className="flex items-center justify-between text-xs text-[#768396] dark:text-[#898999]">
                   <span>
                     Total:{' '}
                     {selectedApps.reduce((sum, app) => sum + (app.timeSpentSeconds || 0), 0) > 0

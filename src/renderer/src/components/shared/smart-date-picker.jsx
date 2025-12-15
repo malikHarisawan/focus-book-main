@@ -79,10 +79,10 @@ const SmartDatePicker = ({ zoomLevel = 'hour', onDateChange, className = '' }) =
       {/* Previous Button */}
       <button
         onClick={handlePrevious}
-        className={`flex items-center justify-center w-8 h-8 rounded transition-all duration-200 ${
+        className={`flex items-center justify-center w-8 h-8 rounded-lg transition-all duration-200 ${
           theme === 'dark'
-            ? 'text-meta-gray-400 hover:text-meta-blue-400 hover:bg-meta-gray-700'
-            : 'text-meta-gray-500 hover:text-meta-blue-600 hover:bg-meta-gray-100'
+            ? 'text-slate-400 hover:text-teal-400 hover:bg-slate-700/50'
+            : 'text-slate-400 hover:text-teal-500 hover:bg-slate-100'
         }`}
         title={`Previous ${getNavigationLabel()}`}
       >
@@ -103,10 +103,10 @@ const SmartDatePicker = ({ zoomLevel = 'hour', onDateChange, className = '' }) =
         {/* Visible button */}
         <button
           onClick={openDatePicker}
-          className={`flex items-center gap-2 border rounded px-3 py-2 text-sm transition-all duration-200 min-w-0 ${
+          className={`flex items-center gap-2 border rounded-lg px-3 py-2 text-sm transition-all duration-200 min-w-0 ${
             theme === 'dark'
-              ? 'bg-meta-gray-700 text-dark-text-primary border-meta-gray-600 hover:bg-meta-gray-600 hover:border-meta-blue-400'
-              : 'bg-meta-gray-50 text-meta-gray-700 border-meta-gray-300 hover:bg-white hover:border-meta-blue-500'
+              ? 'bg-[#252630] text-white border-slate-700/50 hover:bg-slate-700/50 hover:border-teal-400'
+              : 'bg-white text-slate-600 border-slate-200 hover:bg-slate-50 hover:border-teal-400'
           }`}
           title="Click to select specific date"
         >
@@ -118,10 +118,10 @@ const SmartDatePicker = ({ zoomLevel = 'hour', onDateChange, className = '' }) =
       {/* Next Button */}
       <button
         onClick={handleNext}
-        className={`flex items-center justify-center w-8 h-8 rounded transition-all duration-200 ${
+        className={`flex items-center justify-center w-8 h-8 rounded-lg transition-all duration-200 ${
           theme === 'dark'
-            ? 'text-meta-gray-400 hover:text-meta-blue-400 hover:bg-meta-gray-700'
-            : 'text-meta-gray-500 hover:text-meta-blue-600 hover:bg-meta-gray-100'
+            ? 'text-slate-400 hover:text-teal-400 hover:bg-slate-700/50'
+            : 'text-slate-400 hover:text-teal-500 hover:bg-slate-100'
         }`}
         title={`Next ${getNavigationLabel()}`}
       >
@@ -132,10 +132,10 @@ const SmartDatePicker = ({ zoomLevel = 'hour', onDateChange, className = '' }) =
       {!isToday() && (
         <button
           onClick={handleToday}
-          className={`flex items-center justify-center w-8 h-8 rounded transition-all duration-200 ${
+          className={`flex items-center justify-center w-8 h-8 rounded-lg transition-all duration-200 ${
             theme === 'dark'
-              ? 'text-meta-gray-400 hover:text-meta-blue-400 hover:bg-meta-gray-700'
-              : 'text-meta-gray-500 hover:text-meta-blue-600 hover:bg-meta-gray-100'
+              ? 'text-slate-400 hover:text-teal-400 hover:bg-slate-700/50'
+              : 'text-slate-400 hover:text-teal-500 hover:bg-slate-100'
           }`}
           title="Go to today"
         >
@@ -144,7 +144,7 @@ const SmartDatePicker = ({ zoomLevel = 'hour', onDateChange, className = '' }) =
       )}
 
       {/* Current period indicator */}
-      <div className={`text-xs hidden sm:block ${theme === 'dark' ? 'text-meta-gray-500' : 'text-meta-gray-500'}`}>
+      <div className={`text-xs hidden sm:block ${theme === 'dark' ? 'text-slate-500' : 'text-slate-400'}`}>
         {zoomLevel.charAt(0).toUpperCase() + zoomLevel.slice(1)} view
       </div>
     </div>

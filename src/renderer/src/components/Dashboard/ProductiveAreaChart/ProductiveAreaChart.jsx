@@ -67,17 +67,17 @@ const ProductiveAreaChart = ({
   // Get current theme
   const { resolvedTheme } = useTheme()
 
-  // Theme-aware colors - Meta-inspired professional palette
+  // Theme-aware colors - Exact Figma color palette
   const chartColors = {
-    productive: resolvedTheme === 'dark' ? '#4bc793' : '#31a24c', // Meta green
-    unproductive: resolvedTheme === 'dark' ? '#ff7567' : '#fa383e', // Meta red
-    neutral: resolvedTheme === 'dark' ? '#ffab47' : '#f5a623', // Meta orange
-    selection: resolvedTheme === 'dark' ? '#4599ff' : '#1877f2', // Meta blue
-    grid: resolvedTheme === 'dark' ? '#3e4042' : '#dadde1', // Meta gray borders
-    text: resolvedTheme === 'dark' ? '#e4e6eb' : '#1c1e21', // Meta text colors
-    bg: resolvedTheme === 'dark' ? '#242526' : '#ffffff', // Background
-    bgSecondary: resolvedTheme === 'dark' ? '#3a3b3c' : '#f7f8fa', // Secondary bg
-    border: resolvedTheme === 'dark' ? '#3e4042' : '#dadde1', // Border color
+    productive: '#5051F9', // Primary purple - for productive time
+    unproductive: '#FF6B6B', // Red/Salmon - for unproductive/distracting time
+    neutral: '#1EA7FF', // Cyan blue - for neutral
+    selection: '#5051F9', // Selection same as productive
+    grid: resolvedTheme === 'dark' ? '#282932' : '#E8EDF1',
+    text: resolvedTheme === 'dark' ? '#898999' : '#768396',
+    bg: resolvedTheme === 'dark' ? '#212329' : '#ffffff',
+    bgSecondary: resolvedTheme === 'dark' ? '#282932' : '#F4F7FE',
+    border: resolvedTheme === 'dark' ? '#282932' : '#E8EDF1',
   }
 
   // State management using custom hooks
@@ -245,16 +245,15 @@ const ProductiveAreaChart = ({
   // Event listeners setup
   useEffect(() => {
     document.addEventListener('mousedown', handleClickOutside)
+    // Wheel zoom disabled - no wheel event listener added
     if (!selectedRange) {
-      document.addEventListener('wheel', handleWheel, { passive: false })
       document.addEventListener('keydown', handleKeyDown)
     }
     return () => {
       document.removeEventListener('mousedown', handleClickOutside)
-      document.removeEventListener('wheel', handleWheel)
       document.removeEventListener('keydown', handleKeyDown)
     }
-  }, [handleClickOutside, handleWheel, handleKeyDown, selectedRange])
+  }, [handleClickOutside, handleKeyDown, selectedRange])
 
   // Zoom level change handler for breadcrumbs
   const handleBreadcrumbClick = useCallback(
@@ -276,107 +275,124 @@ const ProductiveAreaChart = ({
   // Loading state
   if (!currentData || currentData.length === 0) {
     return (
-      <div className="bg-white dark:bg-meta-gray-800 p-4 rounded-xl h-[250px] flex items-center justify-center border border-meta-gray-200 dark:border-meta-gray-700">
+      <div className="bg-white dark:bg-[#1a1b23] p-4 rounded-xl h-[250px] flex items-center justify-center border border-slate-200 dark:border-slate-700/30">
         {isLoading ? (
-          <div className="flex items-center gap-2 text-meta-blue-500">
-            <div className="animate-spin w-4 h-4 border-2 border-meta-blue-500 border-t-transparent rounded-full"></div>
+          <div className="flex items-center gap-2 text-teal-500">
+            <div className="animate-spin w-4 h-4 border-2 border-teal-500 border-t-transparent rounded-full"></div>
             <span>Loading data...</span>
           </div>
         ) : (
-          <span className="text-meta-gray-500">No data available</span>
+          <span className="text-slate-500">No data available</span>
         )}
       </div>
     )
   }
 
   return (
-    <div ref={containerRef} className="bg-white dark:bg-meta-gray-800 p-4 rounded-xl border border-meta-gray-200 dark:border-meta-gray-700" tabIndex={0}>
-      <div className="space-y-3 mb-4">
-        <ChartHeader
-          zoomLevelLabel={zoomLevelDisplay.label}
-          showHelp={showHelp}
-          onToggleHelp={() => setShowHelp(!showHelp)}
-          selectedRange={selectedRange}
-          onClearSelection={clearSelection}
-          zoomControls={
-            <ZoomControls
-              zoomLevel={zoomLevel}
-              onZoomIn={zoomIn}
-              onZoomOut={zoomOut}
-              onReset={resetZoom}
-              canZoomIn={canZoomInValue && !isZoomDisabled}
-              canZoomOut={canZoomOutValue && !isZoomDisabled}
-              disabled={isZoomDisabled}
-            />
-          }
-        />
-
-        <BreadcrumbNavigation
-          breadcrumbPath={breadcrumbPath}
-          currentZoomLevel={zoomLevel}
-          onZoomLevelClick={handleBreadcrumbClick}
-          disabled={isZoomDisabled}
-        />
-
-        <ZoomProgressIndicator progress={zoomProgress} />
-
-        <HelpPanel isVisible={showHelp} zoomLevelDetail={zoomLevelDisplay.detail} />
+    <div ref={containerRef} className="bg-white dark:bg-[#1a1b23] p-4 rounded-xl border border-slate-200 dark:border-slate-700/30" tabIndex={0}>
+      {/* Clean Header with Tabs */}
+      <div className="flex items-center justify-between mb-6">
+        <h3 className="text-slate-700 dark:text-white text-base font-medium">Productivity Over Time</h3>
+        
+        {/* Tab Navigation - Daily/Weekly/Monthly */}
+        <div className="flex items-center gap-1">
+          <button
+            onClick={() => handleBreadcrumbClick('hour')}
+            className={`px-4 py-1.5 text-sm font-medium transition-all ${
+              zoomLevel === 'hour' || zoomLevel === 'day'
+                ? 'text-[#5051F9] border-b-2 border-[#5051F9]'
+                : 'text-[#768396] dark:text-[#898999] hover:text-[#232360] dark:hover:text-white border-b-2 border-transparent'
+            }`}
+          >
+            Daily
+          </button>
+          <button
+            onClick={() => handleBreadcrumbClick('week')}
+            className={`px-4 py-1.5 text-sm font-medium transition-all ${
+              zoomLevel === 'week'
+                ? 'text-[#5051F9] border-b-2 border-[#5051F9]'
+                : 'text-[#768396] dark:text-[#898999] hover:text-[#232360] dark:hover:text-white border-b-2 border-transparent'
+            }`}
+          >
+            Weekly
+          </button>
+          <button
+            onClick={() => handleBreadcrumbClick('month')}
+            className={`px-4 py-1.5 text-sm font-medium transition-all ${
+              zoomLevel === 'month'
+                ? 'text-[#5051F9] border-b-2 border-[#5051F9]'
+                : 'text-[#768396] dark:text-[#898999] hover:text-[#232360] dark:hover:text-white border-b-2 border-transparent'
+            }`}
+          >
+            Monthly
+          </button>
+        </div>
       </div>
 
-      <ResponsiveContainer width="100%" height={250}>
+      <ResponsiveContainer width="100%" height={280}>
         <AreaChart
           ref={chartRef}
           data={currentData}
-          margin={{ top: 10, right: 30, left: 0, bottom: 0 }}
+          margin={{ top: 20, right: 30, left: 10, bottom: 10 }}
           onMouseDown={onMouseDown}
           onMouseMove={onMouseMove}
           onMouseUp={onMouseUp}
-          style={{ backgroundColor: chartColors.bg }}
+          style={{ backgroundColor: 'transparent' }}
         >
           <defs>
+            {/* Productive gradient - Primary Purple #5051F9 */}
             <linearGradient id="colorProductive" x1="0" y1="0" x2="0" y2="1">
-              <stop offset="5%" stopColor={chartColors.productive} stopOpacity={0.8} />
-              <stop offset="95%" stopColor={chartColors.productive} stopOpacity={0} />
+              <stop offset="0%" stopColor="#5051F9" stopOpacity={0.6} />
+              <stop offset="40%" stopColor="#5051F9" stopOpacity={0.35} />
+              <stop offset="100%" stopColor="#5051F9" stopOpacity={0.05} />
             </linearGradient>
+            {/* Unproductive gradient - Red/Salmon #FF6B6B */}
             <linearGradient id="colorUnproductive" x1="0" y1="0" x2="0" y2="1">
-              <stop offset="5%" stopColor={chartColors.unproductive} stopOpacity={0.8} />
-              <stop offset="95%" stopColor={chartColors.unproductive} stopOpacity={0} />
+              <stop offset="0%" stopColor="#FF6B6B" stopOpacity={0.5} />
+              <stop offset="40%" stopColor="#FF6B6B" stopOpacity={0.3} />
+              <stop offset="100%" stopColor="#FF6B6B" stopOpacity={0.05} />
             </linearGradient>
           </defs>
           <XAxis
             dataKey="day"
-            stroke={chartColors.text}
-            tick={{ fill: chartColors.text }}
+            stroke="transparent"
+            tick={{ fill: '#94a3b8', fontSize: 11, fontWeight: 400 }}
+            tickLine={false}
+            axisLine={false}
+            dy={10}
             style={{ userSelect: 'none', WebkitUserSelect: 'none', MozUserSelect: 'none' }}
           />
           <YAxis 
-            stroke={chartColors.grid}
-            tick={{ fill: chartColors.text }}
+            stroke="transparent"
+            tick={false}
+            tickLine={false}
+            axisLine={false}
+            width={0}
           />
-          <CartesianGrid strokeDasharray="3 3" stroke={chartColors.grid} />
+          <CartesianGrid strokeDasharray="0" stroke="rgba(100, 116, 139, 0.06)" vertical={false} />
           <Tooltip
-            content={
-              <CustomTooltip
-                aggregatedData={aggregatedData}
-                hasSelection={!!selectedRange}
-                zoomLevel={zoomLevel}
-                zoomLevelDetail={zoomLevelDisplay.detail}
-              />
-            }
+            content={<CustomTooltip />}
+            cursor={{ stroke: 'rgba(80, 81, 249, 0.3)', strokeWidth: 1 }}
           />
           <Area
-            type="monotone"
+            type="monotoneX"
             dataKey="productive"
             name="Productive"
-            stroke={chartColors.productive}
+            stroke="#5051F9"
+            strokeWidth={2.5}
             fill="url(#colorProductive)"
+            dot={{ fill: '#5051F9', stroke: '#fff', strokeWidth: 2, r: 4 }}
+            activeDot={{ fill: '#6B6CFA', stroke: '#fff', strokeWidth: 2, r: 6 }}
           />
           <Area
-            type="monotone"
+            type="monotoneX"
             dataKey="unproductive"
             name="Unproductive"
-            stroke={chartColors.unproductive}
+            stroke="#FF6B6B"
+            strokeWidth={2.5}
             fill="url(#colorUnproductive)"
+            dot={{ fill: '#FF6B6B', stroke: '#fff', strokeWidth: 2, r: 4 }}
+            activeDot={{ fill: '#FF8A8A', stroke: '#fff', strokeWidth: 2, r: 6 }}
           />
           {isDragging && dragStart && dragEnd && (
             <ReferenceArea

@@ -197,33 +197,33 @@ const handleResetConversation = async () => {
   ]
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-4">
       {/* Header */}
       <div>
-        <h1 className="text-3xl font-bold bg-gradient-to-r from-cyan-400 to-blue-500 bg-clip-text text-transparent">
+        <h1 className="text-2xl font-bold bg-gradient-to-r from-[#5051F9] to-[#1EA7FF] bg-clip-text text-transparent">
           AI Insights
         </h1>
-        <p className="text-gray-600 dark:text-slate-400 mt-2">
+        <p className="text-[#768396] dark:text-[#898999] mt-1">
           Get personalized insights and summaries about your productivity patterns
         </p>
       </div>
 
       {/* Chat Container */}
-      <Card className="bg-white dark:bg-gradient-to-br dark:from-slate-900/90 dark:to-slate-800/90 border-gray-200 dark:border-slate-700/50 backdrop-blur-sm">
-        <CardHeader className="pb-4">
-          <CardTitle className="flex items-center gap-2 text-gray-900 dark:text-slate-200">
-            <MessageSquare className="h-5 w-5 text-cyan-600 dark:text-cyan-500" />
+      <Card className="bg-white dark:bg-[#212329] border-[#E8EDF1] dark:border-[#282932] backdrop-blur-sm">
+        <CardHeader className="pb-3">
+          <CardTitle className="flex items-center gap-2 text-[#232360] dark:text-white text-base">
+            <MessageSquare className="h-5 w-5 text-[#5051F9]" />
             Chat with AI Assistant
-            <div className="flex items-center gap-2 ml-auto">
+            <div className="flex items-center gap-1.5 ml-auto">
               <div className={`w-2 h-2 rounded-full ${serviceStatus.isRunning ? 'bg-green-500' : 'bg-red-500'}`}></div>
-              <span className="text-xs text-gray-600 dark:text-slate-400">
+              <span className="text-xs text-[#768396] dark:text-[#898999]">
                 {serviceStatus.isRunning ? `Service Running (Port ${serviceStatus.port})` : 'Service Offline'}
               </span>
               <Button
                 variant="ghost"
                 size="sm"
                 onClick={() => setShowResetConfirm(true)}
-                className="text-gray-600 dark:text-slate-400 hover:text-red-600 dark:hover:text-red-400 hover:bg-red-100 dark:hover:bg-red-900/20 p-1 h-8 w-8"
+                className="text-[#768396] dark:text-[#898999] hover:text-[#FF6B6B] hover:bg-[#FF6B6B]/10 p-0.5 h-7 w-7"
                 title="Reset conversation"
               >
                 <RotateCcw className="h-4 w-4" />
@@ -232,25 +232,25 @@ const handleResetConversation = async () => {
             </div>
           </CardTitle>
         </CardHeader>
-        <CardContent className="space-y-4">
+        <CardContent className="space-y-3">
           {/* Messages Area */}
-          <ScrollArea className="h-96 w-full rounded-lg bg-gray-50 dark:bg-slate-900/50 border border-gray-200 dark:border-slate-700/50">
-            <div className="p-4 space-y-4">
+          <ScrollArea className="h-96 w-full rounded-lg bg-[#F4F7FE] dark:bg-[#1E1F25] border border-[#E8EDF1] dark:border-[#282932]">
+            <div className="p-3 space-y-3">
               {messages.map((message) => (
                 <div
                   key={message.id}
-                  className={`flex gap-3 ${message.type === 'user' ? 'justify-end' : 'justify-start'}`}
+                  className={`flex gap-2 ${message.type === 'user' ? 'justify-end' : 'justify-start'}`}
                 >
                   {message.type === 'bot' && (
-                    <div className="w-8 h-8 rounded-full bg-gradient-to-r from-cyan-500 to-blue-500 flex items-center justify-center flex-shrink-0">
+                    <div className="w-7 h-7 rounded-full bg-gradient-to-r from-[#5051F9] to-[#1EA7FF] flex items-center justify-center flex-shrink-0">
                       <Bot className="w-4 h-4 text-white" />
                     </div>
                   )}
                   <div
-                    className={`max-w-[80%] rounded-lg px-4 py-3 ${
+                    className={`max-w-[80%] rounded-lg px-3 py-2 ${
                       message.type === 'user'
-                        ? 'bg-gradient-to-r from-cyan-600 to-blue-600 text-white'
-                        : 'bg-gray-200 dark:bg-slate-800/70 border border-gray-300 dark:border-slate-700/50 text-gray-900 dark:text-slate-200'
+                        ? 'bg-gradient-to-r from-[#5051F9] to-[#1EA7FF] text-white'
+                        : 'bg-white dark:bg-[#282932] border border-[#E8EDF1] dark:border-[#282932] text-[#232360] dark:text-white'
                     }`}
                   >
                     {message.type === 'bot' ? (
@@ -261,16 +261,16 @@ const handleResetConversation = async () => {
                           components={{
                             // Custom styling for markdown elements
                             p: ({ children }) => <p className="mb-2 last:mb-0">{children}</p>,
-                            h1: ({ children }) => <h1 className="text-lg font-bold mb-2 text-cyan-400">{children}</h1>,
-                            h2: ({ children }) => <h2 className="text-md font-semibold mb-2 text-cyan-300">{children}</h2>,
-                            h3: ({ children }) => <h3 className="text-sm font-semibold mb-1 text-cyan-300">{children}</h3>,
+                            h1: ({ children }) => <h1 className="text-lg font-bold mb-2 text-[#5051F9]">{children}</h1>,
+                            h2: ({ children }) => <h2 className="text-md font-semibold mb-2 text-[#5051F9]">{children}</h2>,
+                            h3: ({ children }) => <h3 className="text-sm font-semibold mb-1 text-[#5051F9]">{children}</h3>,
                             ul: ({ children }) => <ul className="list-disc list-inside mb-2 space-y-1">{children}</ul>,
                             ol: ({ children }) => <ol className="list-decimal list-inside mb-2 space-y-1">{children}</ol>,
-                            li: ({ children }) => <li className="text-gray-800 dark:text-slate-300">{children}</li>,
+                            li: ({ children }) => <li className="text-[#232360] dark:text-white">{children}</li>,
                             code: ({ children, className }) => {
                               const isInline = !className;
                               return isInline ? (
-                                <code className="bg-gray-200 dark:bg-slate-900/50 text-cyan-700 dark:text-cyan-400 px-1 py-0.5 rounded text-xs font-mono">
+                                <code className="bg-[#F4F7FE] dark:bg-[#1E1F25] text-[#5051F9] px-1 py-0.5 rounded text-xs font-mono">
                                   {children}
                                 </code>
                               ) : (
@@ -278,41 +278,41 @@ const handleResetConversation = async () => {
                               );
                             },
                             pre: ({ children }) => (
-                              <pre className="bg-gray-100 dark:bg-slate-900/80 border border-gray-300 dark:border-slate-600/50 rounded-md p-3 mb-2 overflow-x-auto custom-scrollbar">
+                              <pre className="bg-[#F4F7FE] dark:bg-[#1E1F25] border border-[#E8EDF1] dark:border-[#282932] rounded-md p-3 mb-2 overflow-x-auto custom-scrollbar">
                                 {children}
                               </pre>
                             ),
                             blockquote: ({ children }) => (
-                              <blockquote className="border-l-4 border-cyan-500/50 pl-4 italic text-gray-700 dark:text-slate-300 mb-2">
+                              <blockquote className="border-l-4 border-[#5051F9]/50 pl-4 italic text-[#768396] dark:text-[#898999] mb-2">
                                 {children}
                               </blockquote>
                             ),
-                            strong: ({ children }) => <strong className="text-gray-900 dark:text-white font-semibold">{children}</strong>,
-                            em: ({ children }) => <em className="text-cyan-300">{children}</em>,
+                            strong: ({ children }) => <strong className="text-[#232360] dark:text-white font-semibold">{children}</strong>,
+                            em: ({ children }) => <em className="text-[#5051F9]">{children}</em>,
                             a: ({ children, href }) => (
                               <a 
                                 href={href} 
                                 target="_blank" 
                                 rel="noopener noreferrer"
-                                className="text-cyan-600 dark:text-cyan-400 hover:text-cyan-700 dark:hover:text-cyan-300 underline"
+                                className="text-[#5051F9] hover:text-[#1EA7FF] underline"
                               >
                                 {children}
                               </a>
                             ),
                             table: ({ children }) => (
                               <div className="overflow-x-auto mb-2 custom-scrollbar">
-                                <table className="min-w-full border-collapse border border-gray-300 dark:border-slate-600">
+                                <table className="min-w-full border-collapse border border-[#E8EDF1] dark:border-[#282932]">
                                   {children}
                                 </table>
                               </div>
                             ),
                             th: ({ children }) => (
-                              <th className="border border-gray-300 dark:border-slate-600 px-3 py-2 bg-gray-200 dark:bg-slate-700/50 text-left font-semibold text-cyan-700 dark:text-cyan-300">
+                              <th className="border border-[#E8EDF1] dark:border-[#282932] px-3 py-2 bg-[#F4F7FE] dark:bg-[#1E1F25] text-left font-semibold text-[#5051F9]">
                                 {children}
                               </th>
                             ),
                             td: ({ children }) => (
-                              <td className="border border-gray-300 dark:border-slate-600 px-3 py-2 text-gray-800 dark:text-slate-300">
+                              <td className="border border-[#E8EDF1] dark:border-[#282932] px-3 py-2 text-[#232360] dark:text-white">
                                 {children}
                               </td>
                             )
@@ -325,13 +325,13 @@ const handleResetConversation = async () => {
                       <p className="text-sm leading-relaxed">{message.content}</p>
                     )}
                     <p className={`text-xs mt-2 ${
-                      message.type === 'user' ? 'text-cyan-100' : 'text-gray-600 dark:text-slate-500'
+                      message.type === 'user' ? 'text-white/70' : 'text-[#768396] dark:text-[#898999]'
                     }`}>
                       {formatTime(message.timestamp)}
                     </p>
                   </div>
                   {message.type === 'user' && (
-                    <div className="w-8 h-8 rounded-full bg-gradient-to-r from-gray-400 to-gray-500 dark:from-slate-600 dark:to-slate-700 flex items-center justify-center flex-shrink-0">
+                    <div className="w-8 h-8 rounded-full bg-gradient-to-r from-[#768396] to-[#5F6388] flex items-center justify-center flex-shrink-0">
                       <User className="w-4 h-4 text-white" />
                     </div>
                   )}
@@ -339,14 +339,14 @@ const handleResetConversation = async () => {
               ))}
               {isLoading && (
                 <div className="flex gap-3 justify-start">
-                  <div className="w-8 h-8 rounded-full bg-gradient-to-r from-cyan-500 to-blue-500 flex items-center justify-center flex-shrink-0">
+                  <div className="w-8 h-8 rounded-full bg-gradient-to-r from-[#5051F9] to-[#1EA7FF] flex items-center justify-center flex-shrink-0">
                     <Bot className="w-4 h-4 text-white" />
                   </div>
-                  <div className="bg-gray-200 dark:bg-slate-800/70 border border-gray-300 dark:border-slate-700/50 rounded-lg px-4 py-3">
+                  <div className="bg-white dark:bg-[#282932] border border-[#E8EDF1] dark:border-[#282932] rounded-lg px-4 py-3">
                     <div className="flex space-x-1">
-                      <div className="w-2 h-2 bg-cyan-500 rounded-full animate-bounce"></div>
-                      <div className="w-2 h-2 bg-cyan-500 rounded-full animate-bounce" style={{ animationDelay: '0.1s' }}></div>
-                      <div className="w-2 h-2 bg-cyan-500 rounded-full animate-bounce" style={{ animationDelay: '0.2s' }}></div>
+                      <div className="w-2 h-2 bg-[#5051F9] rounded-full animate-bounce"></div>
+                      <div className="w-2 h-2 bg-[#5051F9] rounded-full animate-bounce" style={{ animationDelay: '0.1s' }}></div>
+                      <div className="w-2 h-2 bg-[#5051F9] rounded-full animate-bounce" style={{ animationDelay: '0.2s' }}></div>
                     </div>
                   </div>
                 </div>
@@ -357,14 +357,14 @@ const handleResetConversation = async () => {
 
           {/* Suggested Prompts */}
           <div className="space-y-2">
-            <p className="text-xs text-gray-600 dark:text-slate-500 font-mono">SUGGESTED PROMPTS</p>
+            <p className="text-xs text-[#768396] dark:text-[#898999] font-mono">SUGGESTED PROMPTS</p>
             <div className="flex flex-wrap gap-2">
               {suggestedPrompts.map((prompt, index) => (
                 <Button
                   key={index}
                   variant="outline"
                   size="sm"
-                  className="text-xs bg-gray-100 dark:bg-slate-800/50 border-gray-300 dark:border-slate-700/50 hover:bg-gray-200 dark:hover:bg-slate-700/50 hover:border-cyan-500/50 text-gray-700 dark:text-slate-300"
+                  className="text-xs bg-[#F4F7FE] dark:bg-[#282932] border-[#E8EDF1] dark:border-[#282932] hover:bg-white dark:hover:bg-[#212329] hover:border-[#5051F9]/50 text-[#232360] dark:text-white"
                   onClick={() => setInputMessage(prompt)}
                 >
                   {prompt}
@@ -382,14 +382,14 @@ const handleResetConversation = async () => {
                 onChange={(e) => setInputMessage(e.target.value)}
                 onKeyPress={handleKeyPress}
                 placeholder="Ask about your productivity patterns, request insights, or get a summary..."
-                className="w-full min-h-[60px] max-h-32 px-4 py-3 bg-gray-50 dark:bg-slate-900/70 border border-gray-300 dark:border-slate-700/50 rounded-lg text-gray-900 dark:text-slate-200 placeholder-gray-500 dark:placeholder-slate-500 resize-none focus:outline-none focus:ring-2 focus:ring-cyan-500/50 focus:border-transparent"
+                className="w-full min-h-[60px] max-h-32 px-4 py-3 bg-[#F4F7FE] dark:bg-[#1E1F25] border border-[#E8EDF1] dark:border-[#282932] rounded-lg text-[#232360] dark:text-white placeholder-[#768396] dark:placeholder-[#768396] resize-none focus:outline-none focus:ring-2 focus:ring-[#5051F9]/50 focus:border-transparent"
                 disabled={isLoading}
               />
             </div>
             <Button
               onClick={handleSendMessage}
               disabled={!inputMessage.trim() || isLoading}
-              className="px-4 bg-gradient-to-r from-cyan-600 to-blue-600 hover:from-cyan-500 hover:to-blue-500 text-white self-end"
+              className="px-4 bg-gradient-to-r from-[#5051F9] to-[#1EA7FF] hover:from-[#4142E0] hover:to-[#1890D6] text-white self-end"
             >
               <Send className="w-4 h-4" />
             </Button>
@@ -400,28 +400,28 @@ const handleResetConversation = async () => {
       {/* Reset Confirmation Dialog */}
       {showResetConfirm && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-          <Card className="bg-white dark:bg-slate-800 border-gray-300 dark:border-slate-700 w-96">
+          <Card className="bg-white dark:bg-[#212329] border-[#E8EDF1] dark:border-[#282932] w-96">
             <CardHeader>
-              <CardTitle className="text-gray-900 dark:text-slate-200 flex items-center gap-2">
-                <RotateCcw className="h-5 w-5 text-red-500 dark:text-red-400" />
+              <CardTitle className="text-[#232360] dark:text-white flex items-center gap-2">
+                <RotateCcw className="h-5 w-5 text-[#FF6B6B]" />
                 Reset Conversation
               </CardTitle>
             </CardHeader>
             <CardContent className="space-y-4">
-              <p className="text-gray-700 dark:text-slate-300">
+              <p className="text-[#768396] dark:text-[#898999]">
                 Are you sure you want to clear the entire conversation? This action cannot be undone.
               </p>
               <div className="flex gap-3 justify-end">
                 <Button
                   variant="outline"
                   onClick={() => setShowResetConfirm(false)}
-                  className="bg-gray-100 dark:bg-slate-700 border-gray-300 dark:border-slate-600 text-gray-700 dark:text-slate-300 hover:bg-gray-200 dark:hover:bg-slate-600"
+                  className="bg-[#F4F7FE] dark:bg-[#282932] border-[#E8EDF1] dark:border-[#282932] text-[#232360] dark:text-white hover:bg-[#E8EDF1] dark:hover:bg-[#1E1F25]"
                 >
                   Cancel
                 </Button>
                 <Button
                   onClick={handleResetConversation}
-                  className="bg-red-600 hover:bg-red-500 text-white"
+                  className="bg-[#FF6B6B] hover:bg-[#E65C5C] text-white"
                 >
                   Reset Chat
                 </Button>

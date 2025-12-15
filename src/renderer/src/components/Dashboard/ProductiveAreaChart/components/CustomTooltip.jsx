@@ -6,6 +6,8 @@
  *
  * Props:
  * - active: Boolean indicating if tooltip should be shown
+ * - payload: Data from Recharts for the hovered point
+ * - label: The label of the hovered point
  * - aggregatedData: Object with productive, unproductive, and total time
  * - hasSelection: Boolean indicating if there's an active selection
  * - zoomLevel: Current zoom level for contextual title
@@ -15,40 +17,53 @@
 import React from 'react'
 import { formatTooltipValue, getTooltipTitle } from '../utils/selectionUtils'
 
-const CustomTooltip = ({ active, aggregatedData, hasSelection, zoomLevel, zoomLevelDetail }) => {
-  if (!active) return null
+const CustomTooltip = ({ active, payload, label, aggregatedData, hasSelection, zoomLevel, zoomLevelDetail }) => {
+  if (!active || !payload || payload.length === 0) return null
 
-  const productiveTime = formatTooltipValue(aggregatedData.productive)
-  const unproductiveTime = formatTooltipValue(aggregatedData.unproductive)
-  const totalTime = formatTooltipValue(aggregatedData.total)
+  // Get the data for the hovered point
+  const pointData = payload[0]?.payload || {}
+  const productiveSeconds = pointData.productive || 0
+  const unproductiveSeconds = pointData.unproductive || 0
+  const totalSeconds = productiveSeconds + unproductiveSeconds
+
+  const productiveTime = formatTooltipValue(productiveSeconds)
+  const unproductiveTime = formatTooltipValue(unproductiveSeconds)
+  const totalTime = formatTooltipValue(totalSeconds)
   const productivePercentage =
-    aggregatedData.total > 0
-      ? Math.round((aggregatedData.productive / aggregatedData.total) * 100)
+    totalSeconds > 0
+      ? Math.round((productiveSeconds / totalSeconds) * 100)
       : 0
 
   return (
-    <div className="bg-white dark:bg-meta-gray-800 p-3 rounded-lg border border-meta-gray-200 dark:border-meta-gray-700 shadow-lg">
-      <p className="text-meta-gray-900 dark:text-meta-gray-100 font-medium mb-2">{getTooltipTitle(hasSelection, zoomLevel)}</p>
-      <div className="text-xs text-meta-gray-500 dark:text-meta-gray-400 mb-2">{zoomLevelDetail}</div>
-      <div className="space-y-1">
-        <div className="flex items-center gap-2">
-          <div className="w-3 h-3 rounded-full bg-meta-green-500" />
-          <span className="text-meta-gray-600 dark:text-meta-gray-300">Productive: </span>
-          <span className="text-meta-gray-900 dark:text-white">{productiveTime}</span>
+    <div className="bg-white dark:bg-[#1a1b23] p-3 rounded-lg border border-slate-200 dark:border-slate-700 shadow-lg min-w-[180px]">
+      <p className="text-slate-900 dark:text-white font-medium mb-2">{label}</p>
+      <div className="space-y-1.5">
+        <div className="flex items-center justify-between gap-4">
+          <div className="flex items-center gap-2">
+            <div className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: '#5051F9' }} />
+            <span className="text-slate-500 dark:text-slate-400 text-sm">Productive:</span>
+          </div>
+          <span className="text-slate-900 dark:text-white text-sm font-medium">{productiveTime}</span>
         </div>
-        <div className="flex items-center gap-2">
-          <div className="w-3 h-3 rounded-full bg-meta-red-500" />
-          <span className="text-meta-gray-600 dark:text-meta-gray-300">Unproductive: </span>
-          <span className="text-meta-gray-900 dark:text-white">{unproductiveTime}</span>
+        <div className="flex items-center justify-between gap-4">
+          <div className="flex items-center gap-2">
+            <div className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: '#FF6B6B' }} />
+            <span className="text-slate-500 dark:text-slate-400 text-sm">Unproductive:</span>
+          </div>
+          <span className="text-slate-900 dark:text-white text-sm font-medium">{unproductiveTime}</span>
         </div>
-        <div className="flex items-center gap-2 pt-1 border-t border-meta-gray-200 dark:border-meta-gray-600">
-          <span className="text-meta-gray-600 dark:text-meta-gray-300">Total: </span>
-          <span className="text-meta-blue-600 dark:text-meta-blue-400 font-medium">{totalTime}</span>
+        <div className="flex items-center justify-between gap-4 pt-1.5 mt-1.5 border-t border-slate-200 dark:border-slate-700">
+          <span className="text-slate-500 dark:text-slate-400 text-sm">Total:</span>
+          <span className="text-[#5051F9] text-sm font-medium">{totalTime}</span>
         </div>
-        <div className="flex items-center gap-2">
-          <span className="text-meta-gray-600 dark:text-meta-gray-300">Productivity: </span>
-          <span className="text-meta-green-600 dark:text-meta-green-400 font-medium">{productivePercentage}%</span>
-        </div>
+        {totalSeconds > 0 && (
+          <div className="flex items-center justify-between gap-4">
+            <span className="text-slate-500 dark:text-slate-400 text-sm">Productivity:</span>
+            <span className={`text-sm font-medium ${productivePercentage >= 50 ? 'text-[#5051F9]' : 'text-[#FF6B6B]'}`}>
+              {productivePercentage}%
+            </span>
+          </div>
+        )}
       </div>
     </div>
   )

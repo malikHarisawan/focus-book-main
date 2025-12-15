@@ -65,6 +65,19 @@ export default function AppUsageTable() {
     loadApps()
     handleVisibilityChange()
     document.addEventListener('visibilitychange', handleVisibilityChange)
+    
+    // Listen for category updates (in case of multiple windows or external updates)
+    const removeCategoryListener = window.activeWindow.onCategoryUpdated((data) => {
+      console.log('Activity page received category update:', data)
+      loadApps()
+    })
+    
+    return () => {
+      document.removeEventListener('visibilitychange', handleVisibilityChange)
+      if (removeCategoryListener) {
+        removeCategoryListener()
+      }
+    }
   }, [selectedDate])
 
   function handleVisibilityChange() {
@@ -240,10 +253,10 @@ export default function AppUsageTable() {
   }
   return (
     <Card className="bg-background/50 border-border/50 backdrop-blur-sm">
-      <CardHeader className="border-b border-border/50 pb-3">
+      <CardHeader className="border-b border-border/50 pb-2">
         <div className="flex items-center justify-between">
-          <CardTitle className="text-foreground">Application Usage</CardTitle>
-          <div className="flex items-center space-x-2">
+          <CardTitle className="text-foreground text-base">Application Usage</CardTitle>
+          <div className="flex items-center space-x-1.5">
             <div className="relative inline-flex items-center bg-muted/50 text-primary border border-primary/50 text-xs px-2 py-1 rounded-md">
               <input
                 type="date"
@@ -296,8 +309,8 @@ export default function AppUsageTable() {
       </CardHeader>
       <CardContent className="p-0">
         <Tabs defaultValue="table" className="w-full">
-          <div className="px-6 pt-6 pb-2 flex items-center justify-between">
-            <TabsList className="bg-muted/50 p-1">
+          <div className="px-4 pt-4 pb-2 flex items-center justify-between">
+            <TabsList className="bg-muted/50 p-0.5">
               <TabsTrigger
                 value="table"
                 className="data-[state=active]:bg-muted data-[state=active]:text-primary"
