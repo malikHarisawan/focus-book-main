@@ -74,6 +74,9 @@ export default function ProductivityOverview() {
   }
   const loadAndProcessData = async () => {
     const jsonData = await window.activeWindow.getAppUsageStats()
+    console.log('📊 Raw JSON Data:', jsonData)
+    console.log('📅 Selected Date:', selectedDate)
+    console.log('📅 Available dates in data:', jsonData ? Object.keys(jsonData) : 'No data')
     setRawData(jsonData)
     const appsData = formatAppsData(jsonData, selectedDate, false) // Default to summary view
     setApps(appsData)
@@ -81,7 +84,8 @@ export default function ProductivityOverview() {
     setChartData(processedChartData)
 
     const processedProductiveChartData = processProductiveChartData(jsonData, selectedDate, 'hour')
-    console.log('Area Chart data', processedProductiveChartData)
+    console.log('📈 Area Chart data:', processedProductiveChartData)
+    console.log('📈 Data length:', processedProductiveChartData ? processedProductiveChartData.length : 0)
     setProductiveData(processedProductiveChartData)
 
     const processedAppsData = processMostUsedApps(jsonData, selectedDate, false) // Default to summary view
@@ -190,8 +194,8 @@ export default function ProductivityOverview() {
   }
 
   return (
-    <Card className="bg-white border-[#E8EDF1] shadow-sm dark:bg-[#212329] dark:border-[#282932] backdrop-blur-sm overflow-hidden transition-colors h-full">
-      <CardHeader className="border-b bg-white border-[#E8EDF1] dark:bg-[#212329] dark:border-[#282932] py-3 px-4">
+    <Card className="bg-white border-[#E8EDF1] shadow-sm dark:bg-[#212329] dark:border-[#282932] backdrop-blur-sm overflow-hidden transition-colors">
+      <CardHeader className="border-b bg-white border-[#E8EDF1] dark:bg-[#212329] dark:border-[#282932] py-2 px-3">
         <div className="flex flex-col lg:flex-row items-start lg:items-center justify-between gap-3">
           <CardTitle className="text-[#232360] dark:text-white flex items-center font-medium tracking-tight">
             <Activity className="mr-2 h-5 w-5 text-[#5051F9] flex-shrink-0" />
@@ -211,9 +215,9 @@ export default function ProductivityOverview() {
           </div>
         </div>
       </CardHeader>
-      <CardContent className="p-3 dark:bg-[#1E1F25] bg-[#F4F7FE]">
+      <CardContent className="p-2 dark:bg-[#1E1F25] bg-[#F4F7FE]">
         {/* Compact Single Row Summary */}
-        <div className="mb-2 rounded-xl p-3 bg-white dark:bg-[#212329] border border-[#E8EDF1] dark:border-[#282932] shadow-sm">
+        <div className="mb-2 rounded-xl p-2 bg-white dark:bg-[#212329] border border-[#E8EDF1] dark:border-[#282932] shadow-sm">
           {/* Header Row: Score + Total Time */}
           <div className="flex items-center justify-between mb-2">
             <div className="flex items-center gap-2">
@@ -275,28 +279,6 @@ export default function ProductivityOverview() {
                 Total Screen Time
               </div>
             </div>
-          </div>
-
-          {/* Stacked Progress Bar */}
-          <div className="relative w-full rounded-full h-2 overflow-hidden bg-[#E8EDF1] dark:bg-[#282932] mb-2">
-            <div
-              className="absolute top-0 left-0 h-full bg-gradient-to-r from-[#5051F9] to-[#1EA7FF] transition-all duration-500"
-              style={{ width: `${isNaN(productivePercentage) ? 0 : productivePercentage}%` }}
-            ></div>
-            <div
-              className="absolute top-0 h-full bg-gradient-to-r from-[#1EA7FF] to-[#5CBBFF] transition-all duration-500"
-              style={{
-                left: `${isNaN(productivePercentage) ? 0 : productivePercentage}%`,
-                width: `${isNaN(neutralPercentage) ? 0 : neutralPercentage}%`
-              }}
-            ></div>
-            <div
-              className="absolute top-0 h-full bg-gradient-to-r from-[#FF6B6B] to-[#FF9999] transition-all duration-500"
-              style={{
-                left: `${(isNaN(productivePercentage) ? 0 : productivePercentage) + (isNaN(neutralPercentage) ? 0 : neutralPercentage)}%`,
-                width: `${isNaN(distractingPercentage) ? 0 : distractingPercentage}%`
-              }}
-            ></div>
           </div>
 
           {/* Time Breakdown - Horizontal Pills */}
@@ -372,7 +354,7 @@ export default function ProductivityOverview() {
             </div>
 
             <TabsContent value="applications" className="mt-0">
-              <div className="rounded-2xl border overflow-hidden h-48 sm:h-52 lg:h-56 flex flex-col bg-white border-[#E8EDF1] dark:bg-[#212329] dark:border-[#282932]">
+              <div className="rounded-2xl border overflow-hidden min-h-[300px] max-h-[600px] flex flex-col bg-white border-[#E8EDF1] dark:bg-[#212329] dark:border-[#282932]">
                 <div className="grid grid-cols-12 text-xs p-2 border-b flex-shrink-0 text-[#768396] dark:text-[#898999] font-normal border-[#E8EDF1] bg-[#F4F7FE] dark:border-[#282932] dark:bg-[#282932]">
                   <div className="col-span-4 sm:col-span-5">Application</div>
                   <div className="col-span-2 hidden sm:block">Category</div>
@@ -411,7 +393,7 @@ export default function ProductivityOverview() {
             </TabsContent>
 
             <TabsContent value="categories" className="mt-0">
-              <div className="h-72 lg:h-80 w-full relative rounded-2xl overflow-hidden bg-white dark:bg-[#212329] border border-[#E8EDF1] dark:border-[#282932]">
+              <div className="h-[280px] w-full relative rounded-2xl overflow-hidden bg-white dark:bg-[#212329] border border-[#E8EDF1] dark:border-[#282932]">
                 <ProductiveAreaChart
                   data={productiveData}
                   rawData={rawData}
@@ -517,7 +499,7 @@ function AppUsageRow({ name, category, timeSpent, timePercent = 100, productivit
       {/* Inline Breakdown - Minimalistic */}
       {isExpanded && detailedData.length > 0 && (
         <div className="bg-meta-gray-50 dark:bg-dark-bg-secondary px-4 sm:px-6 py-2 border-t border-meta-gray-200 dark:border-dark-border-primary">
-          <div className="space-y-1 max-h-32 overflow-y-auto custom-scrollbar">
+          <div className="space-y-1 max-h-48 overflow-y-auto custom-scrollbar">
             {detailedData.map((detail, index) => (
               <div key={index} className="flex items-center justify-between py-1.5 text-xs">
                 <div className="flex-1 text-meta-gray-700 dark:text-dark-text-secondary truncate pr-3 pl-4">

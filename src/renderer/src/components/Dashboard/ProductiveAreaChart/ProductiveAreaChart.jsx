@@ -289,16 +289,20 @@ const ProductiveAreaChart = ({
   }
 
   return (
-    <div ref={containerRef} className="bg-white dark:bg-[#1a1b23] p-4 rounded-xl border border-slate-200 dark:border-slate-700/30" tabIndex={0}>
-      {/* Clean Header with Tabs */}
-      <div className="flex items-center justify-between mb-6">
-        <h3 className="text-slate-700 dark:text-white text-base font-medium">Productivity Over Time</h3>
-        
+    <div
+      ref={containerRef}
+      className="bg-white dark:bg-[#1a1b23] p-3 rounded-xl border border-slate-200 dark:border-slate-700/30 h-full flex flex-col"
+      tabIndex={0}
+    >
+      {/* Compact Header with Tabs */}
+      <div className="flex items-center justify-between mb-3">
+        <h3 className="text-slate-700 dark:text-white text-sm font-medium leading-tight">Productivity Over Time</h3>
+
         {/* Tab Navigation - Daily/Weekly/Monthly */}
         <div className="flex items-center gap-1">
           <button
             onClick={() => handleBreadcrumbClick('hour')}
-            className={`px-4 py-1.5 text-sm font-medium transition-all ${
+            className={`px-3 py-1 text-xs font-medium transition-all ${
               zoomLevel === 'hour' || zoomLevel === 'day'
                 ? 'text-[#5051F9] border-b-2 border-[#5051F9]'
                 : 'text-[#768396] dark:text-[#898999] hover:text-[#232360] dark:hover:text-white border-b-2 border-transparent'
@@ -308,7 +312,7 @@ const ProductiveAreaChart = ({
           </button>
           <button
             onClick={() => handleBreadcrumbClick('week')}
-            className={`px-4 py-1.5 text-sm font-medium transition-all ${
+            className={`px-3 py-1 text-xs font-medium transition-all ${
               zoomLevel === 'week'
                 ? 'text-[#5051F9] border-b-2 border-[#5051F9]'
                 : 'text-[#768396] dark:text-[#898999] hover:text-[#232360] dark:hover:text-white border-b-2 border-transparent'
@@ -318,7 +322,7 @@ const ProductiveAreaChart = ({
           </button>
           <button
             onClick={() => handleBreadcrumbClick('month')}
-            className={`px-4 py-1.5 text-sm font-medium transition-all ${
+            className={`px-3 py-1 text-xs font-medium transition-all ${
               zoomLevel === 'month'
                 ? 'text-[#5051F9] border-b-2 border-[#5051F9]'
                 : 'text-[#768396] dark:text-[#898999] hover:text-[#232360] dark:hover:text-white border-b-2 border-transparent'
@@ -329,16 +333,17 @@ const ProductiveAreaChart = ({
         </div>
       </div>
 
-      <ResponsiveContainer width="100%" height={280}>
-        <AreaChart
-          ref={chartRef}
-          data={currentData}
-          margin={{ top: 20, right: 30, left: 10, bottom: 10 }}
-          onMouseDown={onMouseDown}
-          onMouseMove={onMouseMove}
-          onMouseUp={onMouseUp}
-          style={{ backgroundColor: 'transparent' }}
-        >
+      <div className="flex-1 min-h-[180px]">
+        <ResponsiveContainer width="100%" height="100%">
+          <AreaChart
+            ref={chartRef}
+            data={currentData}
+            margin={{ top: 8, right: 16, left: 8, bottom: 20 }}
+            onMouseDown={onMouseDown}
+            onMouseMove={onMouseMove}
+            onMouseUp={onMouseUp}
+            style={{ backgroundColor: 'transparent' }}
+          >
           <defs>
             {/* Productive gradient - Primary Purple #5051F9 */}
             <linearGradient id="colorProductive" x1="0" y1="0" x2="0" y2="1">
@@ -356,10 +361,11 @@ const ProductiveAreaChart = ({
           <XAxis
             dataKey="day"
             stroke="transparent"
-            tick={{ fill: '#94a3b8', fontSize: 11, fontWeight: 400 }}
+            tick={{ fill: '#FFFFFF', fontSize: 11, fontWeight: 500 }}
             tickLine={false}
             axisLine={false}
-            dy={10}
+            dy={2}
+            interval={Math.max(0, Math.floor((currentData?.length || 24) / 8))}
             style={{ userSelect: 'none', WebkitUserSelect: 'none', MozUserSelect: 'none' }}
           />
           <YAxis 
@@ -373,6 +379,8 @@ const ProductiveAreaChart = ({
           <Tooltip
             content={<CustomTooltip />}
             cursor={{ stroke: 'rgba(80, 81, 249, 0.3)', strokeWidth: 1 }}
+            position={{ y: -30 }}
+            wrapperStyle={{ outline: 'none' }}
           />
           <Area
             type="monotoneX"
@@ -381,8 +389,8 @@ const ProductiveAreaChart = ({
             stroke="#5051F9"
             strokeWidth={2.5}
             fill="url(#colorProductive)"
-            dot={{ fill: '#5051F9', stroke: '#fff', strokeWidth: 2, r: 4 }}
-            activeDot={{ fill: '#6B6CFA', stroke: '#fff', strokeWidth: 2, r: 6 }}
+            dot={false}
+            activeDot={false}
           />
           <Area
             type="monotoneX"
@@ -391,8 +399,8 @@ const ProductiveAreaChart = ({
             stroke="#FF6B6B"
             strokeWidth={2.5}
             fill="url(#colorUnproductive)"
-            dot={{ fill: '#FF6B6B', stroke: '#fff', strokeWidth: 2, r: 4 }}
-            activeDot={{ fill: '#FF8A8A', stroke: '#fff', strokeWidth: 2, r: 6 }}
+            dot={false}
+            activeDot={false}
           />
           {isDragging && dragStart && dragEnd && (
             <ReferenceArea
@@ -416,7 +424,8 @@ const ProductiveAreaChart = ({
             />
           )}
         </AreaChart>
-      </ResponsiveContainer>
+        </ResponsiveContainer>
+      </div>
     </div>
   )
 }
