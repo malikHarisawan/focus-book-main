@@ -200,30 +200,30 @@ const handleResetConversation = async () => {
     <div className="space-y-4">
       {/* Header */}
       <div>
-        <h1 className="text-2xl font-bold bg-gradient-to-r from-[#5051F9] to-[#1EA7FF] bg-clip-text text-transparent">
+        <h1 className="text-2xl font-bold bg-gradient-to-r from-[#5051F9] to-[#22D3EE] bg-clip-text text-transparent">
           AI Insights
         </h1>
-        <p className="text-[#768396] dark:text-[#898999] mt-1">
+        <p className="text-[#768396] dark:text-[#94A3B8] mt-1">
           Get personalized insights and summaries about your productivity patterns
         </p>
       </div>
 
       {/* Chat Container */}
-      <Card className="bg-white dark:bg-[#212329] border-[#E8EDF1] dark:border-[#282932] backdrop-blur-sm">
+      <Card className="bg-white dark:bg-[#0B1220] border-[#E8EDF1] dark:border-[#1E293B] backdrop-blur-sm">
         <CardHeader className="pb-3">
           <CardTitle className="flex items-center gap-2 text-[#232360] dark:text-white text-base">
             <MessageSquare className="h-5 w-5 text-[#5051F9]" />
             Chat with AI Assistant
             <div className="flex items-center gap-1.5 ml-auto">
               <div className={`w-2 h-2 rounded-full ${serviceStatus.isRunning ? 'bg-green-500' : 'bg-red-500'}`}></div>
-              <span className="text-xs text-[#768396] dark:text-[#898999]">
+              <span className="text-xs text-[#768396] dark:text-[#94A3B8]">
                 {serviceStatus.isRunning ? `Service Running (Port ${serviceStatus.port})` : 'Service Offline'}
               </span>
               <Button
                 variant="ghost"
                 size="sm"
                 onClick={() => setShowResetConfirm(true)}
-                className="text-[#768396] dark:text-[#898999] hover:text-[#FF6B6B] hover:bg-[#FF6B6B]/10 p-0.5 h-7 w-7"
+                className="text-[#768396] dark:text-[#94A3B8] hover:text-[#FF6B6B] hover:bg-[#FF6B6B]/10 p-0.5 h-7 w-7"
                 title="Reset conversation"
               >
                 <RotateCcw className="h-4 w-4" />
@@ -234,7 +234,7 @@ const handleResetConversation = async () => {
         </CardHeader>
         <CardContent className="space-y-3">
           {/* Messages Area */}
-          <ScrollArea className="h-96 w-full rounded-lg bg-[#F4F7FE] dark:bg-[#1E1F25] border border-[#E8EDF1] dark:border-[#282932]">
+          <ScrollArea className="h-96 w-full rounded-lg bg-[#F4F7FE] dark:bg-[#05070D] border border-[#E8EDF1] dark:border-[#1E293B]">
             <div className="p-3 space-y-3">
               {messages.map((message) => (
                 <div
@@ -242,15 +242,15 @@ const handleResetConversation = async () => {
                   className={`flex gap-2 ${message.type === 'user' ? 'justify-end' : 'justify-start'}`}
                 >
                   {message.type === 'bot' && (
-                    <div className="w-7 h-7 rounded-full bg-gradient-to-r from-[#5051F9] to-[#1EA7FF] flex items-center justify-center flex-shrink-0">
+                    <div className="w-7 h-7 rounded-full bg-gradient-to-r from-[#5051F9] to-[#22D3EE] flex items-center justify-center flex-shrink-0">
                       <Bot className="w-4 h-4 text-white" />
                     </div>
                   )}
                   <div
                     className={`max-w-[80%] rounded-lg px-3 py-2 ${
                       message.type === 'user'
-                        ? 'bg-gradient-to-r from-[#5051F9] to-[#1EA7FF] text-white'
-                        : 'bg-white dark:bg-[#282932] border border-[#E8EDF1] dark:border-[#282932] text-[#232360] dark:text-white'
+                        ? 'bg-gradient-to-r from-[#5051F9] to-[#22D3EE] text-white'
+                        : 'bg-white dark:bg-[#1E293B] border border-[#E8EDF1] dark:border-[#1E293B] text-[#232360] dark:text-white'
                     }`}
                   >
                     {message.type === 'bot' ? (
@@ -270,7 +270,7 @@ const handleResetConversation = async () => {
                             code: ({ children, className }) => {
                               const isInline = !className;
                               return isInline ? (
-                                <code className="bg-[#F4F7FE] dark:bg-[#1E1F25] text-[#5051F9] px-1 py-0.5 rounded text-xs font-mono">
+                                <code className="bg-[#F4F7FE] dark:bg-[#05070D] text-[#5051F9] px-1 py-0.5 rounded text-xs font-mono">
                                   {children}
                                 </code>
                               ) : (
@@ -278,12 +278,12 @@ const handleResetConversation = async () => {
                               );
                             },
                             pre: ({ children }) => (
-                              <pre className="bg-[#F4F7FE] dark:bg-[#1E1F25] border border-[#E8EDF1] dark:border-[#282932] rounded-md p-3 mb-2 overflow-x-auto custom-scrollbar">
+                              <pre className="bg-[#F4F7FE] dark:bg-[#05070D] border border-[#E8EDF1] dark:border-[#1E293B] rounded-md p-3 mb-2 overflow-x-auto custom-scrollbar">
                                 {children}
                               </pre>
                             ),
                             blockquote: ({ children }) => (
-                              <blockquote className="border-l-4 border-[#5051F9]/50 pl-4 italic text-[#768396] dark:text-[#898999] mb-2">
+                              <blockquote className="border-l-4 border-[#5051F9]/50 pl-4 italic text-[#768396] dark:text-[#94A3B8] mb-2">
                                 {children}
                               </blockquote>
                             ),
@@ -294,25 +294,25 @@ const handleResetConversation = async () => {
                                 href={href} 
                                 target="_blank" 
                                 rel="noopener noreferrer"
-                                className="text-[#5051F9] hover:text-[#1EA7FF] underline"
+                                className="text-[#5051F9] hover:text-[#22D3EE] underline"
                               >
                                 {children}
                               </a>
                             ),
                             table: ({ children }) => (
                               <div className="overflow-x-auto mb-2 custom-scrollbar">
-                                <table className="min-w-full border-collapse border border-[#E8EDF1] dark:border-[#282932]">
+                                <table className="min-w-full border-collapse border border-[#E8EDF1] dark:border-[#1E293B]">
                                   {children}
                                 </table>
                               </div>
                             ),
                             th: ({ children }) => (
-                              <th className="border border-[#E8EDF1] dark:border-[#282932] px-3 py-2 bg-[#F4F7FE] dark:bg-[#1E1F25] text-left font-semibold text-[#5051F9]">
+                              <th className="border border-[#E8EDF1] dark:border-[#1E293B] px-3 py-2 bg-[#F4F7FE] dark:bg-[#05070D] text-left font-semibold text-[#5051F9]">
                                 {children}
                               </th>
                             ),
                             td: ({ children }) => (
-                              <td className="border border-[#E8EDF1] dark:border-[#282932] px-3 py-2 text-[#232360] dark:text-white">
+                              <td className="border border-[#E8EDF1] dark:border-[#1E293B] px-3 py-2 text-[#232360] dark:text-white">
                                 {children}
                               </td>
                             )
@@ -325,13 +325,13 @@ const handleResetConversation = async () => {
                       <p className="text-sm leading-relaxed">{message.content}</p>
                     )}
                     <p className={`text-xs mt-2 ${
-                      message.type === 'user' ? 'text-white/70' : 'text-[#768396] dark:text-[#898999]'
+                      message.type === 'user' ? 'text-white/70' : 'text-[#768396] dark:text-[#94A3B8]'
                     }`}>
                       {formatTime(message.timestamp)}
                     </p>
                   </div>
                   {message.type === 'user' && (
-                    <div className="w-8 h-8 rounded-full bg-gradient-to-r from-[#768396] to-[#5F6388] flex items-center justify-center flex-shrink-0">
+                    <div className="w-8 h-8 rounded-full bg-gradient-to-r from-[#768396] to-[#94A3B8] flex items-center justify-center flex-shrink-0">
                       <User className="w-4 h-4 text-white" />
                     </div>
                   )}
@@ -339,10 +339,10 @@ const handleResetConversation = async () => {
               ))}
               {isLoading && (
                 <div className="flex gap-3 justify-start">
-                  <div className="w-8 h-8 rounded-full bg-gradient-to-r from-[#5051F9] to-[#1EA7FF] flex items-center justify-center flex-shrink-0">
+                  <div className="w-8 h-8 rounded-full bg-gradient-to-r from-[#5051F9] to-[#22D3EE] flex items-center justify-center flex-shrink-0">
                     <Bot className="w-4 h-4 text-white" />
                   </div>
-                  <div className="bg-white dark:bg-[#282932] border border-[#E8EDF1] dark:border-[#282932] rounded-lg px-4 py-3">
+                  <div className="bg-white dark:bg-[#1E293B] border border-[#E8EDF1] dark:border-[#1E293B] rounded-lg px-4 py-3">
                     <div className="flex space-x-1">
                       <div className="w-2 h-2 bg-[#5051F9] rounded-full animate-bounce"></div>
                       <div className="w-2 h-2 bg-[#5051F9] rounded-full animate-bounce" style={{ animationDelay: '0.1s' }}></div>
@@ -357,14 +357,14 @@ const handleResetConversation = async () => {
 
           {/* Suggested Prompts */}
           <div className="space-y-2">
-            <p className="text-xs text-[#768396] dark:text-[#898999] font-mono">SUGGESTED PROMPTS</p>
+            <p className="text-xs text-[#768396] dark:text-[#94A3B8] font-mono">SUGGESTED PROMPTS</p>
             <div className="flex flex-wrap gap-2">
               {suggestedPrompts.map((prompt, index) => (
                 <Button
                   key={index}
                   variant="outline"
                   size="sm"
-                  className="text-xs bg-[#F4F7FE] dark:bg-[#282932] border-[#E8EDF1] dark:border-[#282932] hover:bg-white dark:hover:bg-[#212329] hover:border-[#5051F9]/50 text-[#232360] dark:text-white"
+                  className="text-xs bg-[#F4F7FE] dark:bg-[#1E293B] border-[#E8EDF1] dark:border-[#1E293B] hover:bg-white dark:hover:bg-[#0B1220] hover:border-[#5051F9]/50 text-[#232360] dark:text-white"
                   onClick={() => setInputMessage(prompt)}
                 >
                   {prompt}
@@ -382,14 +382,14 @@ const handleResetConversation = async () => {
                 onChange={(e) => setInputMessage(e.target.value)}
                 onKeyPress={handleKeyPress}
                 placeholder="Ask about your productivity patterns, request insights, or get a summary..."
-                className="w-full min-h-[60px] max-h-32 px-4 py-3 bg-[#F4F7FE] dark:bg-[#1E1F25] border border-[#E8EDF1] dark:border-[#282932] rounded-lg text-[#232360] dark:text-white placeholder-[#768396] dark:placeholder-[#768396] resize-none focus:outline-none focus:ring-2 focus:ring-[#5051F9]/50 focus:border-transparent"
+                className="w-full min-h-[60px] max-h-32 px-4 py-3 bg-[#F4F7FE] dark:bg-[#05070D] border border-[#E8EDF1] dark:border-[#1E293B] rounded-lg text-[#232360] dark:text-white placeholder-[#768396] dark:placeholder-[#768396] resize-none focus:outline-none focus:ring-2 focus:ring-[#5051F9]/50 focus:border-transparent"
                 disabled={isLoading}
               />
             </div>
             <Button
               onClick={handleSendMessage}
               disabled={!inputMessage.trim() || isLoading}
-              className="px-4 bg-gradient-to-r from-[#5051F9] to-[#1EA7FF] hover:from-[#4142E0] hover:to-[#1890D6] text-white self-end"
+              className="px-4 bg-gradient-to-r from-[#5051F9] to-[#22D3EE] hover:from-[#4142E0] hover:to-[#1890D6] text-white self-end"
             >
               <Send className="w-4 h-4" />
             </Button>
@@ -400,7 +400,7 @@ const handleResetConversation = async () => {
       {/* Reset Confirmation Dialog */}
       {showResetConfirm && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-          <Card className="bg-white dark:bg-[#212329] border-[#E8EDF1] dark:border-[#282932] w-96">
+          <Card className="bg-white dark:bg-[#0B1220] border-[#E8EDF1] dark:border-[#1E293B] w-96">
             <CardHeader>
               <CardTitle className="text-[#232360] dark:text-white flex items-center gap-2">
                 <RotateCcw className="h-5 w-5 text-[#FF6B6B]" />
@@ -408,14 +408,14 @@ const handleResetConversation = async () => {
               </CardTitle>
             </CardHeader>
             <CardContent className="space-y-4">
-              <p className="text-[#768396] dark:text-[#898999]">
+              <p className="text-[#768396] dark:text-[#94A3B8]">
                 Are you sure you want to clear the entire conversation? This action cannot be undone.
               </p>
               <div className="flex gap-3 justify-end">
                 <Button
                   variant="outline"
                   onClick={() => setShowResetConfirm(false)}
-                  className="bg-[#F4F7FE] dark:bg-[#282932] border-[#E8EDF1] dark:border-[#282932] text-[#232360] dark:text-white hover:bg-[#E8EDF1] dark:hover:bg-[#1E1F25]"
+                  className="bg-[#F4F7FE] dark:bg-[#1E293B] border-[#E8EDF1] dark:border-[#1E293B] text-[#232360] dark:text-white hover:bg-[#E8EDF1] dark:hover:bg-[#05070D]"
                 >
                   Cancel
                 </Button>

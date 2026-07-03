@@ -42,10 +42,10 @@ const data = [
 
 export default function Dashboard() {
   return (
-    <div className="p-6 bg-[#0E101A] min-h-screen text-white font-sans">
+    <div className="p-6 bg-[#03050A] min-h-screen text-white font-sans">
       <h1 className="text-2xl font-semibold mb-6">Productivity Overview</h1>
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
-        <Card className="bg-[#151823] text-white">
+        <Card className="bg-[#05070D] text-white">
           <CardContent className="p-4">
             <div className="flex items-center justify-between">
               <div>
@@ -57,7 +57,7 @@ export default function Dashboard() {
             </div>
           </CardContent>
         </Card>
-        <Card className="bg-[#151823] text-white">
+        <Card className="bg-[#05070D] text-white">
           <CardContent className="p-4">
             <div className="flex items-center justify-between">
               <div>
@@ -69,7 +69,7 @@ export default function Dashboard() {
             </div>
           </CardContent>
         </Card>
-        <Card className="bg-[#151823] text-white">
+        <Card className="bg-[#05070D] text-white">
           <CardContent className="p-4">
             <div className="flex items-center justify-between">
               <div>
@@ -83,7 +83,7 @@ export default function Dashboard() {
         </Card>
       </div>
 
-      <div className="bg-[#151823] rounded-2xl shadow p-4">
+      <div className="bg-[#05070D] rounded-2xl shadow p-4">
         <div className="flex items-center gap-4 border-b border-gray-700 pb-2 mb-4">
           <button className="text-cyan-400 border-b-2 border-cyan-400 pb-1">Applications</button>
           <button className="text-gray-400">Categories</button>

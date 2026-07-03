@@ -104,7 +104,7 @@ export function Sidebar({ productivityScore, dailyGoalProgress, weeklyGoalProgre
   }
 
   return (
-    <Card className="backdrop-blur-sm w-full min-w-0 border border-[#E8EDF1] bg-white dark:bg-[#212329] dark:border-[#282932] shadow-sm">
+    <Card className="backdrop-blur-md w-full min-w-0 border border-[#E8EDF1] bg-white dark:bg-[#0B1220]/60 dark:border-[#1E293B]/70 shadow-sm">
       <CardContent className="p-3 min-w-0">
         {/* Toggle Button - Top of Sidebar */}
         <div className="flex justify-end mb-3">
@@ -112,7 +112,7 @@ export function Sidebar({ productivityScore, dailyGoalProgress, weeklyGoalProgre
             onClick={toggleSidebar}
             size="icon"
             variant="ghost"
-            className="h-7 w-7 text-[#768396] dark:text-[#898999] hover:text-[#5051F9] hover:bg-[#F4F7FE] dark:hover:bg-[#282932]"
+            className="h-7 w-7 text-[#768396] dark:text-[#94A3B8] hover:text-[#5051F9] hover:bg-[#F4F7FE] dark:hover:bg-[#1E293B]"
             title={collapsed ? 'Expand sidebar' : 'Collapse sidebar'}
           >
             {collapsed ? <Menu className="h-4 w-4" /> : <ChevronLeft className="h-4 w-4" />}
@@ -121,9 +121,9 @@ export function Sidebar({ productivityScore, dailyGoalProgress, weeklyGoalProgre
 
         {/* Logo */}
         <div className={`flex items-center mb-4 min-w-0 stagger-1 ${collapsed ? 'justify-center' : 'space-x-2'}`}>
-          <Hexagon className="h-5 w-5 text-[#5051F9] flex-shrink-0" />
+          <Hexagon className="h-5 w-5 text-[#5051F9] dark:text-[#22D3EE] flex-shrink-0 dark:drop-shadow-[0_0_6px_rgba(34,211,238,0.5)]" />
           {!collapsed && (
-            <span className="text-sm font-medium tracking-tight truncate min-w-0 text-[#232360] dark:text-white">
+            <span className="text-sm font-semibold tracking-tight truncate min-w-0 text-[#232360] dark:text-transparent dark:bg-clip-text dark:bg-gradient-to-r dark:from-[#67E8F9] dark:via-[#22D3EE] dark:to-[#38BDF8]">
               Focus Book
             </span>
           )}
@@ -152,9 +152,9 @@ export function Sidebar({ productivityScore, dailyGoalProgress, weeklyGoalProgre
 
         {/* Focus Session Status - Hide when collapsed */}
         {!collapsed && (
-          <div className="mt-4 pt-4 border-t border-[#E8EDF1] dark:border-[#282932]">
+          <div className="mt-4 pt-4 border-t border-[#E8EDF1] dark:border-[#1E293B]">
             <div className="text-xs mb-2 uppercase tracking-wide font-medium text-[#768396]">Focus Session</div>
-            <div className="rounded-lg p-3 space-y-2 transition-all duration-200 bg-[#F4F7FE] border border-[#E8EDF1] hover:border-[#5051F9]/30 dark:bg-[#282932] dark:border-[#282932] dark:hover:border-[#5051F9]/50">
+            <div className="rounded-lg p-3 space-y-2 transition-all duration-200 bg-[#F4F7FE] border border-[#E8EDF1] hover:border-[#5051F9]/30 dark:bg-[#1E293B] dark:border-[#1E293B] dark:hover:border-[#5051F9]/50">
             {currentSession && (currentSession.status === 'active' || currentSession.status === 'paused') ? (
               <>
                 <div className="flex items-center justify-between">
@@ -181,14 +181,14 @@ export function Sidebar({ productivityScore, dailyGoalProgress, weeklyGoalProgre
             ) : (
               <>
                 <div className="flex items-center gap-2">
-                  <div className="w-2 h-2 rounded-full bg-[#768396] dark:bg-[#5F6388]"></div>
-                  <span className="text-xs font-medium uppercase tracking-wide text-[#768396]">No Active Session</span>
+                  <div className="w-2 h-2 rounded-full bg-[#768396] dark:bg-[#94A3B8]"></div>
+                  <span className="text-xs font-medium uppercase tracking-wide text-[#768396] dark:text-[#CBD5E1]">No Active Session</span>
                 </div>
-                <div className="text-3xl font-semibold tracking-tight text-[#768396]/50 dark:text-[#5F6388]">00:00</div>
+                <div className="text-3xl font-semibold tracking-tight text-[#768396]/50 dark:text-[#94A3B8]">00:00</div>
                 <div className="flex flex-col gap-2 mt-1 w-full">
                   <Button
                     size="sm"
-                    className="w-full text-xs font-medium tracking-wide transition-all duration-200 hover-lift bg-[#5051F9] text-white hover:bg-[#4142E0] shadow-sm"
+                    className="w-full text-xs font-medium tracking-wide transition-all duration-200 hover-lift bg-[#5051F9] text-white hover:bg-[#4142E0] shadow-sm dark:bg-[#22D3EE] dark:text-[#03050A] dark:hover:bg-[#4FDDF0] dark:shadow-[0_0_16px_rgba(34,211,238,0.25)]"
                     onClick={startQuickFocusSession}
                     disabled={isStarting}
                   >
@@ -199,7 +199,7 @@ export function Sidebar({ productivityScore, dailyGoalProgress, weeklyGoalProgre
                     size="sm"
                     variant="outline"
                     asChild
-                    className="w-full font-medium tracking-wide transition-all duration-200 hover-lift border-[#E8EDF1] text-[#232360] hover:bg-[#F4F7FE] dark:border-[#282932] dark:text-white dark:hover:bg-[#282932]"
+                    className="w-full font-medium tracking-wide transition-all duration-200 hover-lift border-[#E8EDF1] text-[#232360] hover:bg-[#F4F7FE] dark:border-[#1E293B] dark:text-white dark:hover:bg-[#1E293B]"
                   >
                     <Link to="/focus" className="flex items-center justify-center">
                       <Timer className="w-3.5 h-3.5 mr-1.5" />
@@ -223,15 +223,15 @@ function NavItem({ icon: Icon, label, active, href, collapsed = false }) {
     <Button
       variant="ghost"
       asChild
-      className={`w-full text-sm py-2 min-w-0 font-normal rounded-lg transition-all duration-200 group
-        ${collapsed ? 'justify-center px-0' : 'justify-start px-2.5'}
-        ${active 
-          ? 'bg-[#5051F9]/10 text-[#5051F9] border-l-2 border-[#5051F9] hover:bg-[#5051F9]/15' 
-          : 'text-[#768396] dark:text-[#898999] hover:text-[#232360] dark:hover:text-white hover:bg-[#F4F7FE] dark:hover:bg-[#282932] border-l-2 border-transparent hover:border-[#5051F9]/50'
+      className={`w-full text-sm py-3 min-w-0 font-normal rounded-lg transition-all duration-200 group
+        ${collapsed ? 'justify-center px-2' : 'justify-start px-3'}
+        ${active
+          ? 'bg-[#5051F9]/10 text-[#5051F9] border-l-2 border-[#5051F9] hover:bg-[#5051F9]/15 dark:bg-[#22D3EE]/10 dark:text-[#22D3EE] dark:border-[#22D3EE] dark:hover:bg-[#22D3EE]/15'
+          : 'text-[#768396] dark:text-[#94A3B8] hover:text-[#232360] dark:hover:text-white hover:bg-[#F4F7FE] dark:hover:bg-[#1E293B] border-l-2 border-transparent hover:border-[#5051F9]/50 dark:hover:border-[#22D3EE]/50'
       }`}
     >
-      <Link to={href} className={`flex items-center min-w-0 w-full ${collapsed ? 'justify-center' : 'gap-2'}`}>
-        <Icon className={`h-4 w-4 flex-shrink-0 transition-transform duration-200 ${active ? 'scale-105' : 'group-hover:scale-105'}`} />
+      <Link to={href} className={`flex items-center min-w-0 w-full ${collapsed ? 'justify-center' : 'gap-2.5'}`}>
+        <Icon className={`h-5 w-5 flex-shrink-0 transition-transform duration-200 ${active ? 'scale-105' : 'group-hover:scale-105'}`} />
         {!collapsed && (
           <span className="truncate text-left font-normal tracking-normal">{label}</span>
         )}

@@ -19,7 +19,8 @@ import {
   Terminal,
   CodeIcon,
   Tag,
-  Check
+  Check,
+  Sparkles
 } from 'lucide-react'
 import {
   DropdownMenu,
@@ -40,7 +41,10 @@ import { useToast } from '../../hooks/use-toast'
 import useCategoryChangeToast from './category-change-toast'
 import CategoryBadge from './category-badge'
 import BulkCategoryDialog from './bulk-categories-dialog'
+import SummaryTab from './SummaryTab'
+import SummarySkeleton from './SummarySkeleton'
 import { formatAppsData, getProductivityType, refreshCategoryMapping } from '../../utils/dataProcessor'
+import { generateSummary, clearSummaryCache } from '../../utils/aiSummaryService'
 import { useDate } from '../../context/DateContext'
 import { useTheme } from '../../context/ThemeContext'
 
@@ -57,12 +61,16 @@ export default function AppUsageTable() {
   const [sortBy, setSortBy] = useState('timeSpent')
   const [sortOrder, setSortOrder] = useState('desc')
   const [apps, setApps] = useState([])
+  const [summary, setSummary] = useState(null)
+  const [isLoadingSummary, setIsLoadingSummary] = useState(false)
+  const [summaryError, setSummaryError] = useState(null)
   const { selectedDate, handleDateChange } = useDate()
   const { toast } = useToast()
   const { showCategoryChangeToast } = useCategoryChangeToast()
 
   useEffect(() => {
     loadApps()
+    loadSummary()
     handleVisibilityChange()
     document.addEventListener('visibilitychange', handleVisibilityChange)
     
@@ -70,6 +78,9 @@ export default function AppUsageTable() {
     const removeCategoryListener = window.activeWindow.onCategoryUpdated((data) => {
       console.log('Activity page received category update:', data)
       loadApps()
+      // Clear cache and reload summary when categories change
+      clearSummaryCache(selectedDate)
+      loadSummary(true)
     })
     
     return () => {
@@ -83,14 +94,71 @@ export default function AppUsageTable() {
   function handleVisibilityChange() {
     if (document.visibilityState === 'visible') {
       loadApps()
+      loadSummary()
     }
   }
-  // Add the bulk categorize handler function inside the AppUsageTable component
+  
+  // Load application usage data
   async function loadApps() {
+    // Ensure the DB-driven category productivity map is populated before
+    // formatAppsData reads it, otherwise productivity labels default to Neutral.
+    await refreshCategoryMapping()
     const jsonData = await window.activeWindow.getAppUsageStats()
     const appsData = formatAppsData(jsonData, selectedDate)
     setApps(appsData)
   }
+
+  // Load AI-powered summary
+  async function loadSummary(forceRefresh = false) {
+    setIsLoadingSummary(true)
+    setSummaryError(null)
+    
+    try {
+      // Wait for apps to be loaded if not already
+      let appsData = apps
+      if (apps.length === 0) {
+        const jsonData = await window.activeWindow.getAppUsageStats()
+        appsData = formatAppsData(jsonData, selectedDate)
+      }
+
+      const result = await generateSummary(selectedDate, appsData, forceRefresh)
+      
+      if (result.success) {
+        setSummary(result.data)
+        
+        // Show toast for cache hits or AI generation
+        if (result.fromCache && !forceRefresh) {
+          console.log('✅ Using cached summary')
+        } else if (!result.isFallback) {
+          toast({
+            title: 'Summary Generated',
+            description: 'AI analysis completed successfully',
+          })
+        }
+      } else {
+        setSummaryError(result.error)
+        setSummary(result.data) // Fallback data
+      }
+    } catch (error) {
+      console.error('Error loading summary:', error)
+      setSummaryError(error.message)
+      toast({
+        title: 'Summary Error',
+        description: 'Failed to generate summary. Showing basic statistics.',
+        variant: 'destructive'
+      })
+    } finally {
+      setIsLoadingSummary(false)
+    }
+  }
+
+  // Manual refresh handler
+  const handleRefreshSummary = () => {
+    clearSummaryCache(selectedDate)
+    loadSummary(true)
+  }
+
+  // Handle bulk category changes
   const handleBulkCategorize = async (appIds, category) => {
     // Calculate the new productivity status based on the category
     const productivityType = getProductivityType(category)
@@ -117,6 +185,10 @@ export default function AppUsageTable() {
 
       // Refresh the category mapping to ensure consistency across the app
       await refreshCategoryMapping()
+      
+      // Clear summary cache and reload since categories changed
+      clearSummaryCache(selectedDate)
+      loadSummary(true)
     } catch (error) {
       console.error('Failed to save bulk category changes:', error)
       toast({
@@ -160,6 +232,10 @@ export default function AppUsageTable() {
 
         // Refresh the category mapping to ensure consistency across the app
         await refreshCategoryMapping()
+        
+        // Clear summary cache and reload since category changed
+        clearSummaryCache(selectedDate)
+        loadSummary(true)
       } catch (error) {
         console.error('Failed to save category change permanently:', error)
         toast({
@@ -308,9 +384,16 @@ export default function AppUsageTable() {
         </div>
       </CardHeader>
       <CardContent className="p-0">
-        <Tabs defaultValue="table" className="w-full">
+        <Tabs defaultValue="summary" className="w-full">
           <div className="px-4 pt-4 pb-2 flex items-center justify-between">
             <TabsList className="bg-muted/50 p-0.5">
+              <TabsTrigger
+                value="summary"
+                className="data-[state=active]:bg-muted data-[state=active]:text-primary"
+              >
+                <Sparkles className="h-4 w-4 mr-1.5" />
+                Summary
+              </TabsTrigger>
               <TabsTrigger
                 value="table"
                 className="data-[state=active]:bg-muted data-[state=active]:text-primary"
@@ -323,8 +406,26 @@ export default function AppUsageTable() {
               <div className="text-sm text-muted-foreground">
                 Total time: <span className="text-primary font-mono">{totalTimeFormatted}</span>
               </div>
+              <Button
+                onClick={handleRefreshSummary}
+                variant="ghost"
+                size="sm"
+                className="h-8 text-muted-foreground"
+                disabled={isLoadingSummary}
+              >
+                <RefreshCw className={`h-4 w-4 mr-1.5 ${isLoadingSummary ? 'animate-spin' : ''}`} />
+                Refresh Summary
+              </Button>
             </div>
           </div>
+
+          <TabsContent value="summary" className="mt-0">
+            {isLoadingSummary ? (
+              <SummarySkeleton />
+            ) : (
+              <SummaryTab summary={summary} date={selectedDate} />
+            )}
+          </TabsContent>
 
           <TabsContent value="table" className="mt-0">
             <div className="rounded-md border border-border/50 overflow-hidden mx-6 mb-6">

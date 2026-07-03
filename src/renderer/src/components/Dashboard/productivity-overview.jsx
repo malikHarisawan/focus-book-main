@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { Activity, Clock, Flame, LineChart, RefreshCw, Trophy, ChevronDown, ChevronUp } from 'lucide-react'
+import { Activity, Clock, Flame, LineChart, RefreshCw, Trophy } from 'lucide-react'
 import { Card, CardContent, CardHeader, CardTitle } from '../ui/card'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '../ui/tabs'
 import { Badge } from '../ui/badge'
@@ -19,8 +19,8 @@ import {
   processProductiveChartData,
   getTotalScreenTime,
   formatAppsData,
-  extractDomainName,
-  getProductivityType
+  getProductivityType,
+  refreshCategoryMapping
 } from '../../utils/dataProcessor'
 export default function ProductivityOverview() {
   const [view, setView] = useState('day')
@@ -38,8 +38,6 @@ export default function ProductivityOverview() {
   const [selectedApps, setSelectedApps] = useState([])
   const [selectedRange, setSelectedRange] = useState(null)
   const [showAppDetails, setShowAppDetails] = useState(false)
-  const [expandedApp, setExpandedApp] = useState(null)
-  const [appDetailedData, setAppDetailedData] = useState([])
 
   const handleDate = (e) => {
     handleDateChange(e.target.value)
@@ -73,6 +71,10 @@ export default function ProductivityOverview() {
     }
   }
   const loadAndProcessData = async () => {
+    // Ensure the DB-driven category productivity map is populated before any
+    // processing function reads it, otherwise the first render races the
+    // import-time load and shows everything as Neutral.
+    await refreshCategoryMapping()
     const jsonData = await window.activeWindow.getAppUsageStats()
     console.log('📊 Raw JSON Data:', jsonData)
     console.log('📅 Selected Date:', selectedDate)
@@ -116,9 +118,23 @@ export default function ProductivityOverview() {
   const distractingTime = apps
     .filter((app) => getProductivityType(app.category) === 'distracted')
     .reduce((total, app) => total + app.timeSpentSeconds, 0)
-  const productivePercentage = Math.round((productiveTime / totalTimeSeconds) * 100)
-  const neutralPercentage = Math.round((neutralTime / totalTimeSeconds) * 100)
-  const distractingPercentage = Math.round((distractingTime / totalTimeSeconds) * 100)
+
+  // Round the three shares with the largest-remainder method so they always add
+  // up to exactly 100% (independent Math.round calls can drift to 99% or 101%).
+  const [productivePercentage, neutralPercentage, distractingPercentage] = (() => {
+    if (!totalTimeSeconds) return [0, 0, 0]
+    const raw = [productiveTime, neutralTime, distractingTime].map((t) => (t / totalTimeSeconds) * 100)
+    const floors = raw.map((v) => Math.floor(v))
+    let remainder = 100 - floors.reduce((a, b) => a + b, 0)
+    // Hand the leftover points to the largest fractional parts first.
+    const order = raw
+      .map((v, i) => ({ i, frac: v - floors[i] }))
+      .sort((a, b) => b.frac - a.frac)
+    for (let k = 0; k < order.length && remainder > 0; k++, remainder--) {
+      floors[order[k].i] += 1
+    }
+    return floors
+  })()
 
   // Handle selection changes from ProductiveAreaChart
   const handleSelectionChange = (apps, range) => {
@@ -138,76 +154,21 @@ export default function ProductivityOverview() {
     // TODO: Implement actual category change logic
   }
 
-  // Handle app detail expansion
-  const handleAppDetailToggle = async (appName) => {
-    if (expandedApp === appName) {
-      // Collapse if already expanded
-      setExpandedApp(null)
-      setAppDetailedData([])
-    } else {
-      // Expand new app
-      setExpandedApp(appName)
-
-      // Load detailed data for this specific app by going directly to raw data
-      const jsonData = await window.activeWindow.getAppUsageStats()
-      const rawApps = jsonData[selectedDate]?.apps || {}
-
-      console.log('🔍 Expanding details for:', appName)
-      console.log('📅 Selected date:', selectedDate)
-      console.log('📊 Raw apps data:', Object.keys(rawApps).length, 'entries')
-
-      const thisAppDetails = []
-
-      // Filter raw app data to find entries that match this service
-      for (const [originalAppName, data] of Object.entries(rawApps)) {
-        // Use the same logic as formatAppsData: prefer description, fallback to domain name
-        let serviceName
-        if (data.description && data.description.trim()) {
-          serviceName = data.description
-        } else {
-          serviceName = extractDomainName(data.domain, originalAppName)
-        }
-        
-        // Debug: log first few comparisons
-        if (thisAppDetails.length < 3) {
-          console.log(`  Comparing: "${serviceName}" === "${appName}"?`, serviceName === appName)
-          console.log(`    Original: "${originalAppName}", Description: "${data.description}", Domain: "${data.domain}"`)
-        }
-        
-        if (serviceName === appName) {
-          thisAppDetails.push({
-            name: originalAppName,
-            time: Math.floor(data.time / 1000 / 60), // Convert to minutes
-            category: data.category,
-            domain: data.domain
-          })
-        }
-      }
-
-      console.log(`✅ Found ${thisAppDetails.length} matching entries for "${appName}"`)
-
-      // Sort by time spent (descending)
-      thisAppDetails.sort((a, b) => b.time - a.time)
-
-      setAppDetailedData(thisAppDetails)
-    }
-  }
-
   return (
-    <Card className="bg-white border-[#E8EDF1] shadow-sm dark:bg-[#212329] dark:border-[#282932] backdrop-blur-sm overflow-hidden transition-colors">
-      <CardHeader className="border-b bg-white border-[#E8EDF1] dark:bg-[#212329] dark:border-[#282932] py-2 px-3">
-        <div className="flex flex-col lg:flex-row items-start lg:items-center justify-between gap-3">
+    <Card className="bg-white border-[#E8EDF1] shadow-sm dark:bg-[#0B1220] dark:border-[#1E293B] backdrop-blur-sm overflow-hidden transition-colors">
+      <CardHeader className="border-b bg-white border-[#E8EDF1] dark:bg-[#0B1220] dark:border-[#1E293B] py-2 px-3">
+        <div className="flex flex-row items-center justify-between gap-2">
           <CardTitle className="text-[#232360] dark:text-white flex items-center font-medium tracking-tight">
             <Activity className="mr-2 h-5 w-5 text-[#5051F9] flex-shrink-0" />
             <span>Productivity Overview</span>
           </CardTitle>
-          <div className="flex items-center gap-2 w-full lg:w-auto">
+          <div className="flex items-center gap-2 flex-shrink-0">
             <SmartDatePicker zoomLevel={currentZoomLevel} onDateChange={loadAndProcessData} />
             <Button
               onClick={loadAndProcessData}
               variant="ghost"
               size="icon"
-              className="h-9 w-9 text-[#768396] hover:text-[#232360] hover:bg-[#F4F7FE] dark:text-[#898999] dark:hover:text-white dark:hover:bg-[#282932] flex-shrink-0 transition-colors"
+              className="h-9 w-9 text-[#768396] hover:text-[#232360] hover:bg-[#F4F7FE] dark:text-[#94A3B8] dark:hover:text-white dark:hover:bg-[#1E293B] flex-shrink-0 transition-colors"
               title="Refresh data"
             >
               <RefreshCw className="h-4 w-4" />
@@ -215,135 +176,56 @@ export default function ProductivityOverview() {
           </div>
         </div>
       </CardHeader>
-      <CardContent className="p-2 dark:bg-[#1E1F25] bg-[#F4F7FE]">
-        {/* Compact Single Row Summary */}
-        <div className="mb-2 rounded-xl p-2 bg-white dark:bg-[#212329] border border-[#E8EDF1] dark:border-[#282932] shadow-sm">
-          {/* Header Row: Score + Total Time */}
-          <div className="flex items-center justify-between mb-2">
-            <div className="flex items-center gap-2">
-              {/* Mini Donut Chart */}
-              <div className="relative w-12 h-12 flex-shrink-0">
-                <svg className="transform -rotate-90 w-12 h-12">
-                  <circle
-                    cx="24"
-                    cy="24"
-                    r="18"
-                    stroke="currentColor"
-                    strokeWidth="5"
-                    fill="transparent"
-                    className="text-[#E8EDF1] dark:text-[#282932]"
-                  />
-                  <circle
-                    cx="24"
-                    cy="24"
-                    r="18"
-                    stroke="url(#scoreGradient)"
-                    strokeWidth="4"
-                    fill="transparent"
-                    strokeDasharray={`${2 * Math.PI * 18}`}
-                    strokeDashoffset={`${2 * Math.PI * 18 * (1 - (isNaN(productivePercentage) ? 0 : productivePercentage / 100))}`}
-                    strokeLinecap="round"
-                    className="transition-all duration-1000"
-                  />
-                  <defs>
-                    <linearGradient id="scoreGradient" x1="0%" y1="0%" x2="100%" y2="0%">
-                      <stop offset="0%" stopColor="#5051F9" />
-                      <stop offset="100%" stopColor="#1EA7FF" />
-                    </linearGradient>
-                  </defs>
-                </svg>
-                <div className="absolute inset-0 flex items-center justify-center">
-                  <span className="text-sm font-semibold text-[#5051F9]">
-                    {isNaN(productivePercentage) ? '0' : productivePercentage}%
-                  </span>
-                </div>
-              </div>
-              {/* Score Label */}
-              <div>
-                <div className="text-sm font-medium text-[#232360] dark:text-white">
-                  {productivePercentage >= 70 ? 'Excellent!' :
-                   productivePercentage >= 40 ? 'Good Progress' :
-                   'Needs Focus'}
-                </div>
-                <div className="text-xs text-[#768396] font-normal">
-                  Productivity Score
-                </div>
-              </div>
-            </div>
-            {/* Total Screen Time */}
-            <div className="text-right">
-              <div className="text-lg font-semibold text-[#232360] dark:text-white">
-                {totalTimeFormatted}
-              </div>
-              <div className="text-xs text-[#768396] font-normal">
-                Total Screen Time
-              </div>
-            </div>
-          </div>
-
-          {/* Time Breakdown - Horizontal Pills */}
-          <div className="flex flex-wrap gap-2">
-            {/* Productive */}
-            <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-[#5051F9]/10 border border-[#5051F9]/20">
-              <div className="h-2 w-2 rounded-full bg-[#5051F9]"></div>
-              <span className="text-sm font-medium text-[#5051F9]">
-                {Math.floor(productiveTime / 3600)}h {Math.floor((productiveTime % 3600) / 60)}m
-              </span>
-              <span className="text-xs text-[#5051F9]/70">
-                ({isNaN(productivePercentage) ? 0 : productivePercentage}%)
-              </span>
-            </div>
-
-            {/* Neutral */}
-            <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-[#1EA7FF]/10 border border-[#1EA7FF]/20">
-              <div className="h-2 w-2 rounded-full bg-[#1EA7FF]"></div>
-              <span className="text-sm font-medium text-[#1EA7FF]">
-                {Math.floor(neutralTime / 3600)}h {Math.floor((neutralTime % 3600) / 60)}m
-              </span>
-              <span className="text-xs text-[#1EA7FF]/70">
-                ({isNaN(neutralPercentage) ? 0 : neutralPercentage}%)
-              </span>
-            </div>
-
-            {/* Distracting */}
-            <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-[#FF6B6B]/10 border border-[#FF6B6B]/20">
-              <div className="h-2 w-2 rounded-full bg-[#FF6B6B]"></div>
-              <span className="text-sm font-medium text-[#FF6B6B]">
-                {Math.floor(distractingTime / 3600)}h {Math.floor((distractingTime % 3600) / 60)}m
-              </span>
-              <span className="text-xs text-[#FF6B6B]/70">
-                ({isNaN(distractingPercentage) ? 0 : distractingPercentage}%)
-              </span>
-            </div>
-          </div>
+      <CardContent className="p-2 dark:bg-[#05070D] bg-[#F4F7FE]">
+        {/* Summary Cards Row */}
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 mb-3">
+          <StatCard
+            title="Productive Time"
+            value={`${Math.floor(productiveTime / 3600)}h ${Math.floor((productiveTime % 3600) / 60)}m`}
+            percentage={isNaN(productivePercentage) ? 0 : productivePercentage}
+            color="green"
+          />
+          <StatCard
+            title="Neutral Time"
+            value={`${Math.floor(neutralTime / 3600)}h ${Math.floor((neutralTime % 3600) / 60)}m`}
+            percentage={isNaN(neutralPercentage) ? 0 : neutralPercentage}
+            color="blue"
+          />
+          <StatCard
+            title="Distracting Time"
+            value={`${Math.floor(distractingTime / 3600)}h ${Math.floor((distractingTime % 3600) / 60)}m`}
+            percentage={isNaN(distractingPercentage) ? 0 : distractingPercentage}
+            color="red"
+          />
+          <StatCard title="Total Time" value={totalTimeFormatted} />
         </div>
 
         {/* Charts Section */}
         <div className="mt-2">
           <Tabs defaultValue="categories" className="w-full">
             <div className="flex flex-col lg:flex-row items-start lg:items-center justify-between mb-2 gap-2">
-              <TabsList className="p-0.5 w-full lg:w-auto bg-[#F4F7FE] border border-[#E8EDF1] dark:bg-[#282932] dark:border-[#282932] rounded-lg">
+              <TabsList className="p-0.5 w-full lg:w-auto bg-[#F4F7FE] border border-[#E8EDF1] dark:bg-[#1E293B] dark:border-[#1E293B] rounded-lg">
                 <TabsTrigger
                   value="applications"
-                  className="text-xs px-3 py-1.5 rounded-md font-medium transition-all text-[#768396] dark:text-[#898999] data-[state=active]:bg-white data-[state=active]:text-[#5051F9] data-[state=active]:shadow-sm dark:data-[state=active]:bg-[#5051F9] dark:data-[state=active]:text-white"
+                  className="text-xs px-3 py-1.5 rounded-md font-medium transition-all text-[#768396] dark:text-[#94A3B8] data-[state=active]:bg-white data-[state=active]:text-[#5051F9] data-[state=active]:shadow-sm dark:data-[state=active]:bg-[#22D3EE] dark:data-[state=active]:text-[#03050A]"
                 >
                   Apps
                 </TabsTrigger>
                 <TabsTrigger
                   value="categories"
-                  className="text-xs px-3 py-1.5 rounded-md font-medium transition-all text-[#768396] dark:text-[#898999] data-[state=active]:bg-white data-[state=active]:text-[#5051F9] data-[state=active]:shadow-sm dark:data-[state=active]:bg-[#5051F9] dark:data-[state=active]:text-white"
+                  className="text-xs px-3 py-1.5 rounded-md font-medium transition-all text-[#768396] dark:text-[#94A3B8] data-[state=active]:bg-white data-[state=active]:text-[#5051F9] data-[state=active]:shadow-sm dark:data-[state=active]:bg-[#22D3EE] dark:data-[state=active]:text-[#03050A]"
                 >
                   Timeline
                 </TabsTrigger>
               </TabsList>
 
-              <div className="flex items-center gap-3 text-xs font-normal w-full lg:w-auto justify-center lg:justify-end text-[#768396] dark:text-[#898999]">
+              <div className="flex items-center gap-3 text-xs font-normal w-full lg:w-auto justify-center lg:justify-end text-[#768396] dark:text-[#94A3B8]">
                 <div className="flex items-center gap-1">
-                  <div className="h-2 w-2 rounded-full bg-[#5051F9]"></div>
+                  <div className="h-2 w-2 rounded-full bg-[#5051F9] dark:bg-[#22D3EE]"></div>
                   <span>Productive</span>
                 </div>
                 <div className="flex items-center gap-1">
-                  <div className="h-2 w-2 rounded-full bg-[#1EA7FF]"></div>
+                  <div className="h-2 w-2 rounded-full bg-[#22D3EE] dark:bg-[#64748B]"></div>
                   <span>Neutral</span>
                 </div>
                 <div className="flex items-center gap-1">
@@ -354,46 +236,34 @@ export default function ProductivityOverview() {
             </div>
 
             <TabsContent value="applications" className="mt-0">
-              <div className="rounded-2xl border overflow-hidden min-h-[300px] max-h-[600px] flex flex-col bg-white border-[#E8EDF1] dark:bg-[#212329] dark:border-[#282932]">
-                <div className="grid grid-cols-12 text-xs p-2 border-b flex-shrink-0 text-[#768396] dark:text-[#898999] font-normal border-[#E8EDF1] bg-[#F4F7FE] dark:border-[#282932] dark:bg-[#282932]">
-                  <div className="col-span-4 sm:col-span-5">Application</div>
-                  <div className="col-span-2 hidden sm:block">Category</div>
-                  <div className="col-span-3 sm:col-span-2">Time Spent</div>
-                  <div className="col-span-3 sm:col-span-2">Productivity</div>
-                  <div className="col-span-2 sm:col-span-1">Details</div>
+              <div className="rounded-2xl border overflow-hidden min-h-[300px] max-h-[600px] flex flex-col bg-white border-[#E8EDF1] dark:bg-[#0B1220] dark:border-[#1E293B]">
+                <div className="grid grid-cols-12 text-xs p-2 border-b flex-shrink-0 text-[#768396] dark:text-[#94A3B8] font-normal border-[#E8EDF1] bg-[#F4F7FE] dark:border-[#1E293B] dark:bg-[#1E293B]">
+                  <div className="col-span-5 sm:col-span-6">Application</div>
+                  <div className="col-span-3 hidden sm:block">Category</div>
+                  <div className="col-span-4 sm:col-span-2">Time Spent</div>
+                  <div className="col-span-3 sm:col-span-1">Productivity</div>
                 </div>
 
-                <div className="divide-y divide-[#E8EDF1] dark:divide-[#282932] overflow-y-auto flex-1 custom-scrollbar">
-                  {appsData.map((app) => {
-                    const maxAppTime = Math.max(...appsData.map(a => a.time), 1)
-                    const timePercent = (app.time / maxAppTime) * 100
-                    const isExpanded = expandedApp === app.name
-                    const detailsForThisApp = isExpanded ? appDetailedData : []
-
-                    return (
-                      <AppUsageRow
-                        key={app.name}
-                        name={capitalize(app.name)}
-                        category={app.category}
-                        timeSpent={
-                          app.time >= 60
-                            ? `${Math.floor(app.time / 60)}h ${app.time % 60}m`
-                            : `${app.time}m`
-                        }
-                        timePercent={timePercent}
-                        productivity={app.productivity}
-                        isExpanded={isExpanded}
-                        detailedData={detailsForThisApp}
-                        onToggleDetails={() => handleAppDetailToggle(app.name)}
-                      />
-                    )
-                  })}
+                <div className="divide-y divide-[#E8EDF1] dark:divide-[#1E293B] overflow-y-auto flex-1 custom-scrollbar">
+                  {appsData.map((app) => (
+                    <AppUsageRow
+                      key={app.name}
+                      name={capitalize(app.name)}
+                      category={app.category}
+                      timeSpent={
+                        app.time >= 60
+                          ? `${Math.floor(app.time / 60)}h ${app.time % 60}m`
+                          : `${app.time}m`
+                      }
+                      productivity={app.productivity}
+                    />
+                  ))}
                 </div>
               </div>
             </TabsContent>
 
             <TabsContent value="categories" className="mt-0">
-              <div className="h-[280px] w-full relative rounded-2xl overflow-hidden bg-white dark:bg-[#212329] border border-[#E8EDF1] dark:border-[#282932]">
+              <div className="h-[280px] w-full relative rounded-2xl overflow-hidden bg-white dark:bg-[#0B1220] border border-[#E8EDF1] dark:border-[#1E293B]">
                 <ProductiveAreaChart
                   data={productiveData}
                   rawData={rawData}
@@ -422,7 +292,7 @@ export default function ProductivityOverview() {
 }
 
 // App usage row component
-function AppUsageRow({ name, category, timeSpent, timePercent = 100, productivity, isExpanded, detailedData = [], onToggleDetails }) {
+function AppUsageRow({ name, category, timeSpent, productivity }) {
   const getProductivityColor = () => {
     switch (productivity) {
       case 'Productive':
@@ -436,90 +306,19 @@ function AppUsageRow({ name, category, timeSpent, timePercent = 100, productivit
     }
   }
 
-  // Prefer showing domain names in breakdown when available
-  const formatDomain = (domain) => {
-    if (!domain || typeof domain !== 'string') return ''
-    try {
-      let d = domain.trim()
-      
-      // Handle special schemes
-      if (d.startsWith('chrome://') || d.startsWith('edge://') || d.startsWith('brave://')) {
-        return d.split('://')[1].split('/')[0] || d
-      }
-      
-      // Remove protocol
-      d = d.replace(/^https?:\/\//i, '')
-      d = d.replace(/^ftp:\/\//i, '')
-      
-      // Remove www prefix
-      d = d.replace(/^www\./i, '')
-      
-      // Remove path, query, and hash
-      d = d.split('/')[0]
-      d = d.split('?')[0]
-      d = d.split('#')[0]
-      
-      // Remove port if present
-      d = d.split(':')[0]
-      
-      return d || domain
-    } catch (e) {
-      return domain
-    }
-  }
-
   return (
-    <div>
-      {/* Main Row */}
-      <div className="grid grid-cols-12 py-2 px-2 sm:px-3 text-xs sm:text-sm hover:bg-meta-gray-50 dark:hover:bg-dark-bg-hover">
-        <div className="col-span-4 sm:col-span-5 text-meta-gray-800 dark:text-dark-text-primary truncate pr-1">{name}</div>
-        <div className="col-span-2 text-meta-gray-600 dark:text-dark-text-secondary hidden sm:block truncate">{category}</div>
-        <div className="col-span-3 sm:col-span-2 text-meta-blue-600 dark:text-meta-blue-400">{timeSpent}</div>
-        <div className="col-span-3 sm:col-span-2">
-          <Badge variant="outline" className={`${getProductivityColor()} text-xs`}>
-            <span className="hidden sm:inline">{productivity}</span>
-            <span className="sm:hidden">
-              {productivity === 'Productive' ? 'P' : productivity === 'Neutral' ? 'N' : 'D'}
-            </span>
-          </Badge>
-        </div>
-        <div className="col-span-2 sm:col-span-1 flex justify-center">
-          <Button
-            variant="ghost"
-            size="sm"
-            className="h-6 w-6 p-0 text-meta-gray-500 dark:text-dark-text-secondary hover:text-meta-blue-600 dark:hover:text-meta-blue-400"
-            onClick={onToggleDetails}
-            title={isExpanded ? 'Hide details' : 'Show details'}
-          >
-            {isExpanded ? <ChevronUp className="h-3 w-3" /> : <ChevronDown className="h-3 w-3" />}
-          </Button>
-        </div>
+    <div className="grid grid-cols-12 py-2 px-2 sm:px-3 text-xs sm:text-sm hover:bg-meta-gray-50 dark:hover:bg-dark-bg-hover">
+      <div className="col-span-5 sm:col-span-6 text-meta-gray-800 dark:text-dark-text-primary truncate pr-1">{name}</div>
+      <div className="col-span-3 text-meta-gray-600 dark:text-dark-text-secondary hidden sm:block truncate">{category}</div>
+      <div className="col-span-4 sm:col-span-2 text-meta-blue-600 dark:text-meta-blue-400">{timeSpent}</div>
+      <div className="col-span-3 sm:col-span-1">
+        <Badge variant="outline" className={`${getProductivityColor()} text-xs`}>
+          <span className="hidden sm:inline">{productivity}</span>
+          <span className="sm:hidden">
+            {productivity === 'Productive' ? 'P' : productivity === 'Neutral' ? 'N' : 'D'}
+          </span>
+        </Badge>
       </div>
-
-      {/* Inline Breakdown - Minimalistic */}
-      {isExpanded && detailedData.length > 0 && (
-        <div className="bg-meta-gray-50 dark:bg-dark-bg-secondary px-4 sm:px-6 py-2 border-t border-meta-gray-200 dark:border-dark-border-primary">
-          <div className="space-y-1 max-h-48 overflow-y-auto custom-scrollbar">
-            {detailedData.map((detail, index) => (
-              <div key={index} className="flex items-center justify-between py-1.5 text-xs">
-                <div className="flex-1 text-meta-gray-700 dark:text-dark-text-secondary truncate pr-3 pl-4">
-                  <span className="text-meta-gray-400 dark:text-meta-gray-600 mr-2">└</span>
-                  {formatDomain(detail.domain) || detail.name}
-                </div>
-                <div className="text-meta-blue-600 dark:text-meta-blue-400 font-mono text-xs">
-                  {detail.time >= 60
-                    ? `${Math.floor(detail.time / 60)}h ${detail.time % 60}m`
-                    : `${detail.time}m`
-                  }
-                </div>
-              </div>
-            ))}
-          </div>
-          <div className="text-xs text-meta-gray-500 mt-2 pl-4">
-            {detailedData.length} {detailedData.length === 1 ? 'entry' : 'entries'}
-          </div>
-        </div>
-      )}
     </div>
   )
 }

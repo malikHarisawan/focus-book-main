@@ -150,8 +150,8 @@ let pythonErrorRecovery = new PythonErrorRecovery()
 
 function createWindow() {
   mainWindow = new BrowserWindow({
-    width: 1200,
-    height: 800,
+    width: 900,
+    height: 650,
     minWidth: 900,
     minHeight: 650,
     resizable: true,
@@ -291,14 +291,19 @@ autoUpdater.on('error', (err) => {
   console.error('❌ Auto-updater error:', err)
 })
 
-app.whenReady().then(async () => {
+// Heavy backend initialization (SQLite, focus sessions, AI service, Python).
+// Runs in the BACKGROUND after the window is already on screen so the user is
+// never staring at an empty desktop. IPC data handlers await
+// hybridConnection.whenReady() before touching the database, so any data
+// request that arrives before this finishes simply waits rather than failing.
+async function initializeBackendServices() {
   try {
     await hybridConnection.connect()
     console.log('✅ SQLite database system initialized successfully')
 
     // Initialize data aggregation service
     // Data aggregation functionality is now handled directly by app usage service
-    
+
     // Initialize focus session service
     try {
       await focusSessionService.getLocalService().initializeService()
@@ -306,19 +311,10 @@ app.whenReady().then(async () => {
     } catch (error) {
       console.error('❌ Failed to initialize focus session service:', error.message)
     }
-    
+
   } catch (error) {
     console.error('❌ Failed to initialize database system:', error.message)
     console.log('📋 The app will continue to run with reduced functionality.')
-  }
-
-  // Check for updates (only in production)
-  if (!process.env.NODE_ENV || process.env.NODE_ENV === 'production') {
-    setTimeout(() => {
-      autoUpdater.checkForUpdates()
-        .then(() => console.log('✅ Checked for updates'))
-        .catch((err) => console.error('❌ Failed to check for updates:', err))
-    }, 5000) // Check after 5 seconds
   }
 
   // Enable auto-startup on first run (for fresh installs)
@@ -389,8 +385,28 @@ app.whenReady().then(async () => {
   } catch (error) {
     console.error('❌ Python error recovery initialization failed:', error.message)
   }
+}
 
+app.whenReady().then(async () => {
+  // Show the window IMMEDIATELY. Everything below this line (DB, AI service,
+  // Python) previously blocked window creation, forcing the user to wait
+  // ~10s+ staring at nothing. The window now paints first and populates data
+  // as soon as the database is ready.
   createWindow()
+
+  // Kick off the heavy initialization in the background — do NOT await it here.
+  initializeBackendServices().catch((error) => {
+    console.error('❌ Background initialization error:', error)
+  })
+
+  // Check for updates (only in production)
+  if (!process.env.NODE_ENV || process.env.NODE_ENV === 'production') {
+    setTimeout(() => {
+      autoUpdater.checkForUpdates()
+        .then(() => console.log('✅ Checked for updates'))
+        .catch((err) => console.error('❌ Failed to check for updates:', err))
+    }, 5000) // Check after 5 seconds
+  }
 
   ipcMain.on('show-popup-message', async (event, appName, pid) => {
     if (isCleaningUp) return
@@ -449,6 +465,7 @@ app.whenReady().then(async () => {
 
   ipcMain.handle('load-categories', async (event) => {
     try {
+      await hybridConnection.whenReady()
       const categoriesService = hybridConnection.getCategoriesService()
       return await categoriesService.getCategoriesForSettings()
     } catch (error) {
@@ -484,6 +501,7 @@ app.whenReady().then(async () => {
 
   ipcMain.handle('load-data', async () => {
     try {
+      await hybridConnection.whenReady()
       const appUsageService = hybridConnection.getAppUsageService()
       const categoriesService = hybridConnection.getCategoriesService()
       const data = await appUsageService.getAppUsageData()
@@ -540,6 +558,7 @@ app.whenReady().then(async () => {
 
   ipcMain.handle('load-custom-categories', async () => {
     try {
+      await hybridConnection.whenReady()
       const categoriesService = hybridConnection.getCategoriesService()
       return await categoriesService.getCustomCategoryMappings()
     } catch (error) {
@@ -874,6 +893,7 @@ ipcMain.handle('ai-service-reset-memory', async () => {
   // Data Aggregation IPC handlers
   ipcMain.handle('get-aggregated-data-by-date', async (event, date) => {
     try {
+      await hybridConnection.whenReady()
       const appUsageService = hybridConnection.getAppUsageService()
       const categoriesService = hybridConnection.getCategoriesService()
       if (!appUsageService) {
@@ -889,6 +909,7 @@ ipcMain.handle('ai-service-reset-memory', async () => {
 
   ipcMain.handle('get-all-aggregated-data', async () => {
     try {
+      await hybridConnection.whenReady()
       const appUsageService = hybridConnection.getAppUsageService()
       const categoriesService = hybridConnection.getCategoriesService()
       if (!appUsageService) {
@@ -904,6 +925,7 @@ ipcMain.handle('ai-service-reset-memory', async () => {
 
   ipcMain.handle('get-formatted-usage-data', async (event, startDate, endDate) => {
     try {
+      await hybridConnection.whenReady()
       const appUsageService = hybridConnection.getAppUsageService()
       const categoriesService = hybridConnection.getCategoriesService()
       if (!appUsageService) {
@@ -919,6 +941,7 @@ ipcMain.handle('ai-service-reset-memory', async () => {
 
   ipcMain.handle('get-productivity-summary', async (event, date) => {
     try {
+      await hybridConnection.whenReady()
       const appUsageService = hybridConnection.getAppUsageService()
       if (!appUsageService) {
         throw new Error('App usage service not initialized')

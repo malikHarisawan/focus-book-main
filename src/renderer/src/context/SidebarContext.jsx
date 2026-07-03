@@ -7,9 +7,13 @@ export function SidebarProvider({ children }) {
     // Load from localStorage
     if (typeof window !== 'undefined') {
       const saved = localStorage.getItem('sidebarCollapsed')
-      return saved === 'true'
+      if (saved !== null) {
+        return saved === 'true'
+      }
+      // Default to collapsed if window width is 900px or less
+      return window.innerWidth <= 900
     }
-    return false
+    return true
   })
 
   useEffect(() => {

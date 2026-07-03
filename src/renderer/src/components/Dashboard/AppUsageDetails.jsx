@@ -90,8 +90,7 @@ const AppUsageDetails = ({
       case 'Productive':
         return 'bg-[#5051F9]/10 text-[#5051F9] border-[#5051F9]/30'
       case 'Neutral':
-        return 'bg-[#1EA7FF]/10 text-[#1EA7FF] border-[#1EA7FF]/30'
-      case 'Un-Productive':
+        return 'bg-[#22D3EE]/10 text-[#22D3EE] border-[#22D3EE]/30'
       case 'Distracting':
         return 'bg-[#FF6B6B]/10 text-[#FF6B6B] border-[#FF6B6B]/30'
       default:
@@ -198,8 +197,8 @@ const AppUsageDetails = ({
   }
 
   return (
-    <Card className="bg-white dark:bg-[#212329] border-[#E8EDF1] dark:border-[#282932] backdrop-blur-sm mt-3">
-      <CardHeader className="border-b border-[#E8EDF1] dark:border-[#282932] pb-2">
+    <Card className="bg-white dark:bg-[#0B1220] border-[#E8EDF1] dark:border-[#1E293B] backdrop-blur-sm mt-3">
+      <CardHeader className="border-b border-[#E8EDF1] dark:border-[#1E293B] pb-2">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2">
             <Clock className="h-5 w-5 text-[#5051F9]" />
@@ -212,7 +211,7 @@ const AppUsageDetails = ({
             </Badge>
           </div>
           <div className="flex items-center gap-2">
-            <span className="text-sm text-[#768396] dark:text-[#898999]">
+            <span className="text-sm text-[#768396] dark:text-[#94A3B8]">
               {selectedApps.length} app{selectedApps.length !== 1 ? 's' : ''}
             </span>
             {selectedApps.length > 10 && (
@@ -232,7 +231,7 @@ const AppUsageDetails = ({
                 e.stopPropagation()
                 onClose()
               }}
-              className="text-[#768396] dark:text-[#898999] hover:text-[#232360] dark:hover:text-white hover:bg-[#F4F7FE] dark:hover:bg-[#282932]"
+              className="text-[#768396] dark:text-[#94A3B8] hover:text-[#232360] dark:hover:text-white hover:bg-[#F4F7FE] dark:hover:bg-[#1E293B]"
               title="Close details panel"
             >
               <ChevronUp className="h-4 w-4" />
@@ -242,9 +241,9 @@ const AppUsageDetails = ({
       </CardHeader>
 
       <CardContent className="p-0">
-          <div className="bg-[#F4F7FE] dark:bg-[#1E1F25] rounded-b-lg overflow-hidden">
+          <div className="bg-[#F4F7FE] dark:bg-[#05070D] rounded-b-lg overflow-hidden">
             {/* Header */}
-            <div className="grid grid-cols-11 text-xs text-[#768396] dark:text-[#898999] p-2.5 border-b border-[#E8EDF1] dark:border-[#282932] bg-[#F4F7FE] dark:bg-[#282932]">
+            <div className="grid grid-cols-11 text-xs text-[#768396] dark:text-[#94A3B8] p-2.5 border-b border-[#E8EDF1] dark:border-[#1E293B] bg-[#F4F7FE] dark:bg-[#1E293B]">
               <button
                 onClick={() => handleSort('name')}
                 className="col-span-4 flex items-center gap-1 hover:text-[#5051F9] transition-colors text-left font-medium"
@@ -271,15 +270,15 @@ const AppUsageDetails = ({
             </div>
 
             {/* App List */}
-            <div className="divide-y divide-[#E8EDF1] dark:divide-[#282932] max-h-80 overflow-y-auto custom-scrollbar">
+            <div className="divide-y divide-[#E8EDF1] dark:divide-[#1E293B] max-h-80 overflow-y-auto custom-scrollbar">
               {sortedApps.map((app, index) => (
                 <div
                   key={`${app.name}-${index}`}
-                  className="grid grid-cols-11 py-2.5 px-2.5 text-sm hover:bg-white dark:hover:bg-[#212329] transition-colors"
+                  className="grid grid-cols-11 py-2.5 px-2.5 text-sm hover:bg-white dark:hover:bg-[#0B1220] transition-colors"
                   onClick={(e) => e.stopPropagation()}
                 >
                   <div className="col-span-4 flex items-center gap-2">
-                    <div className="w-7 h-7 bg-gradient-to-br from-[#5051F9]/20 to-[#1EA7FF]/20 rounded-lg flex items-center justify-center">
+                    <div className="w-7 h-7 bg-gradient-to-br from-[#5051F9]/20 to-[#22D3EE]/20 rounded-lg flex items-center justify-center">
                       <span className="text-xs font-medium text-[#5051F9]">
                         {app.name?.charAt(0)?.toUpperCase() || '?'}
                       </span>
@@ -289,7 +288,7 @@ const AppUsageDetails = ({
                         {app.name || 'Unknown App'}
                       </div>
                       {app.domain && (
-                        <div className="text-xs text-[#768396] dark:text-[#898999] truncate">{app.domain}</div>
+                        <div className="text-xs text-[#768396] dark:text-[#94A3B8] truncate">{app.domain}</div>
                       )}
                     </div>
                   </div>
@@ -319,7 +318,7 @@ const AppUsageDetails = ({
                           <Button
                             variant="ghost"
                             size="icon"
-                            className="h-6 w-6 text-[#768396] dark:text-[#898999] hover:text-[#232360] dark:hover:text-white"
+                            className="h-6 w-6 text-[#768396] dark:text-[#94A3B8] hover:text-[#232360] dark:hover:text-white"
                             onClick={(e) => e.stopPropagation()}
                           >
                             <MoreHorizontal className="h-4 w-4" />
@@ -327,17 +326,17 @@ const AppUsageDetails = ({
                         </DropdownMenuTrigger>
                         <DropdownMenuContent
                           align="end"
-                          className="bg-white dark:bg-[#212329] border-[#E8EDF1] dark:border-[#282932] text-[#232360] dark:text-white"
+                          className="bg-white dark:bg-[#0B1220] border-[#E8EDF1] dark:border-[#1E293B] text-[#232360] dark:text-white"
                           onClick={(e) => e.stopPropagation()}
                         >
                           <DropdownMenuLabel>Actions</DropdownMenuLabel>
-                          <DropdownMenuSeparator className="bg-[#E8EDF1] dark:bg-[#282932]" />
+                          <DropdownMenuSeparator className="bg-[#E8EDF1] dark:bg-[#1E293B]" />
                           <DropdownMenuSub>
                             <DropdownMenuSubTrigger className="flex items-center">
                               <Tag className="h-4 w-4 mr-2" />
                               <span>Change Category</span>
                             </DropdownMenuSubTrigger>
-                            <DropdownMenuSubContent className="bg-white dark:bg-[#212329] border-[#E8EDF1] dark:border-[#282932]">
+                            <DropdownMenuSubContent className="bg-white dark:bg-[#0B1220] border-[#E8EDF1] dark:border-[#1E293B]">
                               {categories.map((category) => (
                                 <DropdownMenuItem
                                   key={category}
@@ -366,8 +365,8 @@ const AppUsageDetails = ({
 
             {/* Footer */}
             {selectedApps.length > 0 && (
-              <div className="p-2.5 border-t border-[#E8EDF1] dark:border-[#282932] bg-[#F4F7FE] dark:bg-[#282932]">
-                <div className="flex items-center justify-between text-xs text-[#768396] dark:text-[#898999]">
+              <div className="p-2.5 border-t border-[#E8EDF1] dark:border-[#1E293B] bg-[#F4F7FE] dark:bg-[#1E293B]">
+                <div className="flex items-center justify-between text-xs text-[#768396] dark:text-[#94A3B8]">
                   <span>
                     Total:{' '}
                     {selectedApps.reduce((sum, app) => sum + (app.timeSpentSeconds || 0), 0) > 0

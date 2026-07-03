@@ -105,7 +105,7 @@ const SmartDatePicker = ({ zoomLevel = 'hour', onDateChange, className = '' }) =
           onClick={openDatePicker}
           className={`flex items-center gap-2 border rounded-lg px-3 py-2 text-sm transition-all duration-200 min-w-0 ${
             theme === 'dark'
-              ? 'bg-[#252630] text-white border-slate-700/50 hover:bg-slate-700/50 hover:border-teal-400'
+              ? 'bg-[#111C34] text-white border-slate-700/50 hover:bg-slate-700/50 hover:border-teal-400'
               : 'bg-white text-slate-600 border-slate-200 hover:bg-slate-50 hover:border-teal-400'
           }`}
           title="Click to select specific date"

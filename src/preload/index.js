@@ -150,40 +150,87 @@ async function getActiveChromeTab(pid) {
   }
 }
 
-async function getAppDescription(executablePath) {
-  try {
-    const escapedPath = executablePath.replace(/'/g, "''").replace(/"/g, '`"')
+// Cache for process details (executable path + description) keyed by
+// `${pid}:${exeName}`. A process's executable path and file description never
+// change during its lifetime, so once resolved we never need to spawn a
+// subprocess for that process again. This eliminates the biggest source of
+// system load: previously every tracking slice re-spawned wmic + powershell
+// for the same processes.
+const processDetailsCache = new Map()
+const PROCESS_DETAILS_CACHE_TTL = 10 * 60 * 1000 // 10 minutes
 
-    const powershellCommand = `(Get-ItemProperty -Path '${escapedPath}' -ErrorAction SilentlyContinue).VersionInfo.FileDescription`
-    const { stdout } = await execPromise(`powershell -command "${powershellCommand}"`)
-    return stdout.trim() || executablePath.split('\\').pop()
-  } catch (error) {
-    console.error('Error getting app description:', error)
-    return executablePath ? executablePath.split('\\').pop() : 'Unknown application'
+// Cleanup stale process-detail entries every 5 minutes to bound memory.
+setInterval(() => {
+  const now = Date.now()
+  for (const [key, entry] of processDetailsCache.entries()) {
+    if (now - entry.timestamp > PROCESS_DETAILS_CACHE_TTL) {
+      processDetailsCache.delete(key)
+    }
   }
+}, 5 * 60 * 1000)
+
+// Resolve a process's executable path AND file description in a SINGLE
+// PowerShell invocation. This replaces the old approach that spawned `wmic`
+// (deprecated, slow, CPU-heavy) for the path and then a SECOND `powershell`
+// process for the description — two heavyweight spawns per call.
+async function fetchProcessDetails(pid) {
+  // One process, emitting "path|description". Get-Process gives the path;
+  // its .Description property is the FileDescription from the exe's version info.
+  const psCommand =
+    `$p = Get-Process -Id ${pid} -ErrorAction SilentlyContinue; ` +
+    `if ($p) { "$($p.Path)|$($p.Description)" }`
+
+  const { stdout } = await execPromise(
+    `powershell -NoProfile -NonInteractive -Command "${psCommand}"`,
+    { timeout: 8000 }
+  )
+
+  const raw = stdout.trim()
+  if (!raw) {
+    return { description: 'Unknown application' }
+  }
+
+  const sepIndex = raw.indexOf('|')
+  const executablePath = sepIndex >= 0 ? raw.slice(0, sepIndex).trim() : raw.trim()
+  const rawDescription = sepIndex >= 0 ? raw.slice(sepIndex + 1).trim() : ''
+
+  // Fall back to the exe file name when the binary has no FileDescription.
+  const description =
+    rawDescription || (executablePath ? executablePath.split('\\').pop() : 'Unknown application')
+
+  return { executablePath: executablePath || null, description }
 }
 
-async function getProcessDetails(pid) {
+async function getProcessDetails(pid, appClass = '') {
+  // Guard: without a PID we cannot look anything up.
+  if (!pid) {
+    return { description: 'Unknown application' }
+  }
+
+  // Key on PID + executable name. Windows recycles PIDs after a process exits,
+  // so a bare PID could collide with a different app; including the exe name
+  // means a reused PID belonging to a new executable misses the cache and is
+  // re-resolved rather than returning stale details.
+  const cacheKey = `${pid}:${appClass}`
+
+  // Serve from cache when available — the common case during steady tracking,
+  // where the foreground process stays the same across many slices. Zero spawns.
+  const cached = processDetailsCache.get(cacheKey)
+  if (cached && Date.now() - cached.timestamp < PROCESS_DETAILS_CACHE_TTL) {
+    return cached.data
+  }
+
   try {
-    const { stdout: wmiOutput } = await execPromise(
-      `wmic process where ProcessId=${pid} get ExecutablePath /format:list`
-    )
-    const execPathMatch = wmiOutput.match(/ExecutablePath=(.+)/)
-    const executablePath = execPathMatch ? execPathMatch[1].trim() : null
-
-    if (!executablePath) {
-      return { description: 'Unknown application' }
-    }
-
-    const description = await getAppDescription(executablePath)
-
-    return {
-      executablePath,
-      description
-    }
+    const details = await fetchProcessDetails(pid)
+    processDetailsCache.set(cacheKey, { data: details, timestamp: Date.now() })
+    return details
   } catch (error) {
     console.error('Error getting process details:', error)
-    return { description: 'Unknown application' }
+    const fallback = { description: 'Unknown application' }
+    // Cache the fallback too so a persistently-failing PID doesn't re-spawn
+    // PowerShell on every single tracking slice.
+    processDetailsCache.set(cacheKey, { data: fallback, timestamp: Date.now() })
+    return fallback
   }
 }
 
@@ -307,14 +354,15 @@ async function updateAppUsage() {
         const chromeTabInfo = await getActiveChromeTab(pid)
         console.log('Chrome tab info received:', chromeTabInfo)
 
-        // Check if this is a fallback response (Python script failed)
+        // Check if this is a fallback response (Python script failed/timed out)
         if (chromeTabInfo.url === 'Browser Tab' && chromeTabInfo.title === 'Browser Tab') {
           console.log('Python script fallback detected - clearing active URL')
           current_url = null
           current_domain = null
         } else {
-          current_url = String(chromeTabInfo.active_app)
-          current_domain = chromeTabInfo.domain || chromeTabInfo.active_app
+          // The script returns active_app = full URL and domain = clean host.
+          current_url = String(chromeTabInfo.active_app || '')
+          current_domain = String(chromeTabInfo.domain || '')
           if (current_url === 'undefined' || current_url === 'null' || !current_url) {
             current_url = null
           }
@@ -586,7 +634,7 @@ async function updateUsageData(currentWindow, hasAppSwitched) {
       }
 
       const appClass = lastActiveApp.windowClass
-      const appDescription = await getProcessDetails(lastActiveApp.windowPid)
+      const appDescription = await getProcessDetails(lastActiveApp.windowPid, appClass)
       //  const appDescription = processInfo ? processInfo.description : appClass;
 
       if (appClass == 'chrome.exe' || appClass == 'brave.exe') {
@@ -738,10 +786,16 @@ function updateChromeTime(
 
   console.log(`UpdateChromeTime: appKey="${appKey}", active_url="${active_url}", windowName="${windowName}"`)
 
+  // Categorize once from a single expression so the daily aggregate and the
+  // hourly entry can never disagree. (Previously the hourly entry omitted
+  // `appKey`, so a Chrome tab with no active_url was categorized off its window
+  // title in the daily row but as "Unknown application" -> Miscellaneous hourly.)
+  const chromeCategory = getCategory(active_url || appKey || description || windowName)
+
   if (!appUsageData[formattedDate].apps.hasOwnProperty(appKey)) {
     appUsageData[formattedDate].apps[appKey] = {
       time: 0,
-      category: getCategory(active_url || appKey || description || windowName),
+      category: chromeCategory,
       domain: active_domain || active_url,
       description: description,
       timestamps: []
@@ -750,9 +804,7 @@ function updateChromeTime(
   }
 
   appUsageData[formattedDate].apps[appKey].time += timeSpent
-  appUsageData[formattedDate].apps[appKey].category = getCategory(
-    active_url || appKey || description || windowName
-  )
+  appUsageData[formattedDate].apps[appKey].category = chromeCategory
 
   console.log(`Updated time for ${appKey}: ${appUsageData[formattedDate].apps[appKey].time}ms`)
 
@@ -788,7 +840,7 @@ function updateChromeTime(
   if (!appUsageData[formattedDate][formattedHour].hasOwnProperty(appKey)) {
     appUsageData[formattedDate][formattedHour][appKey] = {
       time: 0,
-      category: getCategory(active_url || description || windowName),
+      category: chromeCategory,
       domain: active_domain || active_url,
       description: description,
       timestamps: []
@@ -796,9 +848,7 @@ function updateChromeTime(
   }
 
   appUsageData[formattedDate][formattedHour][appKey].time += timeSpent
-  appUsageData[formattedDate][formattedHour][appKey].category = getCategory(
-    active_url || description || windowName
-  )
+  appUsageData[formattedDate][formattedHour][appKey].category = chromeCategory
 
   const timestamps = appUsageData[formattedDate][formattedHour][appKey].timestamps
 
@@ -876,8 +926,8 @@ async function sendPopupMessage(currentWindow) {
     const pid = await getChromePid(currentWindow)
     if (pid) {
       const chromeTabInfo = await getActiveChromeTab(pid)
-      active_url = String(chromeTabInfo.active_app)
-      active_domain = chromeTabInfo.domain || chromeTabInfo.active_app
+      active_url = String(chromeTabInfo.active_app || '')
+      active_domain = String(chromeTabInfo.domain || '') || null
     }
     
     // Validate active_url before sending

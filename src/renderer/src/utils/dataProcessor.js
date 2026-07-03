@@ -1,24 +1,27 @@
-// Note: This will be replaced by database-driven productivity mapping
-// Kept as fallback for when database categories aren't loaded yet
-const DEFAULT_FOCUS_CATEGORIES = ['Code', 'Documenting', 'Learning']
-const DEFAULT_NEUTRAL_CATEGORIES = ['Utility', 'Miscellaneous', 'Personal', 'Utilities']
-const DEFAULT_UNPRODUCTIVE = ['Entertainment', 'Messaging', 'Communication', 'Browsing']
-
-// Global variable to store database category mappings
-let categoryProductivityMap = null
+// Productivity is DB-driven (Settings). The categories table is the single source
+// of truth; loadCategories() returns [productiveNames[], distractedNames[]] and
+// anything not in either list is treated as Neutral.
+//
+// This map is the renderer-side cache of that lookup. Until it loads (or if the DB
+// is unavailable) it stays empty, so every category degrades to 'Neutral' rather
+// than crashing.
+let categoryProductivityMap = {}
 
 // Function to load category productivity mapping from main process
 async function loadCategoryProductivityMapping() {
   try {
-    // Request categories from the main process via activeWindow API
+    // loadCategories() returns [productive[], distracted[]] — two arrays of category names.
     const categories = await window.activeWindow.loadCategories()
-    if (categories && Array.isArray(categories)) {
-      categoryProductivityMap = {}
-      categories.forEach(category => {
-        if (category.name && category.productivity_type) {
-          categoryProductivityMap[category.name] = category.productivity_type
-        }
+    if (Array.isArray(categories)) {
+      const [productive = [], distracted = []] = categories
+      const map = {}
+      productive.forEach((name) => {
+        map[name] = 'productive'
       })
+      distracted.forEach((name) => {
+        map[name] = 'distracted'
+      })
+      categoryProductivityMap = map
       console.log('Dashboard: Category productivity mapping loaded:', categoryProductivityMap)
     }
   } catch (error) {
@@ -41,46 +44,20 @@ export const formatTime = (milliseconds) => {
 }
 
 const getProductivity = (category) => {
-  // First try to use database mapping if available
-  if (categoryProductivityMap && categoryProductivityMap[category]) {
-    const productivityType = categoryProductivityMap[category]
-    switch (productivityType) {
-      case 'productive':
-        return 'Productive'
-      case 'distracted':
-        return 'Un-Productive'
-      case 'neutral':
-        return 'Neutral'
-      default:
-        return 'Neutral'
-    }
-  }
-
-  // Fallback to static arrays if database mapping not loaded
-  if (DEFAULT_FOCUS_CATEGORIES.includes(category)) {
-    return 'Productive'
-  } else if (DEFAULT_UNPRODUCTIVE.includes(category)) {
-    return 'Un-Productive'
-  } else {
-    return 'Neutral'
+  switch (categoryProductivityMap[category]) {
+    case 'productive':
+      return 'Productive'
+    case 'distracted':
+      return 'Distracting'
+    default:
+      return 'Neutral'
   }
 }
 
-// Export getProductivityType for external use
+// Export getProductivityType for external use — returns the raw DB type
+// ('productive' | 'distracted' | 'neutral').
 export const getProductivityType = (category) => {
-  // First try to use database mapping if available
-  if (categoryProductivityMap && categoryProductivityMap[category]) {
-    return categoryProductivityMap[category]
-  }
-
-  // Fallback to static arrays if database mapping not loaded
-  if (DEFAULT_FOCUS_CATEGORIES.includes(category)) {
-    return 'productive'
-  } else if (DEFAULT_UNPRODUCTIVE.includes(category)) {
-    return 'distracted'
-  } else {
-    return 'neutral'
-  }
+  return categoryProductivityMap[category] || 'neutral'
 }
 
 // Extract domain name from URL or app identifier
@@ -239,6 +216,27 @@ export const processUsageChartData = (jsonData, date, viewType = 'day') => {
   }
 }
 
+// Add an app's time to the correct productivity bucket of a chart data point.
+// Buckets mirror the three DB-driven labels so the chart, summary cards, and
+// tooltip all agree: productive / neutral / distracting.
+const accumulateProductivity = (bucket, app) => {
+  if (!app.category || !app.time) return
+
+  const seconds = app.time / 1000
+  switch (getProductivity(app.category)) {
+    case 'Productive':
+      bucket.productive += seconds
+      break
+    case 'Distracting':
+      bucket.distracting += seconds
+      break
+    default:
+      bucket.neutral += seconds
+  }
+}
+
+const emptyPoint = (day) => ({ day, productive: 0, neutral: 0, distracting: 0 })
+
 export const processProductiveChartData = (jsonData, date, viewType = 'day') => {
   if (viewType === 'hour') {
     if (!jsonData || !jsonData[date]) {
@@ -247,11 +245,7 @@ export const processProductiveChartData = (jsonData, date, viewType = 'day') => 
     const hourlyData = []
 
     for (let i = 9; i <= 21; i++) {
-      hourlyData.push({
-        day: i === 12 ? '12PM' : i < 12 ? `${i}AM` : `${i - 12}PM`,
-        productive: 0,
-        unproductive: 0
-      })
+      hourlyData.push(emptyPoint(i === 12 ? '12PM' : i < 12 ? `${i}AM` : `${i - 12}PM`))
     }
 
     for (const [hourKey, hourData] of Object.entries(jsonData[date])) {
@@ -264,16 +258,7 @@ export const processProductiveChartData = (jsonData, date, viewType = 'day') => 
       if (index < 0 || index >= hourlyData.length) continue
 
       for (const app of Object.values(hourData)) {
-        if (!app.category || !app.time) continue
-
-        const seconds = app.time / 1000
-        const isProductive = getProductivity(app.category)
-
-        if (isProductive == 'Productive') {
-          hourlyData[index].productive += seconds
-        } else {
-          hourlyData[index].unproductive += seconds
-        }
+        accumulateProductivity(hourlyData[index], app)
       }
     }
 
@@ -285,11 +270,9 @@ export const processProductiveChartData = (jsonData, date, viewType = 'day') => 
     const fullDayData = []
 
     for (let i = 0; i < 24; i++) {
-      fullDayData.push({
-        day: i === 0 ? '12AM' : i === 12 ? '12PM' : i < 12 ? `${i}AM` : `${i - 12}PM`,
-        productive: 0,
-        unproductive: 0
-      })
+      fullDayData.push(
+        emptyPoint(i === 0 ? '12AM' : i === 12 ? '12PM' : i < 12 ? `${i}AM` : `${i - 12}PM`)
+      )
     }
 
     for (const [hourKey, hourData] of Object.entries(jsonData[date])) {
@@ -299,16 +282,7 @@ export const processProductiveChartData = (jsonData, date, viewType = 'day') => 
       if (isNaN(hour) || hour < 0 || hour > 23) continue
 
       for (const app of Object.values(hourData)) {
-        if (!app.category || !app.time) continue
-
-        const seconds = app.time / 1000
-        const isProductive = getProductivity(app.category)
-
-        if (isProductive == 'Productive') {
-          fullDayData[hour].productive += seconds
-        } else {
-          fullDayData[hour].unproductive += seconds
-        }
+        accumulateProductivity(fullDayData[hour], app)
       }
     }
 
@@ -323,24 +297,11 @@ export const processProductiveChartData = (jsonData, date, viewType = 'day') => 
       currentDate.setDate(dateObj.getDate() - dateObj.getDay() + i)
       const formattedDate = currentDate.toISOString().split('T')[0]
 
-      const dayData = {
-        day: dayNames[i],
-        productive: 0,
-        unproductive: 0
-      }
+      const dayData = emptyPoint(dayNames[i])
 
       if (jsonData[formattedDate] && jsonData[formattedDate].apps) {
         for (const app of Object.values(jsonData[formattedDate].apps)) {
-          if (!app.category || !app.time) continue
-
-          const seconds = app.time / 1000
-          const isProductive = getProductivity(app.category)
-
-          if (isProductive == 'Productive') {
-            dayData.productive += seconds
-          } else {
-            dayData.unproductive += seconds
-          }
+          accumulateProductivity(dayData, app)
         }
       }
 
@@ -359,24 +320,11 @@ export const processProductiveChartData = (jsonData, date, viewType = 'day') => 
       const currentDate = new Date(year, month, day)
       const formattedDate = currentDate.toISOString().split('T')[0]
 
-      const dayData = {
-        day: day.toString(),
-        productive: 0,
-        unproductive: 0
-      }
+      const dayData = emptyPoint(day.toString())
 
       if (jsonData[formattedDate] && jsonData[formattedDate].apps) {
         for (const app of Object.values(jsonData[formattedDate].apps)) {
-          if (!app.category || !app.time) continue
-
-          const seconds = app.time / 1000
-          const isProductive = getProductivity(app.category)
-
-          if (isProductive == 'Productive') {
-            dayData.productive += seconds
-          } else {
-            dayData.unproductive += seconds
-          }
+          accumulateProductivity(dayData, app)
         }
       }
 
@@ -473,11 +421,7 @@ export const processMostUsedApps = (jsonData, date) => {
 }
 
 const isProductiveCategory = (category) => {
-  if (categoryProductivityMap && categoryProductivityMap[category]) {
-    return categoryProductivityMap[category] === 'productive'
-  }
-  // Fallback to static categories
-  return DEFAULT_FOCUS_CATEGORIES.includes(category)
+  return categoryProductivityMap[category] === 'productive'
 }
 
 export const getTotalFocusTime = (jsonData, date, processedChartData, view) => {
