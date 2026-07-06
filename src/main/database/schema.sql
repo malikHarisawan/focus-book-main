@@ -27,6 +27,19 @@ CREATE TABLE IF NOT EXISTS custom_category_mappings (
     updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
 );
 
+-- Exclusion list table: apps/domains the user has opted out of tracking.
+-- Column names (identifier, type) match the collection fields used by
+-- LocalCategoriesService, which addresses this table via the collection
+-- name "exclusionList" (getTableName falls through to the literal name).
+CREATE TABLE IF NOT EXISTS exclusionList (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    identifier TEXT NOT NULL, -- app name or domain
+    type TEXT NOT NULL CHECK (type IN ('app', 'domain')),
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    UNIQUE (identifier, type)
+);
+
 -- Main app usage table
 CREATE TABLE IF NOT EXISTS app_usage (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -90,6 +103,7 @@ CREATE INDEX IF NOT EXISTS idx_app_usage_domain ON app_usage(domain);
 CREATE INDEX IF NOT EXISTS idx_timestamps_app_usage_id ON timestamps(app_usage_id);
 CREATE INDEX IF NOT EXISTS idx_timestamps_start_time ON timestamps(start_time);
 CREATE INDEX IF NOT EXISTS idx_custom_mappings_app_identifier ON custom_category_mappings(app_identifier);
+CREATE INDEX IF NOT EXISTS idx_exclusion_list_identifier ON exclusionList(identifier);
 CREATE INDEX IF NOT EXISTS idx_focus_sessions_date ON focus_sessions(date);
 CREATE INDEX IF NOT EXISTS idx_focus_sessions_start_time ON focus_sessions(start_time);
 CREATE INDEX IF NOT EXISTS idx_focus_sessions_type ON focus_sessions(type);
@@ -122,7 +136,15 @@ CREATE TRIGGER IF NOT EXISTS update_custom_category_mappings_updated_at
         UPDATE custom_category_mappings SET updated_at = CURRENT_TIMESTAMP WHERE id = NEW.id;
     END;
 
-CREATE TRIGGER IF NOT EXISTS update_focus_sessions_updated_at 
+CREATE TRIGGER IF NOT EXISTS update_exclusion_list_updated_at
+    AFTER UPDATE ON exclusionList
+    FOR EACH ROW
+    WHEN NEW.updated_at = OLD.updated_at
+    BEGIN
+        UPDATE exclusionList SET updated_at = CURRENT_TIMESTAMP WHERE id = NEW.id;
+    END;
+
+CREATE TRIGGER IF NOT EXISTS update_focus_sessions_updated_at
     AFTER UPDATE ON focus_sessions 
     FOR EACH ROW
     WHEN NEW.updated_at = OLD.updated_at

@@ -9,7 +9,20 @@ const {
   globalShortcut,
   nativeImage
 } = require('electron')
-const { autoUpdater } = require('electron-updater')
+// NOTE: do NOT destructure `autoUpdater` here. In electron-updater, `autoUpdater`
+// is a lazy getter that instantiates NsisUpdater on first property access, which
+// reads app.getVersion() — if that happens at module load time (before the app is
+// ready) it crashes the whole main process on startup. We require the module now
+// but only read the `.autoUpdater` getter later, from inside getAutoUpdater(),
+// which is called after app.whenReady().
+const electronUpdater = require('electron-updater')
+let _autoUpdater = null
+function getAutoUpdater() {
+  if (!_autoUpdater) {
+    _autoUpdater = electronUpdater.autoUpdater
+  }
+  return _autoUpdater
+}
 // const { is } = require('@electron-toolkit/utils') // Removed to fix production build issue
 const { exec, spawn } = require('child_process')
 const path = require('path')
@@ -46,6 +59,29 @@ function getIconPath() {
   return iconPath
 }
 
+// In-memory cache for the exclusion list. The list changes only when the user
+// adds/removes/clears an exclusion (all of which call invalidateExclusionCache),
+// but filterExcludedApps runs on every dashboard/activity refresh. Caching avoids
+// a SQLite round-trip on each of those frequent reads.
+let exclusionCache = null
+
+function invalidateExclusionCache() {
+  exclusionCache = null
+}
+
+// Returns { apps: [], domains: [] }, served from cache when available.
+async function getCachedExclusionList(categoriesService) {
+  if (exclusionCache) {
+    return exclusionCache
+  }
+  const exclusionList = await categoriesService.getExclusionList()
+  exclusionCache = {
+    apps: exclusionList.apps || [],
+    domains: exclusionList.domains || []
+  }
+  return exclusionCache
+}
+
 // Helper function to filter excluded apps from usage data
 async function filterExcludedApps(data, categoriesService) {
   if (!data || typeof data !== 'object') {
@@ -53,8 +89,8 @@ async function filterExcludedApps(data, categoriesService) {
   }
 
   try {
-    // Get the exclusion list (returns { apps: [], domains: [] })
-    const exclusionList = await categoriesService.getExclusionList()
+    // Get the exclusion list (returns { apps: [], domains: [] }) — cached
+    const exclusionList = await getCachedExclusionList(categoriesService)
     const excludedApps = new Set(exclusionList.apps || [])
     const excludedDomains = new Set(exclusionList.domains || [])
 
@@ -133,6 +169,7 @@ const focusSessionService = require('./database/focusSessionService')
 const PopupManager = require('./popupManager')
 const AIServiceManager = require('./aiServiceManager')
 const PythonErrorRecovery = require('./pythonErrorRecovery')
+const BrowserBridge = require('./browserBridge')
 // const backgroundSyncService = require('./database/backgroundSyncService') // Commented out for simplified architecture
 
 let mainWindow = null
@@ -147,6 +184,7 @@ let isCleaningUp = false
 let popupManager = new PopupManager()
 let aiServiceManager = new AIServiceManager()
 let pythonErrorRecovery = new PythonErrorRecovery()
+let browserBridge = new BrowserBridge(app.getPath('userData'))
 
 function createWindow() {
   mainWindow = new BrowserWindow({
@@ -267,29 +305,40 @@ function createPopUp() {
   }
 }
 
-// Configure auto-updater
-autoUpdater.autoDownload = false
-autoUpdater.autoInstallOnAppQuit = true
+// Configure auto-updater.
+// IMPORTANT: this MUST be called after app.whenReady(). Touching `autoUpdater`
+// at module load time instantiates NsisUpdater, which reads app.getVersion()
+// before Electron's `app` is ready and crashes the whole main process on
+// startup. Keep all autoUpdater access inside this function.
+let autoUpdaterConfigured = false
+function configureAutoUpdater() {
+  if (autoUpdaterConfigured) return
+  autoUpdaterConfigured = true
 
-autoUpdater.on('update-available', (info) => {
-  console.log('🔔 Update available:', info.version)
-  // Notify user about update
-  if (mainWindow) {
-    mainWindow.webContents.send('update-available', info)
-  }
-})
+  const updater = getAutoUpdater()
+  updater.autoDownload = false
+  updater.autoInstallOnAppQuit = true
 
-autoUpdater.on('update-downloaded', (info) => {
-  console.log('✅ Update downloaded:', info.version)
-  // Notify user that update is ready
-  if (mainWindow) {
-    mainWindow.webContents.send('update-downloaded', info)
-  }
-})
+  updater.on('update-available', (info) => {
+    console.log('🔔 Update available:', info.version)
+    // Notify user about update
+    if (mainWindow) {
+      mainWindow.webContents.send('update-available', info)
+    }
+  })
 
-autoUpdater.on('error', (err) => {
-  console.error('❌ Auto-updater error:', err)
-})
+  updater.on('update-downloaded', (info) => {
+    console.log('✅ Update downloaded:', info.version)
+    // Notify user that update is ready
+    if (mainWindow) {
+      mainWindow.webContents.send('update-downloaded', info)
+    }
+  })
+
+  updater.on('error', (err) => {
+    console.error('❌ Auto-updater error:', err)
+  })
+}
 
 // Heavy backend initialization (SQLite, focus sessions, AI service, Python).
 // Runs in the BACKGROUND after the window is already on screen so the user is
@@ -385,6 +434,20 @@ async function initializeBackendServices() {
   } catch (error) {
     console.error('❌ Python error recovery initialization failed:', error.message)
   }
+
+  // Initialize the browser extension bridge (WebSocket URL source). This is a
+  // separate health domain from Python error recovery: it self-heals on
+  // reconnect and never latches into a permanent no-URL state.
+  try {
+    const started = await browserBridge.start()
+    if (started) {
+      console.log('✅ Browser bridge started (extension is the URL source)')
+    } else {
+      console.log('⚠️ Browser bridge could not bind a port; extension URLs unavailable until restart')
+    }
+  } catch (error) {
+    console.error('❌ Browser bridge initialization failed:', error.message)
+  }
 }
 
 app.whenReady().then(async () => {
@@ -399,10 +462,12 @@ app.whenReady().then(async () => {
     console.error('❌ Background initialization error:', error)
   })
 
-  // Check for updates (only in production)
+  // Check for updates (only in production). Configure the updater here — after
+  // the app is ready — so instantiating it can safely read app.getVersion().
   if (!process.env.NODE_ENV || process.env.NODE_ENV === 'production') {
+    configureAutoUpdater()
     setTimeout(() => {
-      autoUpdater.checkForUpdates()
+      getAutoUpdater().checkForUpdates()
         .then(() => console.log('✅ Checked for updates'))
         .catch((err) => console.error('❌ Failed to check for updates:', err))
     }, 5000) // Check after 5 seconds
@@ -477,7 +542,10 @@ app.whenReady().then(async () => {
   // Auto-updater IPC handlers
   ipcMain.handle('check-for-updates', async () => {
     try {
-      const result = await autoUpdater.checkForUpdates()
+      // Ensure listeners are attached even if the startup check never ran
+      // (e.g. dev mode or a manual check before the 5s timer fires).
+      configureAutoUpdater()
+      const result = await getAutoUpdater().checkForUpdates()
       return result
     } catch (error) {
       console.error('Error checking for updates:', error)
@@ -487,7 +555,8 @@ app.whenReady().then(async () => {
 
   ipcMain.handle('download-update', async () => {
     try {
-      await autoUpdater.downloadUpdate()
+      configureAutoUpdater()
+      await getAutoUpdater().downloadUpdate()
       return true
     } catch (error) {
       console.error('Error downloading update:', error)
@@ -496,7 +565,7 @@ app.whenReady().then(async () => {
   })
 
   ipcMain.handle('install-update', () => {
-    autoUpdater.quitAndInstall()
+    getAutoUpdater().quitAndInstall()
   })
 
   ipcMain.handle('load-data', async () => {
@@ -1061,7 +1130,8 @@ ipcMain.handle('ai-service-reset-memory', async () => {
 
       // Notify all windows that exclusion list has been updated
       if (result) {
-        const updatedList = await categoriesService.getExclusionList()
+        invalidateExclusionCache()
+        const updatedList = await getCachedExclusionList(categoriesService)
         mainWindow?.webContents.send('exclusion-list-updated', updatedList)
       }
 
@@ -1079,7 +1149,8 @@ ipcMain.handle('ai-service-reset-memory', async () => {
 
       // Notify all windows that exclusion list has been updated
       if (result) {
-        const updatedList = await categoriesService.getExclusionList()
+        invalidateExclusionCache()
+        const updatedList = await getCachedExclusionList(categoriesService)
         mainWindow?.webContents.send('exclusion-list-updated', updatedList)
       }
 
@@ -1106,6 +1177,7 @@ ipcMain.handle('ai-service-reset-memory', async () => {
       const result = await categoriesService.clearExclusionList()
 
       // Notify all windows that exclusion list has been cleared
+      invalidateExclusionCache()
       mainWindow?.webContents.send('exclusion-list-updated', { apps: [], domains: [] })
 
       return result
@@ -1206,6 +1278,15 @@ function cleanup() {
     aiServiceManager.stop().catch((err) => {
       console.error('Error stopping AI service:', err)
     })
+  }
+
+  // Stop the browser extension bridge WebSocket server.
+  if (browserBridge) {
+    try {
+      browserBridge.stop()
+    } catch (err) {
+      console.error('Error stopping browser bridge:', err)
+    }
   }
 
   // Disconnect from hybrid database system
@@ -1389,6 +1470,23 @@ ipcMain.handle('get-python-status', () => {
 ipcMain.handle('reset-python-recovery', () => {
   pythonErrorRecovery.reset()
   return { success: true, message: 'Python error recovery system reset' }
+})
+
+// Browser extension bridge: the URL-source seam. The preload calls this only
+// after the focus tracker has confirmed a Chromium browser is foreground. It
+// resolves state ONLY — it never opens, closes, or mutates a usage span.
+ipcMain.handle('resolve-browser-url', (event, windowInfo) => {
+  try {
+    return browserBridge.resolve(windowInfo || {})
+  } catch (error) {
+    console.error('Error resolving browser URL:', error)
+    return { source: 'degraded' }
+  }
+})
+
+// Bridge status + token for the Settings UI.
+ipcMain.handle('get-browser-bridge-status', () => {
+  return browserBridge.getStatus()
 })
 
 ipcMain.on('start-focus', (event, isFocused) => {

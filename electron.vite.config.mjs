@@ -67,6 +67,17 @@ export default defineConfig({
           } else {
             console.error(`Python Error Recovery file not found: ${pythonErrorRecoverySrc}`)
           }
+
+          // Copy browserBridge.js specifically (WebSocket URL-source bridge)
+          const browserBridgeSrc = resolve(srcMainDir, 'browserBridge.js')
+          const browserBridgeDest = resolve(outMainDir, 'browserBridge.js')
+
+          if (existsSync(browserBridgeSrc)) {
+            copyFileSync(browserBridgeSrc, browserBridgeDest)
+            console.log(`Copied ${browserBridgeSrc} to ${browserBridgeDest}`)
+          } else {
+            console.error(`Browser Bridge file not found: ${browserBridgeSrc}`)
+          }
         }
       }
     ]

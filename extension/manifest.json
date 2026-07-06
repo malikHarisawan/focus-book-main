@@ -1,0 +1,13 @@
+{
+  "manifest_version": 3,
+  "name": "FocusBook Tab Reporter",
+  "version": "1.0.0",
+  "description": "Reports the active browser tab to the FocusBook desktop app over a local, token-authenticated WebSocket. Reports state only — never durations or time spent.",
+  "permissions": ["tabs", "alarms", "storage"],
+  "host_permissions": [],
+  "background": {
+    "service_worker": "background.js"
+  },
+  "options_page": "options.html",
+  "icons": {}
+}

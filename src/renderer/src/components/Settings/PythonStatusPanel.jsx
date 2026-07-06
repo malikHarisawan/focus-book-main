@@ -71,7 +71,7 @@ const PythonStatusPanel = () => {
       <CardHeader>
         <CardTitle>Python Environment Status</CardTitle>
         <CardDescription>
-          Python is used for advanced browser tab detection and closing. When unavailable, the app uses fallback mechanisms.
+          Python is used to close distracting browser tabs. When unavailable, the app uses fallback mechanisms.
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-4">

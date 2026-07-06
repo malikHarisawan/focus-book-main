@@ -52,7 +52,8 @@
     "remark-gfm": "^4.0.1",
     "sqlite3": "^5.1.7",
     "tailwind-variants": "^1.0.0",
-    "winreg": "^1.2.5"
+    "winreg": "^1.2.5",
+    "ws": "^8.21.0"
   },
   "devDependencies": {
     "@electron-toolkit/eslint-config": "^2.0.0",

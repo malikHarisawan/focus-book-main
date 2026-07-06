@@ -26,6 +26,10 @@ extraResources:
     to: scripts
     filter:
       - '**/*.py'
+  - from: extension
+    to: extension
+    filter:
+      - '**/*'
   - from: .
     to: .
     filter:
