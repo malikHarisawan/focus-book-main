@@ -322,6 +322,9 @@ function createWindow() {
     frame: false,
     title: 'FocusBook',
     titleBarStyle: 'hidden',
+    // Use the same logo as the system tray for the window/taskbar icon so they
+    // match. getIconPath() resolves icon.png in both dev and packaged builds.
+    icon: getIconPath(),
     backgroundColor: '#0f172a',
     webPreferences: {
       nodeIntegration: true,
@@ -587,6 +590,13 @@ async function initializeBackendServices() {
 }
 
 app.whenReady().then(async () => {
+  // On Windows, associate the app with an explicit AppUserModelID so the
+  // taskbar uses our window icon (matching electron-builder's appId) instead of
+  // the default Electron icon, and groups windows correctly.
+  if (process.platform === 'win32') {
+    app.setAppUserModelId('com.focusbook.app')
+  }
+
   // Show the window IMMEDIATELY. Everything below this line (DB, AI service,
   // Python) previously blocked window creation, forcing the user to wait
   // ~10s+ staring at nothing. The window now paints first and populates data
