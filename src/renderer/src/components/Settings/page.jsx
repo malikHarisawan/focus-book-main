@@ -27,7 +27,7 @@ import {
 
 export default function SettingsPage() {
   const [activeTab, setActiveTab] = useState('profile')
-  const { theme, setThemeMode, primaryColor, secondaryColor, setPrimaryAccent, setSecondaryAccent } = useTheme()
+  const { theme, resolvedTheme, setThemeMode, primaryColor, secondaryColor, setPrimaryAccent, setSecondaryAccent } = useTheme()
   const [focusMode, setFocusMode] = useState(false)
   const [notifications, setNotifications] = useState(true)
   const [soundEffects, setSoundEffects] = useState(true)
@@ -43,28 +43,50 @@ export default function SettingsPage() {
   const [aiServiceStatus, setAiServiceStatus] = useState({ isRunning: false, port: null, error: null })
   const [isExporting, setIsExporting] = useState(false)
   const [exportStatus, setExportStatus] = useState(null) // { ok, message }
+  const [exportFrom, setExportFrom] = useState('') // YYYY-MM-DD, blank = no lower bound
+  const [exportTo, setExportTo] = useState('') // YYYY-MM-DD, blank = no upper bound
 
   // Export the full app-usage history as CSV or JSON. The renderer already has
   // the data via getAllAggregatedData(); we serialize here and hand the string
   // to the main process, which shows a native Save dialog and writes the file.
   const handleExport = async (format) => {
     const fmt = format.toLowerCase()
+    // Guard against an inverted range before doing any work.
+    if (exportFrom && exportTo && exportFrom > exportTo) {
+      setExportStatus({ ok: false, message: '"From" date must be on or before "To" date.' })
+      return
+    }
     setIsExporting(true)
     setExportStatus(null)
     try {
-      const data = await window.electronAPI.getAllAggregatedData()
+      // Blank pickers = whole history; either/both filled = date-range export.
+      // getFormattedUsageData returns the same nested shape as getAllAggregatedData,
+      // so the serializers are unchanged. Use very-wide bounds for an open end.
+      const hasRange = exportFrom || exportTo
+      const data = hasRange
+        ? await window.electronAPI.getFormattedUsageData(
+            exportFrom || '0000-01-01',
+            exportTo || '9999-12-31'
+          )
+        : await window.electronAPI.getAllAggregatedData()
       if (!data || data.error) {
         throw new Error(data?.error || 'Could not load usage data')
       }
       if (Object.keys(data).length === 0) {
-        setExportStatus({ ok: false, message: 'No usage data to export yet.' })
+        setExportStatus({
+          ok: false,
+          message: hasRange
+            ? 'No usage data in that date range.'
+            : 'No usage data to export yet.'
+        })
         return
       }
 
       const exportedAt = new Date().toISOString()
       const content = fmt === 'json' ? toJSON(data, exportedAt) : toCSV(data)
       const stamp = exportedAt.slice(0, 10)
-      const defaultName = `focusbook-usage-${stamp}.${fmt}`
+      const rangeSuffix = hasRange ? `-${exportFrom || 'start'}_to_${exportTo || 'end'}` : ''
+      const defaultName = `focusbook-usage${rangeSuffix}-${stamp}.${fmt}`
 
       const result = await window.electronAPI.exportData({ content, format: fmt, defaultName })
       if (result?.success) {
@@ -822,6 +844,50 @@ export default function SettingsPage() {
                     <p className="text-sm text-slate-400 mb-3">
                       Download your productivity data in various formats
                     </p>
+
+                    {/* Optional date range. Leave blank to export the full history. */}
+                    <div className="flex flex-wrap items-end gap-3 mb-4">
+                      <div className="flex flex-col">
+                        <label className="text-xs text-slate-500 dark:text-slate-400 mb-1">
+                          From
+                        </label>
+                        <input
+                          type="date"
+                          value={exportFrom}
+                          max={exportTo || undefined}
+                          onChange={(e) => setExportFrom(e.target.value)}
+                          style={{ colorScheme: resolvedTheme === 'dark' ? 'dark' : 'light' }}
+                          className="text-sm bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded px-2 py-1.5 text-slate-800 dark:text-slate-200"
+                        />
+                      </div>
+                      <div className="flex flex-col">
+                        <label className="text-xs text-slate-500 dark:text-slate-400 mb-1">
+                          To
+                        </label>
+                        <input
+                          type="date"
+                          value={exportTo}
+                          min={exportFrom || undefined}
+                          onChange={(e) => setExportTo(e.target.value)}
+                          style={{ colorScheme: resolvedTheme === 'dark' ? 'dark' : 'light' }}
+                          className="text-sm bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded px-2 py-1.5 text-slate-800 dark:text-slate-200"
+                        />
+                      </div>
+                      {(exportFrom || exportTo) && (
+                        <button
+                          onClick={() => {
+                            setExportFrom('')
+                            setExportTo('')
+                          }}
+                          className="text-xs text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200 underline pb-2"
+                        >
+                          Clear
+                        </button>
+                      )}
+                      <span className="text-xs text-slate-400 pb-2">
+                        {exportFrom || exportTo ? 'Exporting selected range' : 'Exporting all history'}
+                      </span>
+                    </div>
 
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                       {[
