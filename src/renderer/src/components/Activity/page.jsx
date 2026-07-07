@@ -1,6 +1,6 @@
 'use client'
 
-import { use, useEffect, useState, useMemo } from 'react'
+import { use, useEffect, useRef, useState, useMemo } from 'react'
 import { Badge } from '../ui/badge'
 import { Button } from '../ui/button'
 import {
@@ -76,25 +76,41 @@ export default function AppUsageTable() {
   const [summary, setSummary] = useState(null)
   const [isLoadingSummary, setIsLoadingSummary] = useState(false)
   const [summaryError, setSummaryError] = useState(null)
+  // Table is the default tab; the AI summary is generated lazily only when the
+  // user actually opens the Summary tab (see the tab-change handler below).
+  const [activeTab, setActiveTab] = useState('table')
+  // Ref mirror of activeTab so the category-update listener (registered once per
+  // date) always reads the current tab instead of a stale closure value.
+  const activeTabRef = useRef('table')
+  // Guards against re-generating the summary every time the user re-visits the
+  // Summary tab within the same date. Reset when the date changes.
+  const [summaryLoadedForDate, setSummaryLoadedForDate] = useState(null)
   const { selectedDate, handleDateChange } = useDate()
   const { toast } = useToast()
   const { showCategoryChangeToast } = useCategoryChangeToast()
 
   useEffect(() => {
     loadApps()
-    loadSummary()
+    // Summary is generated lazily when the Summary tab is opened, not on mount.
+    // Reset the per-date guard so a date change re-generates on the next open.
+    setSummaryLoadedForDate(null)
     handleVisibilityChange()
     document.addEventListener('visibilitychange', handleVisibilityChange)
-    
+
     // Listen for category updates (in case of multiple windows or external updates)
     const removeCategoryListener = window.activeWindow.onCategoryUpdated((data) => {
       console.log('Activity page received category update:', data)
       loadApps()
-      // Clear cache and reload summary when categories change
+      // Invalidate the cached summary; only regenerate now if the Summary tab is
+      // actually open, otherwise it'll regenerate the next time it's opened.
       clearSummaryCache(selectedDate)
-      loadSummary(true)
+      setSummaryLoadedForDate(null)
+      if (activeTabRef.current === 'summary') {
+        loadSummary(true)
+        setSummaryLoadedForDate(selectedDate)
+      }
     })
-    
+
     return () => {
       document.removeEventListener('visibilitychange', handleVisibilityChange)
       if (removeCategoryListener) {
@@ -106,6 +122,16 @@ export default function AppUsageTable() {
   function handleVisibilityChange() {
     if (document.visibilityState === 'visible') {
       loadApps()
+    }
+  }
+
+  // Lazily generate the AI summary the first time the Summary tab is opened for
+  // a given date. Switching to Table never triggers generation.
+  const handleTabChange = (value) => {
+    setActiveTab(value)
+    activeTabRef.current = value
+    if (value === 'summary' && summaryLoadedForDate !== selectedDate) {
+      setSummaryLoadedForDate(selectedDate)
       loadSummary()
     }
   }
@@ -171,6 +197,7 @@ export default function AppUsageTable() {
   // Manual refresh handler
   const handleRefreshSummary = () => {
     clearSummaryCache(selectedDate)
+    setSummaryLoadedForDate(selectedDate)
     loadSummary(true)
   }
 
@@ -380,9 +407,15 @@ export default function AppUsageTable() {
         </div>
       </CardHeader>
       <CardContent className="p-0">
-        <Tabs defaultValue="summary" className="w-full">
+        <Tabs value={activeTab} onValueChange={handleTabChange} className="w-full">
           <div className="px-4 pt-4 pb-2 flex items-center justify-between">
             <TabsList className="bg-muted/50 p-0.5">
+              <TabsTrigger
+                value="table"
+                className="data-[state=active]:bg-muted data-[state=active]:text-primary"
+              >
+                Table
+              </TabsTrigger>
               <TabsTrigger
                 value="summary"
                 className="data-[state=active]:bg-muted data-[state=active]:text-primary"
@@ -390,18 +423,14 @@ export default function AppUsageTable() {
                 <Sparkles className="h-4 w-4 mr-1.5" />
                 Summary
               </TabsTrigger>
-              <TabsTrigger
-                value="table"
-                className="data-[state=active]:bg-muted data-[state=active]:text-primary"
-              >
-                Table
-              </TabsTrigger>
             </TabsList>
 
             <div className="flex items-center space-x-4">
               <div className="text-sm text-muted-foreground">
                 Total time: <span className="text-primary font-mono">{totalTimeFormatted}</span>
               </div>
+              {/* Refresh only makes sense on the Summary tab, where the AI runs. */}
+              {activeTab === 'summary' && (
               <Button
                 onClick={handleRefreshSummary}
                 variant="ghost"
@@ -412,6 +441,7 @@ export default function AppUsageTable() {
                 <RefreshCw className={`h-4 w-4 mr-1.5 ${isLoadingSummary ? 'animate-spin' : ''}`} />
                 Refresh Summary
               </Button>
+              )}
             </div>
           </div>
 
