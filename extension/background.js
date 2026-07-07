@@ -173,6 +173,24 @@ async function connect() {
     startHeartbeat()
   }
 
+  // Commands from FocusBook. Currently only "close_tab" (Stay Focused). The
+  // token must match ours so a rogue local page can't drive the extension.
+  socket.onmessage = (event) => {
+    let msg
+    try {
+      msg = JSON.parse(event.data)
+    } catch (e) {
+      return
+    }
+    if (!authToken || msg.token !== authToken) return
+    if (msg.type === 'close_tab' && typeof msg.tabId === 'number') {
+      chrome.tabs.remove(msg.tabId, () => {
+        // Access lastError to avoid unchecked-error warnings if the tab is gone.
+        void chrome.runtime.lastError
+      })
+    }
+  }
+
   socket.onclose = () => {
     stopHeartbeat()
     socket = null

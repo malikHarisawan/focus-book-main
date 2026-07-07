@@ -978,7 +978,13 @@ async function sendPopupMessage(currentWindow) {
       return
     }
 
-    ipcRenderer.send('show-popup-message', active_url, pid)
+    // Pass the browser exe + OS window title so the main process can ask the
+    // extension bridge to close this exact tab (no Python).
+    ipcRenderer.send('show-popup-message', active_url, pid, {
+      isBrowser: true,
+      exe: currentWindow.windowClass,
+      title: currentWindow.windowName
+    })
   } else {
     // Validate windowClass before sending
     const appName = currentWindow.windowClass
@@ -986,8 +992,10 @@ async function sendPopupMessage(currentWindow) {
       console.log('Popup blocked: Invalid or undefined application name:', appName)
       return
     }
-    
-    ipcRenderer.send('show-popup-message', appName, currentWindow.windowPid)
+
+    ipcRenderer.send('show-popup-message', appName, currentWindow.windowPid, {
+      isBrowser: false
+    })
   }
 }
 
@@ -1425,8 +1433,6 @@ contextBridge.exposeInMainWorld('electronAPI', {
   getAiConfig: () => ipcRenderer.invoke('get-ai-config'),
   saveAiConfig: (config) => ipcRenderer.invoke('save-ai-config', config),
   // Python Error Recovery API
-  getPythonStatus: () => ipcRenderer.invoke('get-python-status'),
-  resetPythonRecovery: () => ipcRenderer.invoke('reset-python-recovery'),
   // Browser Extension Bridge API
   getBrowserBridgeStatus: () => ipcRenderer.invoke('get-browser-bridge-status'),
   // Auto-startup API

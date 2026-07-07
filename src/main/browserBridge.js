@@ -306,45 +306,9 @@ class BrowserBridge {
    *                                                          to title-only attribution
    */
   resolve({ exe, title }) {
-    const browser = EXE_TO_BROWSER[String(exe || '').toLowerCase()]
-    if (!browser) {
+    const chosen = this._pickConnection({ exe, title })
+    if (!chosen) {
       return { source: 'degraded' }
-    }
-
-    const candidates = []
-    for (const conn of this.connections.values()) {
-      if (conn.browser === browser && this._isAlive(conn)) {
-        candidates.push(conn)
-      }
-    }
-    if (candidates.length === 0) {
-      return { source: 'degraded' }
-    }
-
-    // Multiple profiles of the same browser can be connected at once. Pick
-    // the connection whose focused-window tab title matches the OS window
-    // title; with a single candidate, trust its focused window (tab titles
-    // can briefly lag the OS title during navigation).
-    let chosen = null
-    if (candidates.length === 1) {
-      chosen = candidates[0]
-    } else {
-      chosen = candidates.find((conn) => {
-        const entry = conn.focusedWindowId !== null ? conn.windows.get(conn.focusedWindowId) : null
-        return entry && this._titleMatches(entry.title, title)
-      })
-      // No title match: only safe if exactly one candidate believes it owns
-      // OS focus (focusedWindowId set). Otherwise we cannot tell profiles
-      // apart and must not guess a URL.
-      if (!chosen) {
-        const focusedCandidates = candidates.filter((c) => c.focusedWindowId !== null)
-        if (focusedCandidates.length === 1) {
-          chosen = focusedCandidates[0]
-        }
-      }
-      if (!chosen) {
-        return { source: 'degraded' }
-      }
     }
 
     // Connection is live but reports no focused window (or one we have no
@@ -361,6 +325,71 @@ class BrowserBridge {
       domain: this._hostnameOf(entry.url),
       title: entry.title,
       browser: chosen.browser
+    }
+  }
+
+  /**
+   * Pick the live connection that owns the OS-foreground window for a given
+   * browser exe + OS window title. Returns the connection or null. Shared by
+   * resolve() (read state) and closeActiveTab() (send a command).
+   */
+  _pickConnection({ exe, title }) {
+    const browser = EXE_TO_BROWSER[String(exe || '').toLowerCase()]
+    if (!browser) return null
+
+    const candidates = []
+    for (const conn of this.connections.values()) {
+      if (conn.browser === browser && this._isAlive(conn)) {
+        candidates.push(conn)
+      }
+    }
+    if (candidates.length === 0) return null
+    if (candidates.length === 1) return candidates[0]
+
+    // Multiple profiles of the same browser can be connected at once. Prefer the
+    // one whose focused-window tab title matches the OS title; else the sole
+    // candidate that believes it owns OS focus. Otherwise we can't tell them apart.
+    let chosen = candidates.find((conn) => {
+      const entry = conn.focusedWindowId !== null ? conn.windows.get(conn.focusedWindowId) : null
+      return entry && this._titleMatches(entry.title, title)
+    })
+    if (!chosen) {
+      const focusedCandidates = candidates.filter((c) => c.focusedWindowId !== null)
+      if (focusedCandidates.length === 1) chosen = focusedCandidates[0]
+    }
+    return chosen || null
+  }
+
+  /**
+   * Ask the extension to close the active tab of the foreground browser window.
+   * Returns { ok: true } if a close command was sent, or { ok: false, reason }
+   * when we can't (no extension connected, private/PWA window, etc.) so the
+   * caller can give the user clear feedback instead of a silent no-op.
+   * Replaces the old pywinauto/closeTab.py path — no Python, targets the real
+   * active tab id the extension already tracks.
+   */
+  closeActiveTab({ exe, title }) {
+    const conn = this._pickConnection({ exe, title })
+    if (!conn) {
+      return { ok: false, reason: 'no-extension' }
+    }
+    const entry = conn.focusedWindowId !== null ? conn.windows.get(conn.focusedWindowId) : null
+    if (!entry || entry.activeTabId == null) {
+      return { ok: false, reason: 'private' }
+    }
+    try {
+      conn.socket.send(
+        JSON.stringify({
+          type: 'close_tab',
+          token: this.config.token,
+          windowId: conn.focusedWindowId,
+          tabId: entry.activeTabId
+        })
+      )
+      return { ok: true }
+    } catch (error) {
+      console.warn('BrowserBridge: failed to send close_tab command:', error.message)
+      return { ok: false, reason: 'send-failed' }
     }
   }
 

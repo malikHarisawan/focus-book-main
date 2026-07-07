@@ -24,7 +24,6 @@ function getAutoUpdater() {
   return _autoUpdater
 }
 // const { is } = require('@electron-toolkit/utils') // Removed to fix production build issue
-const { exec, spawn } = require('child_process')
 const path = require('path')
 const fs = require('fs')
 
@@ -57,6 +56,73 @@ function getIconPath() {
   }
 
   return iconPath
+}
+
+// Close a distracting native app by its PID using Node's built-in process.kill —
+// no external `taskkill`. Tries a graceful SIGTERM first so the app can save,
+// then escalates to SIGKILL if it's still alive after a short grace period.
+// Targets the single foreground PID, not every instance of the exe.
+function closeAppByPid(pid, appName) {
+  const numericPid = parseInt(pid, 10)
+  if (!numericPid || Number.isNaN(numericPid)) {
+    console.log(`Cannot close ${appName}: no valid PID (got ${pid})`)
+    return
+  }
+
+  const isAlive = () => {
+    try {
+      process.kill(numericPid, 0) // signal 0 = existence check, doesn't kill
+      return true
+    } catch {
+      return false
+    }
+  }
+
+  try {
+    process.kill(numericPid, 'SIGTERM')
+    console.log(`Sent SIGTERM to ${appName} (pid ${numericPid})`)
+  } catch (error) {
+    if (error.code === 'ESRCH') {
+      console.log(`${appName} (pid ${numericPid}) was already closed`)
+    } else {
+      console.warn(`Could not signal ${appName} (pid ${numericPid}): ${error.message}`)
+    }
+    return
+  }
+
+  // Escalate to a forced kill if it ignored SIGTERM.
+  setTimeout(() => {
+    if (!isAlive()) {
+      console.log(`Successfully closed ${appName} (pid ${numericPid})`)
+      return
+    }
+    try {
+      process.kill(numericPid, 'SIGKILL')
+      console.log(`Force-closed ${appName} (pid ${numericPid}) after SIGTERM timeout`)
+    } catch (error) {
+      if (error.code !== 'ESRCH') {
+        console.warn(`Failed to force-close ${appName} (pid ${numericPid}): ${error.message}`)
+      }
+    }
+  }, 2000)
+}
+
+// Tell the user why an auto tab-close couldn't happen, instead of silently doing
+// nothing. Uses a native notification so it works even though the popup is gone.
+function notifyTabCloseUnavailable(reason) {
+  const { Notification } = require('electron')
+  if (!Notification.isSupported()) return
+  const body =
+    reason === 'no-extension'
+      ? 'Install and connect the FocusBook browser extension to auto-close distracting tabs.'
+      : reason === 'private'
+        ? "This tab is in a private/incognito window FocusBook can't close automatically."
+        : "Couldn't close the tab automatically. Please close it manually."
+  try {
+    new Notification({ title: 'FocusBook', body }).show()
+  } catch (error) {
+    console.warn('Could not show tab-close notification:', error.message)
+  }
 }
 
 // In-memory cache for the exclusion list. The list changes only when the user
@@ -168,7 +234,6 @@ const { hybridConnection } = require('./database/hybridConnection')
 const focusSessionService = require('./database/focusSessionService')
 const PopupManager = require('./popupManager')
 const AIServiceManager = require('./aiServiceManager')
-const PythonErrorRecovery = require('./pythonErrorRecovery')
 const BrowserBridge = require('./browserBridge')
 // const backgroundSyncService = require('./database/backgroundSyncService') // Commented out for simplified architecture
 
@@ -180,10 +245,12 @@ let timeDisplay = 0
 let timerInterval = null
 let app_name = null
 let n_pid = null
+// Context for the currently-shown popup: { isBrowser, exe, title } — used by the
+// stay-focused handler to close a browser tab via the extension bridge.
+let popup_context = null
 let isCleaningUp = false
 let popupManager = new PopupManager()
 let aiServiceManager = new AIServiceManager()
-let pythonErrorRecovery = new PythonErrorRecovery()
 let browserBridge = new BrowserBridge(app.getPath('userData'))
 
 // Window sizing. Default opens comfortably for the dashboard; the minimum is
@@ -502,19 +569,6 @@ async function initializeBackendServices() {
     console.log('📋 AI insights will not be available.')
   }
 
-  // Initialize Python error recovery system
-  try {
-    await pythonErrorRecovery.checkPythonAvailability()
-    await pythonErrorRecovery.checkPythonDependencies()
-    const status = pythonErrorRecovery.getStatus()
-    if (status.pythonAvailable && !status.fallbackMode) {
-      console.log('✅ Python environment verified successfully')
-    } else {
-      console.log('⚠️ Python environment not available, using fallback mode for browser detection')
-    }
-  } catch (error) {
-    console.error('❌ Python error recovery initialization failed:', error.message)
-  }
 
   // Initialize the browser extension bridge (WebSocket URL source). This is a
   // separate health domain from Python error recovery: it self-heals on
@@ -554,7 +608,7 @@ app.whenReady().then(async () => {
     }, 5000) // Check after 5 seconds
   }
 
-  ipcMain.on('show-popup-message', async (event, appName, pid) => {
+  ipcMain.on('show-popup-message', async (event, appName, pid, context) => {
     if (isCleaningUp) return
 
     try {
@@ -576,6 +630,7 @@ app.whenReady().then(async () => {
       console.log('pid', pid, 'appName', appName)
       app_name = appName
       n_pid = pid || null
+      popup_context = context || null
 
       // Record popup shown and create popup
       popupManager.recordPopupShown(appName)
@@ -1507,92 +1562,33 @@ ipcMain.on('stay-focused', (event) => {
     popupWindow.close()
     popupWindow = null
 
-    // Check if we're dealing with a Chrome/Brave browser tab (URL) vs regular application (.exe)
-    if (app_name && (app_name.startsWith('http') || (app_name.includes('.') && !app_name.endsWith('.exe'))) && n_pid) {
-      // This is a URL/domain from Chrome/Brave - use Python script to close tab
-      // In production, scripts are in extraResources; in dev, they're in the project root
-      const isDev = process.env.NODE_ENV === 'development' || !process.resourcesPath
-      const closeScriptPath = isDev
-        ? path.join(__dirname, '../../scripts/closeTab.py')
-        : path.join(process.resourcesPath, 'scripts/closeTab.py')
+    // Browser tab vs regular application. A browser popup carries context.isBrowser
+    // (set in the preload); app_name for browsers is the URL/domain.
+    const isBrowserTab =
+      popup_context?.isBrowser ||
+      (app_name && (app_name.startsWith('http') || (app_name.includes('.') && !app_name.endsWith('.exe'))))
 
-      console.log(`Close script path (isDev=${isDev}): ${closeScriptPath}`)
-
-      // Check if Python script exists
-      if (!fs.existsSync(closeScriptPath)) {
-        console.warn('Python closeTab script not found, cannot close browser tab')
-        console.log('User requested to close distracting tab but script is unavailable')
-        return
-      }
-
-      try {
-        const pythonProcess = spawn('python', [closeScriptPath, n_pid, app_name])
-        
-        // Set timeout for Python process
-        const timeout = setTimeout(() => {
-          pythonProcess.kill('SIGKILL')
-          console.warn('Python closeTab script timeout')
-        }, 10000) // 10 second timeout
-
-        pythonProcess.stdout.on('data', (data) => {
-          clearTimeout(timeout)
-          try {
-            const result = JSON.parse(data.toString())
-            if (result.success) {
-              console.log(`Successfully closed Chrome tab: ${result.closed_domain}`)
-            } else if (result.error) {
-              console.warn(`Python script error: ${result.error}`)
-            } else {
-              console.log(`Tab not closed: ${result.reason}`)
-            }
-          } catch {
-            console.log('Python script output:', data.toString())
-          }
-        })
-
-        pythonProcess.stderr.on('data', (data) => {
-          clearTimeout(timeout)
-          console.warn('Python script error:', data.toString())
-        })
-        
-        pythonProcess.on('error', (err) => {
-          clearTimeout(timeout)
-          console.warn('Failed to start Python closeTab process:', err.message)
-          console.log('User requested to close tab but Python execution failed')
-        })
-        
-        pythonProcess.on('close', (code) => {
-          clearTimeout(timeout)
-          if (code !== 0) {
-            console.warn(`Python closeTab script exited with code ${code}`)
-          }
-        })
-        
-      } catch (error) {
-        console.warn('Error executing Python closeTab script:', error.message)
-        console.log('User requested to close tab but script execution failed')
+    if (isBrowserTab && popup_context?.exe) {
+      // Close the tab via the browser extension bridge (no Python). The bridge
+      // asks the extension to chrome.tabs.remove the real active tab. When the
+      // extension isn't connected we tell the user instead of silently no-op'ing.
+      const result = browserBridge.closeActiveTab({
+        exe: popup_context.exe,
+        title: popup_context.title
+      })
+      if (result.ok) {
+        console.log('Requested tab close via extension bridge')
+      } else {
+        console.log(`Could not close tab via extension: ${result.reason}`)
+        notifyTabCloseUnavailable(result.reason)
       }
     } else if (app_name && app_name.endsWith('.exe')) {
-      // This is a regular application - use taskkill
-      try {
-        exec(`taskkill /IM "${app_name}" /F`, { timeout: 5000 }, (error, stdout, stderr) => {
-          if (error) {
-            if (error.code === 128) {
-              console.log(`Application ${app_name} was not running or already closed`)
-            } else {
-              console.warn(`Error closing app ${app_name}: ${error.message}`)
-            }
-            return
-          }
-          if (stderr && !stderr.includes('SUCCESS')) {
-            console.warn(`Warning while closing ${app_name}: ${stderr}`)
-            return
-          }
-          console.log(`Successfully closed application: ${app_name}`)
-        })
-      } catch (error) {
-        console.warn(`Failed to execute taskkill for ${app_name}:`, error.message)
-      }
+      // Regular application. Use Node's built-in process.kill on the specific
+      // foreground PID instead of shelling out to `taskkill /IM /F` (which is
+      // Windows-only, force-kills EVERY instance of the exe, and risks unsaved
+      // work). This is cross-platform and targets just the offending window's
+      // process, trying a graceful SIGTERM before a forced SIGKILL.
+      closeAppByPid(n_pid, app_name)
     } else {
       console.log(`App close requested but cannot determine closure method for: ${app_name} (invalid format or missing PID)`)
       console.log('This may be a system process or already closed application')
@@ -1644,17 +1640,6 @@ ipcMain.on('categoriesUpdated', (event, catTags) => {
   fs.writeFileSync('Distractedcat.json', data, (err) => {
     console.log('error writing file', err)
   })
-})
-
-// Debug endpoint for Python error recovery status
-ipcMain.handle('get-python-status', () => {
-  return pythonErrorRecovery.getStatus()
-})
-
-// Manual reset for Python error recovery
-ipcMain.handle('reset-python-recovery', () => {
-  pythonErrorRecovery.reset()
-  return { success: true, message: 'Python error recovery system reset' }
 })
 
 // Browser extension bridge: the URL-source seam. The preload calls this only
