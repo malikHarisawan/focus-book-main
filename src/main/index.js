@@ -8,7 +8,8 @@ const {
   Menu,
   globalShortcut,
   nativeImage,
-  dialog
+  dialog,
+  shell
 } = require('electron')
 // NOTE: do NOT destructure `autoUpdater` here. In electron-updater, `autoUpdater`
 // is a lazy getter that instantiates NsisUpdater on first property access, which
@@ -1171,6 +1172,42 @@ ipcMain.handle('ai-service-reset-memory', async () => {
       return { success: true, state: merged }
     } catch (error) {
       console.error('Error saving UI state:', error)
+      return { success: false, error: error.message }
+    }
+  })
+
+  // Resolve the bundled browser-extension folder. In dev it lives at the project
+  // root; electron-builder copies it into resources/extension for packaged apps
+  // (see electron-builder.yml `from: extension -> to: extension`).
+  const getExtensionDir = () => {
+    const isDev = process.env.NODE_ENV === 'development'
+    const candidates = isDev
+      ? [path.join(__dirname, '../../extension')]
+      : [
+          path.join(process.resourcesPath, 'extension'),
+          path.join(__dirname, '../../extension'),
+          path.join(__dirname, 'extension')
+        ]
+    for (const dir of candidates) {
+      if (fs.existsSync(dir)) return dir
+    }
+    return candidates[0]
+  }
+
+  // Open the extension folder in the OS file manager so the user can point their
+  // browser's "Load unpacked" at it. Returns the path so the UI can show it.
+  ipcMain.handle('open-extension-folder', async () => {
+    try {
+      const dir = getExtensionDir()
+      if (!fs.existsSync(dir)) {
+        return { success: false, error: 'Extension folder not found', path: dir }
+      }
+      // openPath returns '' on success, or an error string.
+      const err = await shell.openPath(dir)
+      if (err) return { success: false, error: err, path: dir }
+      return { success: true, path: dir }
+    } catch (error) {
+      console.error('Error opening extension folder:', error)
       return { success: false, error: error.message }
     }
   })

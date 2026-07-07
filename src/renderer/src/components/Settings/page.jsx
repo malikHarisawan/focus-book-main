@@ -5,6 +5,7 @@ import { useSearchParams } from 'react-router-dom'
 import { useTheme, colorSchemes } from '../../context/ThemeContext'
 import BrowserBridgePanel from './BrowserBridgePanel'
 import CategoryRulesPanel from './CategoryRulesPanel'
+import GettingStartedPanel from './GettingStartedPanel'
 import { toCSV, toJSON } from '../../utils/exportUtils'
 import {
   Settings,
@@ -22,14 +23,15 @@ import {
   Download,
   Upload,
   Bot,
-  Check
+  Check,
+  Sparkles
 } from 'lucide-react'
 
 export default function SettingsPage() {
   // Honor a ?tab= deep link (e.g. from Activity's "Manage all rules" link) so
   // we can open directly on the Categories Management tab.
   const [searchParams] = useSearchParams()
-  const [activeTab, setActiveTab] = useState(() => searchParams.get('tab') || 'appearance')
+  const [activeTab, setActiveTab] = useState(() => searchParams.get('tab') || 'getting-started')
   const { theme, resolvedTheme, setThemeMode, primaryColor, secondaryColor, setPrimaryAccent, setSecondaryAccent } = useTheme()
   const [focusMode, setFocusMode] = useState(false)
   const [notifications, setNotifications] = useState(true)
@@ -160,6 +162,7 @@ export default function SettingsPage() {
             <nav className="p-3">
               <ul className="space-y-0.5">
                 {[
+                  { id: 'getting-started', label: 'Getting Started', icon: Sparkles },
                   { id: 'appearance', label: 'Appearance', icon: Palette },
                   { id: 'notifications', label: 'Notifications', icon: Bell },
                   { id: 'Categories Management', label: 'Categories Management', icon: Lock },
@@ -188,6 +191,11 @@ export default function SettingsPage() {
 
           {/* Settings Content */}
           <div className="col-span-12 md:col-span-9 p-6">
+            {/* Getting Started */}
+            {activeTab === 'getting-started' && (
+              <GettingStartedPanel onNavigateTab={setActiveTab} />
+            )}
+
             {/* Appearance Settings */}
             {activeTab === 'appearance' && (
               <div className="space-y-6 animate-fadeIn">

@@ -1437,6 +1437,9 @@ contextBridge.exposeInMainWorld('electronAPI', {
   // merges the patch into ui-state.json rather than overwriting.
   getUiState: () => ipcRenderer.invoke('get-ui-state'),
   setUiState: (patch) => ipcRenderer.invoke('set-ui-state', patch),
+  // Opens the bundled browser-extension folder in the OS file manager so the
+  // user can "Load unpacked" it. Returns { success, path }.
+  openExtensionFolder: () => ipcRenderer.invoke('open-extension-folder'),
   // Browser Extension Bridge API
   getBrowserBridgeStatus: () => ipcRenderer.invoke('get-browser-bridge-status'),
   // Auto-startup API

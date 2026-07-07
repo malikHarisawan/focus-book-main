@@ -222,8 +222,11 @@ function SlideExtension({ connected, token, port, copied, onCopy }) {
       </div>
 
       <p className="mt-3 text-xs text-[#768396] dark:text-[#94A3B8]">
-        This step is optional — you can set it up later in Settings → Browser Extension. App tracking
-        still works without it.
+        Optional — full install steps (and an “Open extension folder” button) live under{' '}
+        <span className="font-medium text-[#5051F9] dark:text-[#22D3EE]">
+          Settings → Getting Started
+        </span>
+        . App tracking still works without it.
       </p>
     </div>
   )

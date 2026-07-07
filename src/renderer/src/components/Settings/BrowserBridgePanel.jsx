@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import { FolderOpen } from 'lucide-react'
 
 // Pairing + status panel for the browser extension that reports the active tab
 // over the local WebSocket bridge. Lets the user copy the auth token (paste it
@@ -8,6 +9,21 @@ export default function BrowserBridgePanel() {
   const [status, setStatus] = useState(null)
   const [copied, setCopied] = useState(false)
   const [showToken, setShowToken] = useState(false)
+  const [folderMsg, setFolderMsg] = useState(null)
+
+  const openExtensionFolder = async () => {
+    setFolderMsg(null)
+    try {
+      const res = await window.electronAPI?.openExtensionFolder?.()
+      if (res?.success) {
+        setFolderMsg({ ok: true, text: `Opened: ${res.path}` })
+      } else {
+        setFolderMsg({ ok: false, text: res?.error || 'Could not open the extension folder.' })
+      }
+    } catch (error) {
+      setFolderMsg({ ok: false, text: error.message })
+    }
+  }
 
   const fetchStatus = async () => {
     try {
@@ -57,11 +73,33 @@ export default function BrowserBridgePanel() {
         </span>
       </div>
 
-      <p className="text-sm text-slate-500 dark:text-slate-400 mb-4">
+      <p className="text-sm text-slate-500 dark:text-slate-400 mb-3">
         Reports the active browser tab from Chrome, Brave, or Edge over a local, token-authenticated
-        connection — replacing the Python-based URL lookup. Install the extension, then paste this
-        token into its options page.
+        connection — replacing the Python-based URL lookup. Paste the token below into the
+        extension&rsquo;s options page.
       </p>
+
+      <div className="mb-4 flex flex-wrap items-center gap-2">
+        <button
+          onClick={openExtensionFolder}
+          className="inline-flex items-center gap-1.5 rounded-md bg-cyan-600 hover:bg-cyan-700 text-white px-3 py-1.5 text-sm transition-colors"
+        >
+          <FolderOpen className="h-4 w-4" />
+          Open extension folder
+        </button>
+        <span className="text-xs text-slate-400">
+          Step-by-step install is under Settings → Getting Started.
+        </span>
+      </div>
+      {folderMsg && (
+        <p
+          className={`mb-3 break-all text-xs ${
+            folderMsg.ok ? 'text-emerald-600 dark:text-emerald-400' : 'text-red-500'
+          }`}
+        >
+          {folderMsg.text}
+        </p>
+      )}
 
       <div className="space-y-4">
         <div>
