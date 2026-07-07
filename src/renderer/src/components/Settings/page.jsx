@@ -8,7 +8,6 @@ import CategoryRulesPanel from './CategoryRulesPanel'
 import { toCSV, toJSON } from '../../utils/exportUtils'
 import {
   Settings,
-  User,
   Palette,
   Bell,
   Lock,
@@ -30,7 +29,7 @@ export default function SettingsPage() {
   // Honor a ?tab= deep link (e.g. from Activity's "Manage all rules" link) so
   // we can open directly on the Categories Management tab.
   const [searchParams] = useSearchParams()
-  const [activeTab, setActiveTab] = useState(() => searchParams.get('tab') || 'profile')
+  const [activeTab, setActiveTab] = useState(() => searchParams.get('tab') || 'appearance')
   const { theme, resolvedTheme, setThemeMode, primaryColor, secondaryColor, setPrimaryAccent, setSecondaryAccent } = useTheme()
   const [focusMode, setFocusMode] = useState(false)
   const [notifications, setNotifications] = useState(true)
@@ -161,7 +160,6 @@ export default function SettingsPage() {
             <nav className="p-3">
               <ul className="space-y-0.5">
                 {[
-                  { id: 'profile', label: 'Profile', icon: User },
                   { id: 'appearance', label: 'Appearance', icon: Palette },
                   { id: 'notifications', label: 'Notifications', icon: Bell },
                   { id: 'Categories Management', label: 'Categories Management', icon: Lock },
@@ -190,112 +188,6 @@ export default function SettingsPage() {
 
           {/* Settings Content */}
           <div className="col-span-12 md:col-span-9 p-6">
-            {/* Profile Settings */}
-            {activeTab === 'profile' && (
-              <div className="space-y-6 animate-fadeIn">
-                <h3 className="text-lg font-medium text-slate-900 dark:text-slate-200 border-b border-slate-200 dark:border-slate-700/30 pb-2">
-                  User Profile
-                </h3>
-
-                <div className="flex items-start space-x-6">
-                  <div className="relative group">
-                    <div className="w-24 h-24 rounded-full bg-gradient-to-br from-cyan-500 to-cyan-600 flex items-center justify-center text-2xl font-bold text-white">
-                      JD
-                    </div>
-                    <button className="absolute bottom-0 right-0 bg-slate-200 dark:bg-[#05070D] p-1.5 rounded-full border border-slate-300 dark:border-slate-600 text-cyan-600 dark:text-cyan-400 hover:bg-slate-300 dark:hover:bg-slate-700 transition-colors">
-                      <RefreshCw className="h-4 w-4" />
-                    </button>
-                    <div className="absolute inset-0 rounded-full bg-black/50 opacity-0 group-hover:opacity-100 flex items-center justify-center transition-opacity">
-                      <span className="text-xs text-white font-medium">Change</span>
-                    </div>
-                  </div>
-
-                  <div className="flex-1 space-y-4">
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                      <div>
-                        <label className="block text-sm font-medium text-slate-700 dark:text-slate-400 mb-1">
-                          Full Name
-                        </label>
-                        <input
-                          type="text"
-                          defaultValue="John Doe"
-                          className="w-full bg-slate-50 dark:bg-[#05070D] border border-slate-300 dark:border-slate-700/30 rounded-md px-3 py-2 text-slate-900 dark:text-slate-200 focus:outline-none focus:ring-1 focus:ring-cyan-500 focus:border-cyan-500"
-                        />
-                      </div>
-                      <div>
-                        <label className="block text-sm font-medium text-slate-700 dark:text-slate-400 mb-1">
-                          Display Name
-                        </label>
-                        <input
-                          type="text"
-                          defaultValue="JohnD"
-                          className="w-full bg-slate-50 dark:bg-[#05070D] border border-slate-300 dark:border-slate-700/30 rounded-md px-3 py-2 text-slate-900 dark:text-slate-200 focus:outline-none focus:ring-1 focus:ring-cyan-500 focus:border-cyan-500"
-                        />
-                      </div>
-                    </div>
-
-                    <div>
-                      <label className="block text-sm font-medium text-slate-700 dark:text-slate-400 mb-1">Email</label>
-                      <input
-                        type="email"
-                        defaultValue="john.doe@example.com"
-                        className="w-full bg-slate-50 dark:bg-[#05070D] border border-slate-300 dark:border-slate-700/30 rounded-md px-3 py-2 text-slate-900 dark:text-slate-200 focus:outline-none focus:ring-1 focus:ring-cyan-500 focus:border-cyan-500"
-                      />
-                    </div>
-
-                    <div>
-                      <label className="block text-sm font-medium text-slate-700 dark:text-slate-400 mb-1">Bio</label>
-                      <textarea
-                        defaultValue="Software developer focused on productivity and time management."
-                        rows={3}
-                        className="w-full bg-slate-50 dark:bg-[#05070D] border border-slate-300 dark:border-slate-700/30 rounded-md px-3 py-2 text-slate-900 dark:text-slate-200 focus:outline-none focus:ring-1 focus:ring-cyan-500 focus:border-cyan-500"
-                      />
-                    </div>
-                  </div>
-                </div>
-
-                <div className="pt-4 border-t border-slate-700">
-                  <h4 className="text-md font-medium text-slate-800 dark:text-slate-300 mb-3">Account Settings</h4>
-
-                  <div className="space-y-4">
-                    <div>
-                      <label className="block text-sm font-medium text-slate-700 dark:text-slate-400 mb-1">
-                        Current Password
-                      </label>
-                      <input
-                        type="password"
-                        placeholder="••••••••"
-                        className="w-full bg-slate-50 dark:bg-[#05070D] border border-slate-300 dark:border-slate-700/30 rounded-md px-3 py-2 text-slate-900 dark:text-slate-200 focus:outline-none focus:ring-1 focus:ring-cyan-500 focus:border-cyan-500"
-                      />
-                    </div>
-
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                      <div>
-                        <label className="block text-sm font-medium text-slate-700 dark:text-slate-400 mb-1">
-                          New Password
-                        </label>
-                        <input
-                          type="password"
-                          placeholder="••••••••"
-                          className="w-full bg-slate-50 dark:bg-[#05070D] border border-slate-300 dark:border-slate-700/30 rounded-md px-3 py-2 text-slate-900 dark:text-slate-200 focus:outline-none focus:ring-1 focus:ring-cyan-500 focus:border-cyan-500"
-                        />
-                      </div>
-                      <div>
-                        <label className="block text-sm font-medium text-slate-700 dark:text-slate-400 mb-1">
-                          Confirm New Password
-                        </label>
-                        <input
-                          type="password"
-                          placeholder="••••••••"
-                          className="w-full bg-slate-50 dark:bg-[#05070D] border border-slate-300 dark:border-slate-700/30 rounded-md px-3 py-2 text-slate-900 dark:text-slate-200 focus:outline-none focus:ring-1 focus:ring-cyan-500 focus:border-cyan-500"
-                        />
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            )}
-
             {/* Appearance Settings */}
             {activeTab === 'appearance' && (
               <div className="space-y-6 animate-fadeIn">
