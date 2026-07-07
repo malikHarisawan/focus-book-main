@@ -1574,12 +1574,24 @@ async function retagAppCategory(app, category) {
     const pattern = domain || app.name || app.description
     if (!pattern) return { success: false, error: 'Could not derive a rule pattern' }
 
+    // Flush any in-memory tracking (up to ~60s worth, between saveData ticks) to
+    // the DB FIRST, so the retag covers today's not-yet-persisted rows and the
+    // reload below doesn't discard them.
+    await saveData()
+
     const result = await ipcRenderer.invoke('retag-app-category', { matchType, pattern, category })
 
     // Refresh local caches so this preload's live tracking uses the new rule
     // immediately (the categories-updated broadcast also does this, but do it
     // here too so there's no window where the next tick re-derives the old one).
     categoryRules = await loadCategoryRules()
+
+    // The retag updated the DB, but getAppUsageStats() serves the in-memory
+    // appUsageData snapshot. Without reloading it, the UI's post-change refresh
+    // would re-read the STALE in-memory copy and the category would flicker back
+    // to its old value. Reload the snapshot from the (now-retagged) DB so the
+    // view shows the change.
+    await loadData()
     return { ...result, pattern, matchType }
   } catch (error) {
     console.error('Error in retagAppCategory:', error)
