@@ -567,8 +567,17 @@ async function initializeBackendServices() {
       }
     }
 
-    await aiServiceManager.start(aiConfig)
-    console.log('✅ AI service started successfully')
+    // Only start the AI service if a key is actually configured. The service's
+    // startup requires a valid provider key and exits otherwise, so starting it
+    // keyless just crash-loops it on every launch. AI features stay unavailable
+    // until the user adds a key in Settings (which restarts the service).
+    const hasKey = Boolean((aiConfig.openaiKey || '').trim() || (aiConfig.geminiKey || '').trim())
+    if (hasKey) {
+      await aiServiceManager.start(aiConfig)
+      console.log('✅ AI service started successfully')
+    } else {
+      console.log('📋 No AI key configured — AI service not started (add one in Settings to enable).')
+    }
   } catch (error) {
     console.error('❌ Failed to start AI service:', error.message)
     console.log('📋 AI insights will not be available.')
