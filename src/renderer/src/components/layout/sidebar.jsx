@@ -2,7 +2,7 @@
 
 import { useLocation } from 'react-router-dom'
 import { Link } from 'react-router-dom'
-import { Activity, Command, Hexagon, ListTodo, Settings, Timer, Play, Pause, MessageSquare } from 'lucide-react'
+import { Activity, Command, Hexagon, Settings, Timer, Play, Pause, MessageSquare } from 'lucide-react'
 import { Button } from '../ui/button'
 import { Card, CardContent } from '..//ui/card'
 import { StatusItem } from '../Dashboard/status-item'
@@ -140,7 +140,6 @@ export function Sidebar({ productivityScore, dailyGoalProgress, weeklyGoalProgre
           />
           <NavItem href="/focus" icon={Timer} label="Focus Timer" active={pathname === '/focus'} collapsed={collapsed} />
           <NavItem href="/chat" icon={MessageSquare} label="AI Insights" active={pathname === '/chat'} collapsed={collapsed} />
-          <NavItem href="/tasks" icon={ListTodo} label="Tasks" active={pathname === '/tasks'} collapsed={collapsed} />
           <NavItem
             href="/settings"
             icon={Settings}
