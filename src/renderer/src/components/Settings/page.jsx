@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react'
 import { useTheme, colorSchemes } from '../../context/ThemeContext'
 import BrowserBridgePanel from './BrowserBridgePanel'
 import CategoryRulesPanel from './CategoryRulesPanel'
+import { toCSV, toJSON } from '../../utils/exportUtils'
 import {
   Settings,
   User,
@@ -40,6 +41,46 @@ export default function SettingsPage() {
   const [aiProvider, setAiProvider] = useState('openai') // 'openai' or 'gemini'
   const [isApiKeyValid, setIsApiKeyValid] = useState(false)
   const [aiServiceStatus, setAiServiceStatus] = useState({ isRunning: false, port: null, error: null })
+  const [isExporting, setIsExporting] = useState(false)
+  const [exportStatus, setExportStatus] = useState(null) // { ok, message }
+
+  // Export the full app-usage history as CSV or JSON. The renderer already has
+  // the data via getAllAggregatedData(); we serialize here and hand the string
+  // to the main process, which shows a native Save dialog and writes the file.
+  const handleExport = async (format) => {
+    const fmt = format.toLowerCase()
+    setIsExporting(true)
+    setExportStatus(null)
+    try {
+      const data = await window.electronAPI.getAllAggregatedData()
+      if (!data || data.error) {
+        throw new Error(data?.error || 'Could not load usage data')
+      }
+      if (Object.keys(data).length === 0) {
+        setExportStatus({ ok: false, message: 'No usage data to export yet.' })
+        return
+      }
+
+      const exportedAt = new Date().toISOString()
+      const content = fmt === 'json' ? toJSON(data, exportedAt) : toCSV(data)
+      const stamp = exportedAt.slice(0, 10)
+      const defaultName = `focusbook-usage-${stamp}.${fmt}`
+
+      const result = await window.electronAPI.exportData({ content, format: fmt, defaultName })
+      if (result?.success) {
+        setExportStatus({ ok: true, message: `Exported to ${result.filePath}` })
+      } else if (result?.canceled) {
+        setExportStatus(null)
+      } else {
+        throw new Error(result?.error || 'Export failed')
+      }
+    } catch (error) {
+      console.error('Export error:', error)
+      setExportStatus({ ok: false, message: `Export failed: ${error.message}` })
+    } finally {
+      setIsExporting(false)
+    }
+  }
 
   useEffect(() => {
     // Load AI config from config.json
@@ -782,22 +823,36 @@ export default function SettingsPage() {
                       Download your productivity data in various formats
                     </p>
 
-                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                       {[
                         { format: 'CSV', icon: '📊', desc: 'Spreadsheet compatible' },
-                        { format: 'JSON', icon: '{ }', desc: 'Developer friendly' },
-                        { format: 'PDF', icon: '📄', desc: 'Printable report' }
+                        { format: 'JSON', icon: '{ }', desc: 'Developer friendly' }
                       ].map((item) => (
                         <button
                           key={item.format}
-                          className="flex flex-col items-center justify-center p-4 bg-slate-100 dark:bg-[#05070D] hover:bg-slate-200 dark:hover:bg-slate-700 border border-slate-300 dark:border-slate-700/30 rounded-lg transition-colors"
+                          onClick={() => handleExport(item.format)}
+                          disabled={isExporting}
+                          className="flex flex-col items-center justify-center p-4 bg-slate-100 dark:bg-[#05070D] hover:bg-slate-200 dark:hover:bg-slate-700 border border-slate-300 dark:border-slate-700/30 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                         >
                           <div className="text-2xl mb-2">{item.icon}</div>
-                          <div className="font-medium text-slate-200">{item.format}</div>
+                          <div className="font-medium text-slate-800 dark:text-slate-200">
+                            {item.format}
+                          </div>
                           <div className="text-xs text-slate-400">{item.desc}</div>
                         </button>
                       ))}
                     </div>
+                    {exportStatus && (
+                      <p
+                        className={`text-sm mt-3 ${
+                          exportStatus.ok
+                            ? 'text-emerald-600 dark:text-emerald-400'
+                            : 'text-rose-500 dark:text-rose-400'
+                        }`}
+                      >
+                        {exportStatus.message}
+                      </p>
+                    )}
                   </div>
 
                   <div className="bg-slate-50 dark:bg-[#05070D] border border-slate-300 dark:border-slate-700/30 rounded-lg p-4">

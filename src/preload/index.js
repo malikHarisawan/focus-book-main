@@ -1425,6 +1425,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
   getFormattedUsageData: (startDate, endDate) => ipcRenderer.invoke('get-formatted-usage-data', startDate, endDate),
   getProductivitySummary: (date) => ipcRenderer.invoke('get-productivity-summary', date),
   cleanupDatabase: () => ipcRenderer.invoke('cleanup-database'),
+  exportData: (payload) => ipcRenderer.invoke('export-data', payload),
   // AI Service API
   aiChat: (message) => ipcRenderer.invoke('ai-chat', message),
   getAiServiceStatus: () => ipcRenderer.invoke('ai-service-status'),

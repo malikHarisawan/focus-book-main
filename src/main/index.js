@@ -7,7 +7,8 @@ const {
   Tray,
   Menu,
   globalShortcut,
-  nativeImage
+  nativeImage,
+  dialog
 } = require('electron')
 // NOTE: do NOT destructure `autoUpdater` here. In electron-updater, `autoUpdater`
 // is a lazy getter that instantiates NsisUpdater on first property access, which
@@ -1229,6 +1230,38 @@ ipcMain.handle('ai-service-reset-memory', async () => {
     } catch (error) {
       console.error('Error getting all aggregated data:', error)
       return { error: error.message }
+    }
+  })
+
+  // Export handler: the renderer serializes the data (it already has it) and hands
+  // us the string; we show a native Save dialog and write the file. Returns
+  // { success, canceled?, filePath?, error? } so the UI can give clear feedback.
+  ipcMain.handle('export-data', async (event, { content, format, defaultName }) => {
+    try {
+      if (typeof content !== 'string' || !content) {
+        return { success: false, error: 'Nothing to export' }
+      }
+      const ext = format === 'json' ? 'json' : 'csv'
+      const filters =
+        ext === 'json'
+          ? [{ name: 'JSON', extensions: ['json'] }]
+          : [{ name: 'CSV', extensions: ['csv'] }]
+
+      const result = await dialog.showSaveDialog(mainWindow, {
+        title: 'Export FocusBook Data',
+        defaultPath: defaultName || `focusbook-export.${ext}`,
+        filters: [...filters, { name: 'All Files', extensions: ['*'] }]
+      })
+
+      if (result.canceled || !result.filePath) {
+        return { success: false, canceled: true }
+      }
+
+      fs.writeFileSync(result.filePath, content, 'utf8')
+      return { success: true, filePath: result.filePath }
+    } catch (error) {
+      console.error('Error exporting data:', error)
+      return { success: false, error: error.message }
     }
   })
 
