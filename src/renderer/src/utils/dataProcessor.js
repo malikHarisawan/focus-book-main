@@ -1,16 +1,49 @@
-// Productivity is DB-driven (Settings). The categories table is the single source
-// of truth; loadCategories() returns [productiveNames[], distractedNames[]] and
-// anything not in either list is treated as Neutral.
+// Category metadata is DB-driven — the `categories` table is the single source of
+// truth for productivity type, color, and icon. This module is the renderer-side
+// cache: it loads the full metadata once (get-all-categories) and exposes lookups
+// so no component needs its own hardcoded color/icon/productivity map.
 //
-// This map is the renderer-side cache of that lookup. Until it loads (or if the DB
-// is unavailable) it stays empty, so every category degrades to 'Neutral' rather
-// than crashing.
+// Fallbacks below apply when the DB is unreachable or a category has no color/icon
+// set, so the UI degrades gracefully (Neutral / gray / Package) rather than
+// crashing.
 let categoryProductivityMap = {}
+let categoryColorMap = {}
+let categoryIconMap = {}
+let categoryList = [] // [{ name, type, color, icon }, ...]
 
-// Function to load category productivity mapping from main process
+// Sensible defaults when the DB has no color/icon for a category, or is offline.
+const DEFAULT_CATEGORY_COLOR = '#7a7a7a'
+const DEFAULT_CATEGORY_ICON = 'Package'
+
+// Function to load category metadata from main process
 async function loadCategoryProductivityMapping() {
   try {
-    // loadCategories() returns [productive[], distracted[]] — two arrays of category names.
+    // Prefer the rich metadata source (name, type, color, icon).
+    let cats = []
+    if (window.activeWindow?.loadAllCategories) {
+      cats = await window.activeWindow.loadAllCategories()
+    }
+
+    if (Array.isArray(cats) && cats.length > 0) {
+      const pMap = {}
+      const cMap = {}
+      const iMap = {}
+      cats.forEach((c) => {
+        if (!c || !c.name) return
+        // Store productive/distracted; neutral is the default so we can omit it.
+        if (c.type === 'productive' || c.type === 'distracted') pMap[c.name] = c.type
+        if (c.color) cMap[c.name] = c.color
+        if (c.icon) iMap[c.name] = c.icon
+      })
+      categoryProductivityMap = pMap
+      categoryColorMap = cMap
+      categoryIconMap = iMap
+      categoryList = cats
+      console.log('Category metadata loaded:', categoryList.length, 'categories')
+      return
+    }
+
+    // Fallback: the older [productive[], distracted[]] shape (no color/icon).
     const categories = await window.activeWindow.loadCategories()
     if (Array.isArray(categories)) {
       const [productive = [], distracted = []] = categories
@@ -22,10 +55,9 @@ async function loadCategoryProductivityMapping() {
         map[name] = 'distracted'
       })
       categoryProductivityMap = map
-      console.log('Dashboard: Category productivity mapping loaded:', categoryProductivityMap)
     }
   } catch (error) {
-    console.error('Dashboard: Error loading category productivity mapping:', error)
+    console.error('Error loading category metadata:', error)
   }
 }
 
@@ -36,6 +68,20 @@ loadCategoryProductivityMapping()
 export const refreshCategoryMapping = () => {
   return loadCategoryProductivityMapping()
 }
+
+// DB-driven category color. Falls back to a neutral gray when unknown.
+export const getCategoryColorFromDB = (category) => {
+  return categoryColorMap[category] || DEFAULT_CATEGORY_COLOR
+}
+
+// DB-driven category icon name (a lucide-react icon name string). Falls back to
+// 'Package'. Consumers resolve the string to a component/emoji themselves.
+export const getCategoryIconFromDB = (category) => {
+  return categoryIconMap[category] || DEFAULT_CATEGORY_ICON
+}
+
+// The full list of categories [{ name, type, color, icon }] for dropdowns/menus.
+export const getCategoryList = () => categoryList
 export const formatTime = (milliseconds) => {
   const hours = Math.floor(milliseconds / (1000 * 60 * 60))
   const minutes = Math.floor((milliseconds % (1000 * 60 * 60)) / (1000 * 60))
@@ -43,7 +89,10 @@ export const formatTime = (milliseconds) => {
   return `${hours * 60 + minutes}`
 }
 
-const getProductivity = (category) => {
+// Map a category to its display productivity level.
+// Canonical labels: 'Productive' | 'Neutral' | 'Distracting'. Exported so all
+// components share this one mapping instead of hardcoding their own.
+export const getProductivity = (category) => {
   switch (categoryProductivityMap[category]) {
     case 'productive':
       return 'Productive'

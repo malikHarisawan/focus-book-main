@@ -10,6 +10,11 @@ let lastUpdateTime = Date.now()
 let Distracted_List = ['Entertainment']
 let customCategoryMappings = {}
 let exclusionList = { apps: [], domains: [] }
+// DB-driven classification rules, loaded from the category_rules table. Each rule
+// is { pattern, category, match_type: 'app'|'keyword', priority }. Falls back to
+// the hardcoded APP_CATEGORIES only if the table is empty/unreachable. See the
+// categorization design notes; getCategory consumes this.
+let categoryRules = []
 
 // Chromium browsers whose active tab is enriched by the extension bridge.
 // Extracting this set widens support to Edge without duplicating the
@@ -22,6 +27,46 @@ function isBrowserExe(windowClass) {
 // Sentinel appKey used when the foreground browser window is a private/PWA
 // context the extension cannot see. We never guess a URL for these.
 const PRIVATE_BROWSER_KEY = 'browser:private'
+
+// Resolve the human-friendly display name for a non-browser app.
+//
+// Windows exposes a FileDescription per executable (the "Description" field in
+// file properties), which is usually a clean product name — "Visual Studio Code"
+// for Code.exe, "ClickUp" for ClickUp.exe, "Google Chrome" for chrome.exe. Using
+// it as the stored name gives one canonical row per app and fixes duplicates that
+// arose when the raw exe string was spelled differently across window switches
+// (e.g. "vscode.exe" vs "VS Code").
+//
+// The description is NOT always usable, so we fall back to a cleaned exe name:
+//   - some binaries have no FileDescription (blank) — e.g. Task Manager
+//   - some report the file name itself as the description — e.g. Notepad reports
+//     "Notepad.exe", which is no better than the exe
+// In those cases we strip a trailing ".exe" from the exe name and use that.
+//
+// NOTE: this only affects the display/storage name. Categorization stays keyed on
+// the exe name (see updateAppTime / getCategory) so app classification is
+// unchanged. See [[categorization-exe-first]].
+function stripExe(name) {
+  return String(name || '').replace(/\.exe$/i, '').trim()
+}
+
+function resolveDisplayName(description, exeName) {
+  const cleanedExe = stripExe(exeName)
+  const desc = String(description || '').trim()
+
+  // Reject descriptions that are empty, the "unknown" sentinel, or literally a
+  // ".exe" file name (e.g. Notepad reports "Notepad.exe") — none of these read
+  // better than the cleaned exe name. A description that merely matches the exe's
+  // base name (e.g. "Electron" for electron.exe, "Obsidian" for Obsidian.exe) is
+  // a legitimate product name and is kept, preserving its original casing.
+  const descIsUseless =
+    !desc || desc === 'Unknown application' || /\.exe$/i.test(desc)
+
+  if (descIsUseless) {
+    return cleanedExe || 'Unknown application'
+  }
+  return desc
+}
 
 // Resolve the active-tab URL for a foreground browser window via the extension
 // bridge in the main process. Returns a normalized shape the tracking code
@@ -642,8 +687,15 @@ function updateAppTime(
   // even for exes that are explicitly categorized.)
   const appCategory = getCategory(appClass || description)
 
-  if (!appUsageData[formattedDate].apps.hasOwnProperty(appClass)) {
-    appUsageData[formattedDate].apps[appClass] = {
+  // Store/display under the friendly name (e.g. "Visual Studio Code") rather than
+  // the raw exe string. This collapses duplicate rows that used to appear when the
+  // exe was spelled differently across window switches (e.g. "vscode.exe" vs
+  // "VS Code"). Categorization above still uses appClass (the exe), so app
+  // classification is unaffected.
+  const appKey = resolveDisplayName(description, appClass)
+
+  if (!appUsageData[formattedDate].apps.hasOwnProperty(appKey)) {
+    appUsageData[formattedDate].apps[appKey] = {
       time: 0,
       category: appCategory,
       description: description,
@@ -651,31 +703,31 @@ function updateAppTime(
     }
   }
 
-  appUsageData[formattedDate].apps[appClass].time += timeSpent
-  appUsageData[formattedDate].apps[appClass].category = appCategory
+  appUsageData[formattedDate].apps[appKey].time += timeSpent
+  appUsageData[formattedDate].apps[appKey].category = appCategory
 
   // Only add timestamps when app is switched or on first entry
-  if (hasAppSwitched || appUsageData[formattedDate].apps[appClass].timestamps.length === 0) {
-    appUsageData[formattedDate].apps[appClass].timestamps.push({
+  if (hasAppSwitched || appUsageData[formattedDate].apps[appKey].timestamps.length === 0) {
+    appUsageData[formattedDate].apps[appKey].timestamps.push({
       start: new Date().toString(),
       duration: timeSpent
     })
   } else {
     // Update the duration of the last timestamp entry instead of adding a new one
-    const lastIndex = appUsageData[formattedDate].apps[appClass].timestamps.length - 1
+    const lastIndex = appUsageData[formattedDate].apps[appKey].timestamps.length - 1
     if (lastIndex >= 0) {
       // Check if the last timestamp is recent (within last 5 seconds)
-      const lastTimestamp = appUsageData[formattedDate].apps[appClass].timestamps[lastIndex]
+      const lastTimestamp = appUsageData[formattedDate].apps[appKey].timestamps[lastIndex]
       const lastStart = new Date(lastTimestamp.start)
       const now = new Date()
       const timeDiff = now - lastStart
-      
+
       // If last timestamp is recent, update it
       if (timeDiff < 5000) {
         lastTimestamp.duration += timeSpent
       } else {
         // Otherwise, add a new timestamp
-        appUsageData[formattedDate].apps[appClass].timestamps.push({
+        appUsageData[formattedDate].apps[appKey].timestamps.push({
           start: new Date().toString(),
           duration: timeSpent
         })
@@ -683,8 +735,8 @@ function updateAppTime(
     }
   }
 
-  if (!appUsageData[formattedDate][formattedHour].hasOwnProperty(appClass)) {
-    appUsageData[formattedDate][formattedHour][appClass] = {
+  if (!appUsageData[formattedDate][formattedHour].hasOwnProperty(appKey)) {
+    appUsageData[formattedDate][formattedHour][appKey] = {
       time: 0,
       category: appCategory,
       description: description,
@@ -692,10 +744,10 @@ function updateAppTime(
     }
   }
 
-  appUsageData[formattedDate][formattedHour][appClass].time += timeSpent
-  appUsageData[formattedDate][formattedHour][appClass].category = appCategory
+  appUsageData[formattedDate][formattedHour][appKey].time += timeSpent
+  appUsageData[formattedDate][formattedHour][appKey].category = appCategory
 
-  const timestamps = appUsageData[formattedDate][formattedHour][appClass].timestamps
+  const timestamps = appUsageData[formattedDate][formattedHour][appKey].timestamps
 
   if (timestamps.length === 0) {
     // First entry for this app in this hour
@@ -722,9 +774,9 @@ function updateAppTime(
       })
     }
   }
-  if (appUsageData[formattedDate][formattedHour][appClass].time > 3600000) {
+  if (appUsageData[formattedDate][formattedHour][appKey].time > 3600000) {
     console.warn(
-      `Hour ${formattedHour} for ${appClass} exceeds 1 hour: ${appUsageData[formattedDate][formattedHour][appClass].time}ms`
+      `Hour ${formattedHour} for ${appKey} exceeds 1 hour: ${appUsageData[formattedDate][formattedHour][appKey].time}ms`
     )
   }
 }
@@ -953,29 +1005,48 @@ loadCustomCategoryMappings().then((mappings) => {
   console.log('Loaded custom category mappings:', mappings)
 })
 
+loadCategoryRules().then((rules) => {
+  categoryRules = rules
+  console.log(`Loaded ${rules.length} category rules from DB`)
+})
+
 loadExclusionList().then((list) => {
   exclusionList = list
   console.log('Loaded exclusion list:', list)
 })
 
+// Classify an app/title/url into a category name.
+// Order: user per-app override -> DB rules (app matches before keyword, higher
+// priority first) -> hardcoded APP_CATEGORIES fallback -> 'Miscellaneous'.
+// The DB rules (category_rules table) are the data-driven replacement for the
+// hardcoded catalog; the fallback only runs if the table is empty/unreachable.
 function getCategory(app) {
-  const title = app.toLowerCase()
+  const title = String(app || '').toLowerCase()
 
-  // First check if we have a custom mapping for this app
+  // 1. User per-app override always wins.
   if (customCategoryMappings[app]) {
-    console.log('Category ', customCategoryMappings[app])
     return customCategoryMappings[app]
   }
 
-  // Then follow your existing logic
+  // 2. DB-driven rules. categoryRules is pre-sorted (app-type first, then by
+  //    descending priority) when loaded, so the first substring match wins.
+  if (categoryRules.length > 0) {
+    for (const rule of categoryRules) {
+      if (rule.pattern && title.includes(String(rule.pattern).toLowerCase())) {
+        return rule.category
+      }
+    }
+    return 'Miscellaneous'
+  }
+
+  // 3. Fallback to the legacy hardcoded catalog if rules aren't loaded yet.
   for (const [category, details] of Object.entries(APP_CATEGORIES)) {
-    for (const app of details.apps) {
-      if (title.includes(app.toLowerCase())) {
+    for (const appPattern of details.apps) {
+      if (title.includes(appPattern.toLowerCase())) {
         return category
       }
     }
   }
-
   for (const [category, details] of Object.entries(APP_CATEGORIES)) {
     for (const keyword of details.keywords) {
       if (title.includes(keyword.toLowerCase())) {
@@ -1224,6 +1295,43 @@ async function loadCategories() {
   return data
 }
 
+// Full category metadata for the renderer: [{ name, type, color, icon }, ...].
+// This is the single DB-driven source the renderer uses for palette, icons, the
+// category list, and the productivity-level (type) mapping.
+async function loadAllCategories() {
+  try {
+    const data = await ipcRenderer.invoke('get-all-categories')
+    return Array.isArray(data) ? data : []
+  } catch (error) {
+    console.error('Error loading all categories:', error)
+    return []
+  }
+}
+
+// --- Category + rule CRUD wrappers (used by Settings) ---
+async function addCategory(name, type, color, icon) {
+  return ipcRenderer.invoke('category-add', { name, type, color, icon })
+}
+async function updateCategory(name, updates) {
+  return ipcRenderer.invoke('category-update', { name, updates })
+}
+async function deleteCategory(name) {
+  return ipcRenderer.invoke('category-delete', { name })
+}
+async function getCategoryRules() {
+  const rules = await ipcRenderer.invoke('load-category-rules')
+  return Array.isArray(rules) ? rules : []
+}
+async function addCategoryRule(pattern, category, matchType, priority) {
+  return ipcRenderer.invoke('rule-add', { pattern, category, matchType, priority })
+}
+async function updateCategoryRule(id, updates) {
+  return ipcRenderer.invoke('rule-update', { id, updates })
+}
+async function deleteCategoryRule(id) {
+  return ipcRenderer.invoke('rule-delete', { id })
+}
+
 async function loadData() {
   try {
     appUsageData = await ipcRenderer.invoke('load-data')
@@ -1372,6 +1480,15 @@ contextBridge.exposeInMainWorld('activeWindow', {
     }
   },
   loadCategories: () => loadCategories(),
+  loadAllCategories: () => loadAllCategories(),
+  addCategory: (name, type, color, icon) => addCategory(name, type, color, icon),
+  updateCategory: (name, updates) => updateCategory(name, updates),
+  deleteCategory: (name) => deleteCategory(name),
+  getCategoryRules: () => getCategoryRules(),
+  addCategoryRule: (pattern, category, matchType, priority) =>
+    addCategoryRule(pattern, category, matchType, priority),
+  updateCategoryRule: (id, updates) => updateCategoryRule(id, updates),
+  deleteCategoryRule: (id) => deleteCategoryRule(id),
   refreshData: () => loadData(),
   updateAppCategory: (appIdentifier, category, selectedDate, appToUpdate) =>
     updateAppCategory(appIdentifier, category, selectedDate, appToUpdate)
@@ -1462,6 +1579,25 @@ async function loadCustomCategoryMappings() {
   }
 }
 
+// Load classification rules from the DB and sort them so getCategory can match
+// in priority order without re-sorting per lookup: 'app' rules before 'keyword'
+// (the exe is the reliable signal), then higher priority first.
+async function loadCategoryRules() {
+  try {
+    const rules = await ipcRenderer.invoke('load-category-rules')
+    if (!Array.isArray(rules)) return []
+    return rules.slice().sort((a, b) => {
+      const at = a.match_type === 'app' ? 0 : 1
+      const bt = b.match_type === 'app' ? 0 : 1
+      if (at !== bt) return at - bt
+      return (b.priority || 0) - (a.priority || 0)
+    })
+  } catch (error) {
+    console.error('Error loading category rules:', error)
+    return []
+  }
+}
+
 async function saveCustomCategoryMappings(mappings) {
   try {
     await ipcRenderer.invoke('save-custom-categories', mappings)
@@ -1493,6 +1629,12 @@ ipcRenderer.on('categories-updated', (event, categories) => {
     Distracted_List = categories[1] // Update distracted categories
     console.log('Distracted categories updated:', Distracted_List)
   }
+  // Reload the classification rules cache so getCategory reflects any rule/category
+  // edits made in Settings without needing an app restart.
+  loadCategoryRules().then((rules) => {
+    categoryRules = rules
+    console.log(`Reloaded ${rules.length} category rules after update`)
+  })
 })
 
 // Listen for exclusion list updates from main process

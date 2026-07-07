@@ -6,6 +6,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '.
 import AppUsageDetails from './AppUsageDetails'
 import DatabaseManager from './DatabaseManager'
 import { useDataAggregation } from '../../hooks/useDataAggregation'
+import { getProductivity } from '../../utils/dataProcessor'
 
 const AggregatedDashboard = () => {
   const [selectedDate, setSelectedDate] = useState(new Date().toISOString().split('T')[0])
@@ -95,21 +96,8 @@ const AggregatedDashboard = () => {
     loadDashboardData()
   }, [selectedDate, dateRange, getFormattedData, getDataByDate, getProductivitySummary])
 
-  const getProductivityLevel = (category) => {
-    switch (category) {
-      case 'Code':
-      case 'Productivity':
-      case 'Learning':
-      case 'Documenting':
-        return 'Productive'
-      case 'Entertainment':
-      case 'Browsing':
-      case 'Personal':
-        return 'Un-Productive'
-      default:
-        return 'Neutral'
-    }
-  }
+  // DB-driven productivity level (single source of truth in dataProcessor).
+  const getProductivityLevel = (category) => getProductivity(category)
 
   const formatTime = (seconds) => {
     const hours = Math.floor(seconds / 3600)
@@ -128,7 +116,7 @@ const AggregatedDashboard = () => {
         return 'text-cyan-400'
       case 'Neutral':
         return 'text-violet-400'
-      case 'Un-Productive':
+      case 'Distracting':
         return 'text-rose-400'
       default:
         return 'text-slate-400'
@@ -225,7 +213,7 @@ const AggregatedDashboard = () => {
 
         <Card className="bg-slate-900/50 border-slate-700/50">
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium text-slate-400">Un-Productive</CardTitle>
+            <CardTitle className="text-sm font-medium text-slate-400">Distracting</CardTitle>
             <TrendingUp className="h-4 w-4 text-rose-400" />
           </CardHeader>
           <CardContent>

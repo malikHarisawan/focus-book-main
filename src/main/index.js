@@ -186,12 +186,65 @@ let aiServiceManager = new AIServiceManager()
 let pythonErrorRecovery = new PythonErrorRecovery()
 let browserBridge = new BrowserBridge(app.getPath('userData'))
 
+// Window sizing. Default opens comfortably for the dashboard; the minimum is
+// smaller so it can shrink (sidebar collapses) without the layout breaking.
+const DEFAULT_WINDOW = { width: 1280, height: 800 }
+const MIN_WINDOW = { width: 860, height: 600 }
+const WINDOW_STATE_FILE = path.join(app.getPath('userData'), 'window-state.json')
+
+// Load the last-saved window bounds, if any. Returns null when absent/invalid.
+function loadWindowState() {
+  try {
+    if (!fs.existsSync(WINDOW_STATE_FILE)) return null
+    const state = JSON.parse(fs.readFileSync(WINDOW_STATE_FILE, 'utf8'))
+    if (typeof state.width !== 'number' || typeof state.height !== 'number') return null
+    return state
+  } catch (error) {
+    console.warn('Could not read window state:', error.message)
+    return null
+  }
+}
+
+// Persist the current window bounds (and maximized flag) so the next launch
+// restores them. Debounced by the caller via resize/move listeners.
+function saveWindowState() {
+  try {
+    if (!mainWindow || mainWindow.isDestroyed()) return
+    const isMaximized = mainWindow.isMaximized()
+    // Use normal bounds so a maximized window still remembers its restored size.
+    const bounds = mainWindow.getNormalBounds()
+    fs.writeFileSync(
+      WINDOW_STATE_FILE,
+      JSON.stringify({ ...bounds, isMaximized })
+    )
+  } catch (error) {
+    console.warn('Could not save window state:', error.message)
+  }
+}
+
+// Only accept a saved position if it still lands on a currently-connected
+// display, so unplugging a monitor doesn't strand the window off-screen.
+function boundsAreVisible(bounds) {
+  if (typeof bounds.x !== 'number' || typeof bounds.y !== 'number') return false
+  return screen.getAllDisplays().some((display) => {
+    const wa = display.workArea
+    return (
+      bounds.x < wa.x + wa.width &&
+      bounds.x + bounds.width > wa.x &&
+      bounds.y < wa.y + wa.height &&
+      bounds.y + bounds.height > wa.y
+    )
+  })
+}
+
 function createWindow() {
-  mainWindow = new BrowserWindow({
-    width: 900,
-    height: 650,
-    minWidth: 900,
-    minHeight: 650,
+  const saved = loadWindowState()
+
+  const windowOptions = {
+    width: DEFAULT_WINDOW.width,
+    height: DEFAULT_WINDOW.height,
+    minWidth: MIN_WINDOW.width,
+    minHeight: MIN_WINDOW.height,
     resizable: true,
     maximizable: true,
     minimizable: true,
@@ -208,7 +261,35 @@ function createWindow() {
       preload: path.join(__dirname, '../preload/index.js'),
       sandbox: false
     }
-  })
+  }
+
+  // Restore saved size, and position too if it's still on a visible display.
+  if (saved) {
+    windowOptions.width = Math.max(saved.width, MIN_WINDOW.width)
+    windowOptions.height = Math.max(saved.height, MIN_WINDOW.height)
+    if (boundsAreVisible(saved)) {
+      windowOptions.x = saved.x
+      windowOptions.y = saved.y
+    }
+  }
+
+  mainWindow = new BrowserWindow(windowOptions)
+
+  // Re-maximize if that's how the user left it.
+  if (saved && saved.isMaximized) {
+    mainWindow.maximize()
+  }
+
+  // Persist bounds when the user resizes, moves, or (un)maximizes the window.
+  let saveTimer = null
+  const scheduleSave = () => {
+    clearTimeout(saveTimer)
+    saveTimer = setTimeout(saveWindowState, 400)
+  }
+  mainWindow.on('resize', scheduleSave)
+  mainWindow.on('move', scheduleSave)
+  mainWindow.on('maximize', saveWindowState)
+  mainWindow.on('unmaximize', saveWindowState)
 
   if (process.env.NODE_ENV === 'development' && process.env['ELECTRON_RENDERER_URL']) {
     mainWindow.loadURL(process.env['ELECTRON_RENDERER_URL'])
@@ -539,6 +620,99 @@ app.whenReady().then(async () => {
     }
   })
 
+  // Full category metadata (name, type, color, icon) for the renderer to drive its
+  // palette/icons/lists from the DB instead of hardcoded per-component maps.
+  ipcMain.handle('get-all-categories', async () => {
+    try {
+      await hybridConnection.whenReady()
+      const categoriesService = hybridConnection.getCategoriesService()
+      return await categoriesService.getAllCategories()
+    } catch (error) {
+      console.error('Error loading all categories:', error)
+      return []
+    }
+  })
+
+  // --- Category + rule CRUD (Settings "Categories Management") ---
+  // Broadcast so any open window refreshes its DB-driven category cache.
+  const broadcastCategoriesUpdated = () => {
+    BrowserWindow.getAllWindows().forEach((w) => {
+      w.webContents.send('categories-updated', null)
+    })
+  }
+
+  ipcMain.handle('category-add', async (event, { name, type, color, icon }) => {
+    try {
+      const svc = hybridConnection.getCategoriesService()
+      const result = await svc.addCategory(name, type, color, icon)
+      broadcastCategoriesUpdated()
+      return result
+    } catch (error) {
+      console.error('Error adding category:', error)
+      return false
+    }
+  })
+
+  ipcMain.handle('category-update', async (event, { name, updates }) => {
+    try {
+      const svc = hybridConnection.getCategoriesService()
+      const result = await svc.updateCategory(name, updates)
+      broadcastCategoriesUpdated()
+      return result
+    } catch (error) {
+      console.error('Error updating category:', error)
+      return false
+    }
+  })
+
+  ipcMain.handle('category-delete', async (event, { name }) => {
+    try {
+      const svc = hybridConnection.getCategoriesService()
+      const result = await svc.deleteCategory(name)
+      broadcastCategoriesUpdated()
+      return result
+    } catch (error) {
+      console.error('Error deleting category:', error)
+      return false
+    }
+  })
+
+  ipcMain.handle('rule-add', async (event, { pattern, category, matchType, priority }) => {
+    try {
+      const svc = hybridConnection.getCategoriesService()
+      const result = await svc.addCategoryRule(pattern, category, matchType, priority)
+      broadcastCategoriesUpdated()
+      return result
+    } catch (error) {
+      console.error('Error adding category rule:', error)
+      return false
+    }
+  })
+
+  ipcMain.handle('rule-update', async (event, { id, updates }) => {
+    try {
+      const svc = hybridConnection.getCategoriesService()
+      const result = await svc.updateCategoryRule(id, updates)
+      broadcastCategoriesUpdated()
+      return result
+    } catch (error) {
+      console.error('Error updating category rule:', error)
+      return false
+    }
+  })
+
+  ipcMain.handle('rule-delete', async (event, { id }) => {
+    try {
+      const svc = hybridConnection.getCategoriesService()
+      const result = await svc.deleteCategoryRule(id)
+      broadcastCategoriesUpdated()
+      return result
+    } catch (error) {
+      console.error('Error deleting category rule:', error)
+      return false
+    }
+  })
+
   // Auto-updater IPC handlers
   ipcMain.handle('check-for-updates', async () => {
     try {
@@ -643,6 +817,17 @@ app.whenReady().then(async () => {
     } catch (error) {
       console.error('Error saving custom categories:', error)
       return false
+    }
+  })
+
+  ipcMain.handle('load-category-rules', async () => {
+    try {
+      await hybridConnection.whenReady()
+      const categoriesService = hybridConnection.getCategoriesService()
+      return await categoriesService.getCategoryRules()
+    } catch (error) {
+      console.error('Error loading category rules:', error)
+      return []
     }
   })
 

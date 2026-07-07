@@ -139,11 +139,12 @@ const AppUsageDetails = ({
     )
   }
 
-  // Handle single app category change
+  // Handle single app category change — pass the full app object so the parent
+  // can persist against the real app identifier (domain or name).
   const handleSingleCategoryChange = (appIndex, newCategory) => {
     const app = selectedApps[appIndex]
     if (app) {
-      onCategoryChange([`${app.name}-${appIndex}`], newCategory)
+      onCategoryChange(app, newCategory)
     }
   }
 

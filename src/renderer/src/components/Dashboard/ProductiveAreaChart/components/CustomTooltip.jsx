@@ -20,15 +20,15 @@ import { formatTooltipValue, getTooltipTitle } from '../utils/selectionUtils'
 const CustomTooltip = ({ active, payload, label, aggregatedData, hasSelection, zoomLevel, zoomLevelDetail }) => {
   if (!active || !payload || payload.length === 0) return null
 
-  // Get the data for the hovered point
+  // Get the data for the hovered point. The chart shows only productive and
+  // distracting (neutral is intentionally omitted), so the tooltip total is the
+  // sum of those two to stay consistent with what's drawn.
   const pointData = payload[0]?.payload || {}
   const productiveSeconds = pointData.productive || 0
-  const neutralSeconds = pointData.neutral || 0
   const distractingSeconds = pointData.distracting || 0
-  const totalSeconds = productiveSeconds + neutralSeconds + distractingSeconds
+  const totalSeconds = productiveSeconds + distractingSeconds
 
   const productiveTime = formatTooltipValue(productiveSeconds)
-  const neutralTime = formatTooltipValue(neutralSeconds)
   const distractingTime = formatTooltipValue(distractingSeconds)
   const totalTime = formatTooltipValue(totalSeconds)
   const productivePercentage =
@@ -46,13 +46,6 @@ const CustomTooltip = ({ active, payload, label, aggregatedData, hasSelection, z
             <span className="text-slate-600 dark:text-slate-300 text-sm">Productive:</span>
           </div>
           <span className="text-slate-900 dark:text-white text-sm font-medium">{productiveTime}</span>
-        </div>
-        <div className="flex items-center justify-between gap-4">
-          <div className="flex items-center gap-2">
-            <div className="w-2.5 h-2.5 rounded-full bg-[#22D3EE] dark:bg-[#64748B]" />
-            <span className="text-slate-600 dark:text-slate-300 text-sm">Neutral:</span>
-          </div>
-          <span className="text-slate-900 dark:text-white text-sm font-medium">{neutralTime}</span>
         </div>
         <div className="flex items-center justify-between gap-4">
           <div className="flex items-center gap-2">

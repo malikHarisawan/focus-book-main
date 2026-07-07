@@ -43,7 +43,14 @@ import CategoryBadge from './category-badge'
 import BulkCategoryDialog from './bulk-categories-dialog'
 import SummaryTab from './SummaryTab'
 import SummarySkeleton from './SummarySkeleton'
-import { formatAppsData, getProductivityType, refreshCategoryMapping } from '../../utils/dataProcessor'
+import {
+  formatAppsData,
+  getProductivityType,
+  refreshCategoryMapping,
+  getCategoryList,
+  getCategoryColorFromDB
+} from '../../utils/dataProcessor'
+import { getCategoryIconComponent } from '../../utils/categoryVisuals'
 import { generateSummary, clearSummaryCache } from '../../utils/aiSummaryService'
 import { useDate } from '../../context/DateContext'
 import { useTheme } from '../../context/ThemeContext'
@@ -61,6 +68,11 @@ export default function AppUsageTable() {
   const [sortBy, setSortBy] = useState('timeSpent')
   const [sortOrder, setSortOrder] = useState('desc')
   const [apps, setApps] = useState([])
+  // Category names for the "Change Category" menu — DB-driven via getCategoryList,
+  // seeded from the cache and refreshed alongside the data loads below.
+  const [categoryNames, setCategoryNames] = useState(() =>
+    getCategoryList().map((c) => c.name)
+  )
   const [summary, setSummary] = useState(null)
   const [isLoadingSummary, setIsLoadingSummary] = useState(false)
   const [summaryError, setSummaryError] = useState(null)
@@ -103,6 +115,10 @@ export default function AppUsageTable() {
     // Ensure the DB-driven category productivity map is populated before
     // formatAppsData reads it, otherwise productivity labels default to Neutral.
     await refreshCategoryMapping()
+    // Refresh the category name list (now that metadata is loaded) so the
+    // "Change Category" menu reflects any user-added categories.
+    const names = getCategoryList().map((c) => c.name)
+    if (names.length > 0) setCategoryNames(names)
     const jsonData = await window.activeWindow.getAppUsageStats()
     const appsData = formatAppsData(jsonData, selectedDate)
     setApps(appsData)
@@ -297,32 +313,11 @@ export default function AppUsageTable() {
     }
   }
 
+  // DB-driven category icon (icon component + color both from the categories
+  // table). Replaces the old hardcoded per-category switch.
   const getCategoryIcon = (category) => {
-    switch (category) {
-      case 'Browsing':
-        return <Globe className="h-4 w-4 text-blue-500 dark:text-blue-400" />
-      case 'Code':
-        return <CodeIcon className="h-4 w-4 text-cyan-600 dark:text-cyan-400" />
-      case 'Documenting':
-        return <FileText className="h-4 w-4 text-green-600 dark:text-green-400" />
-      case 'Entertainment':
-        return <Video className="h-4 w-4 text-red-600 dark:text-red-400" />
-      case 'Learning':
-        return <BookOpen className="h-4 w-4 text-purple-600 dark:text-purple-400" />
-      case 'Messaging':
-      case 'Communication':
-        return <MessageSquare className="h-4 w-4 text-indigo-600 dark:text-indigo-400" />
-      case 'Miscellaneous':
-        return <Package className="h-4 w-4 text-slate-600 dark:text-slate-400" />
-      case 'Personal':
-        return <User className="h-4 w-4 text-pink-600 dark:text-pink-400" />
-      case 'Productivity':
-        return <Briefcase className="h-4 w-4 text-amber-600 dark:text-amber-400" />
-      case 'Utility':
-        return <Terminal className="h-4 w-4 text-emerald-600 dark:text-emerald-400" />
-      default:
-        return <Package className="h-4 w-4 text-slate-600 dark:text-slate-400" />
-    }
+    const Icon = getCategoryIconComponent(category)
+    return <Icon className="h-4 w-4" style={{ color: getCategoryColorFromDB(category) }} />
   }
   const handleDate = (e) => {
     handleDateChange(e.target.value)
@@ -339,6 +334,7 @@ export default function AppUsageTable() {
                 value={selectedDate}
                 onChange={handleDate}
                 className="bg-transparent text-primary outline-none text-xs"
+                style={{ colorScheme: resolvedTheme === 'dark' ? 'dark' : 'light' }}
               />
 
               <Calendar className="absolute right-2 w-4 h-4 text-primary pointer-events-none" />
@@ -510,19 +506,7 @@ export default function AppUsageTable() {
                                   <span>Change Category</span>
                                 </DropdownMenuSubTrigger>
                                 <DropdownMenuSubContent className="bg-white dark:bg-slate-900 border-gray-300 dark:border-slate-700 text-gray-900 dark:text-slate-50 shadow-xl">
-                                  {[
-                                    'Browsing',
-                                    'Code',
-                                    'Communication',
-                                    'Documenting',
-                                    'Entertainment',
-                                    'Learning',
-                                    'Messaging',
-                                    'Miscellaneous',
-                                    'Personal',
-                                    'Productivity',
-                                    'Utility'
-                                  ].map((category) => (
+                                  {categoryNames.map((category) => (
                                     <DropdownMenuItem
                                       key={category}
                                       className="flex items-center hover:bg-gray-100 dark:hover:bg-slate-800 cursor-pointer"

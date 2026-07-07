@@ -146,12 +146,26 @@ export default function ProductivityOverview() {
     }
   }
 
-  // Handle category change for selected apps
-  const handleCategoryChange = (appIds, newCategory) => {
-    // This would integrate with the category change system
-    // For now, just log the change
-    console.log('Category change requested:', { appIds, newCategory })
-    // TODO: Implement actual category change logic
+  // Persist a category change for an app from the timeline breakdown panel.
+  // Uses the same updateAppCategory IPC as the Activity page (which writes a
+  // custom mapping + updates stored usage), then refreshes the DB-driven mapping
+  // and reloads the view. Previously this was a no-op stub.
+  const handleCategoryChange = async (app, newCategory) => {
+    try {
+      if (!app || !newCategory) return
+      const appIdentifier = app.domain || app.name
+      const appKey = app.name
+      await window.activeWindow.updateAppCategory(
+        appIdentifier,
+        newCategory,
+        selectedDate,
+        appKey
+      )
+      await refreshCategoryMapping()
+      await loadAndProcessData()
+    } catch (error) {
+      console.error('Error changing category from dashboard:', error)
+    }
   }
 
   return (
@@ -223,10 +237,6 @@ export default function ProductivityOverview() {
                 <div className="flex items-center gap-1">
                   <div className="h-2 w-2 rounded-full bg-[#5051F9] dark:bg-[#22D3EE]"></div>
                   <span>Productive</span>
-                </div>
-                <div className="flex items-center gap-1">
-                  <div className="h-2 w-2 rounded-full bg-[#22D3EE] dark:bg-[#64748B]"></div>
-                  <span>Neutral</span>
                 </div>
                 <div className="flex items-center gap-1">
                   <div className="h-2 w-2 rounded-full bg-[#FF6B6B]"></div>

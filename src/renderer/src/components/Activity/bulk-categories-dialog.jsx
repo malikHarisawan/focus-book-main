@@ -16,25 +16,26 @@ import { Checkbox } from '../ui/checkbox'
 import { ScrollArea } from '../ui/scroll-area'
 import CategoryBadge from './category-badge'
 import { Tag, Check } from 'lucide-react'
+import { getCategoryList } from '../../utils/dataProcessor'
+
+// DB-driven default list; falls back to a built-in set if metadata isn't loaded.
+const FALLBACK_CATEGORIES = [
+  'Browsing',
+  'Code',
+  'Communication',
+  'Entertainment',
+  'Social Media',
+  'Utilities',
+  'Miscellaneous'
+]
 
 export default function BulkCategoryDialog({ apps, onCategorize }) {
   const [selectedApps, setSelectedApps] = useState([])
   const [selectedCategory, setSelectedCategory] = useState('')
   const [open, setOpen] = useState(false)
 
-  const categories = [
-    'Browsing',
-    'Code',
-    'Communication',
-    'Documenting',
-    'Entertainment',
-    'Learning',
-    'Messaging',
-    'Miscellaneous',
-    'Personal',
-    'Productivity',
-    'Utility'
-  ]
+  const dbCategories = getCategoryList().map((c) => c.name)
+  const categories = dbCategories.length > 0 ? dbCategories : FALLBACK_CATEGORIES
 
   const handleSelectAll = () => {
     if (selectedApps.length === apps.length) {

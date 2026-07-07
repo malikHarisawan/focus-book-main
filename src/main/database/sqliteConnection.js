@@ -226,7 +226,20 @@ class SQLiteConnection extends DatabaseAdapter {
         await this.run('ALTER TABLE focus_sessions ADD COLUMN paused_duration INTEGER DEFAULT 0')
         console.log('✅ Added paused_duration column to focus_sessions')
       }
-      
+
+      // Add color/icon columns to categories on older databases. The CREATE TABLE
+      // in schema.sql already includes them for fresh DBs; this backfills existing
+      // ones so the DB-driven palette/icon work has somewhere to write.
+      const categoriesInfo = await this.all('PRAGMA table_info(categories)')
+      if (!categoriesInfo.some((col) => col.name === 'color')) {
+        console.log('Adding color column to categories table...')
+        await this.run('ALTER TABLE categories ADD COLUMN color TEXT')
+      }
+      if (!categoriesInfo.some((col) => col.name === 'icon')) {
+        console.log('Adding icon column to categories table...')
+        await this.run('ALTER TABLE categories ADD COLUMN icon TEXT')
+      }
+
       console.log('✅ Schema migrations completed successfully')
     } catch (error) {
       console.warn('Schema migration warning:', error.message)
@@ -569,6 +582,7 @@ class SQLiteConnection extends DatabaseAdapter {
       'appUsage': 'app_usage',
       'categories': 'categories',
       'customCategoryMappings': 'custom_category_mappings',
+      'categoryRules': 'category_rules',
       'focusSessions': 'focus_sessions',
       'focus_session_interruptions': 'focus_session_interruptions'
     }
@@ -586,6 +600,9 @@ class SQLiteConnection extends DatabaseAdapter {
       'customCategoryMappings': {
         'appIdentifier': 'app_identifier',
         'customCategory': 'custom_category',
+        '_id': 'id'
+      },
+      'categoryRules': {
         '_id': 'id'
       },
       'focusSessions': {

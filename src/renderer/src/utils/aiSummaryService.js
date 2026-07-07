@@ -3,6 +3,8 @@
  * Handles AI-powered productivity summary generation with caching
  */
 
+import { getProductivity } from './dataProcessor'
+
 const CACHE_PREFIX = 'focusbook-summary-'
 const CACHE_TTL_MINUTES = 30
 
@@ -93,26 +95,15 @@ function formatActivityDataForAI(apps) {
 function calculateStats(apps) {
   const totalSeconds = apps.reduce((sum, app) => sum + app.timeSpentSeconds, 0)
   
-  const productive = apps.filter(app => 
-    app.productivity === 'Productive' || 
-    app.category === 'Code' || 
-    app.category === 'Learning' || 
-    app.category === 'Productivity' ||
-    app.category === 'Documenting'
-  )
-  
-  const neutral = apps.filter(app => 
-    app.productivity === 'Neutral' || 
-    app.category === 'Browsing' || 
-    app.category === 'Utility' ||
-    app.category === 'Miscellaneous'
-  )
-  
-  const distracting = apps.filter(app => 
-    app.productivity === 'Distracting' || 
-    app.category === 'Entertainment' ||
-    app.category === 'Personal'
-  )
+  // Productivity level is DB-driven. Prefer the level already computed upstream
+  // (app.productivity); fall back to the shared getProductivity(category) lookup.
+  // No hardcoded category-name lists — they used to disagree with the rest of the
+  // app (e.g. Browsing was Neutral here but Distracting elsewhere).
+  const levelOf = (app) => app.productivity || getProductivity(app.category)
+
+  const productive = apps.filter((app) => levelOf(app) === 'Productive')
+  const neutral = apps.filter((app) => levelOf(app) === 'Neutral')
+  const distracting = apps.filter((app) => levelOf(app) === 'Distracting')
 
   const productiveSeconds = productive.reduce((sum, app) => sum + app.timeSpentSeconds, 0)
   const neutralSeconds = neutral.reduce((sum, app) => sum + app.timeSpentSeconds, 0)

@@ -10,8 +10,10 @@ export function SidebarProvider({ children }) {
       if (saved !== null) {
         return saved === 'true'
       }
-      // Default to collapsed if window width is 900px or less
-      return window.innerWidth <= 900
+      // Default to collapsed on narrower windows so content isn't cramped.
+      // Aligns with the app's min window width (860) and the point where the
+      // dashboard's 4-across layout starts to feel tight.
+      return window.innerWidth <= 1024
     }
     return true
   })

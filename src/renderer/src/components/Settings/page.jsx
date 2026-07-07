@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react'
 import { useTheme, colorSchemes } from '../../context/ThemeContext'
 import BrowserBridgePanel from './BrowserBridgePanel'
+import CategoryRulesPanel from './CategoryRulesPanel'
 import {
   Settings,
   User,
@@ -22,17 +23,6 @@ import {
   Bot,
   Check
 } from 'lucide-react'
-const allCategories = [
-  'Code',
-  'Browsing',
-  'Entertainment',
-  'Communication',
-  'Utility',
-  'Documenting',
-  'Learning',
-  'Personal',
-  'Miscellaneous'
-]
 
 export default function SettingsPage() {
   const [activeTab, setActiveTab] = useState('profile')
@@ -45,10 +35,6 @@ export default function SettingsPage() {
   const [timeFormat, setTimeFormat] = useState('24h')
   const [weekStart, setWeekStart] = useState('monday')
   const [language, setLanguage] = useState('english')
-  const [productiveCategories, setproductiveCategories] = useState([])
-  const [distractedCategories, setdistractedCategories] = useState([])
-  const [newProCategory, setNewProCategory] = useState('')
-  const [newDisCategory, setNewDisCategory] = useState('')
   const [openaiApiKey, setOpenaiApiKey] = useState('')
   const [geminiApiKey, setGeminiApiKey] = useState('')
   const [aiProvider, setAiProvider] = useState('openai') // 'openai' or 'gemini'
@@ -56,15 +42,6 @@ export default function SettingsPage() {
   const [aiServiceStatus, setAiServiceStatus] = useState({ isRunning: false, port: null, error: null })
 
   useEffect(() => {
-    const fetchCategories = async () => {
-      const [productive, distracted] = await window.activeWindow.loadCategories()
-      if (productive) {
-        setproductiveCategories(productive)
-        setdistractedCategories(distracted)
-      }
-    }
-    fetchCategories()
-
     // Load AI config from config.json
     const loadAiConfig = async () => {
       try {
@@ -99,31 +76,6 @@ export default function SettingsPage() {
 
     return () => clearInterval(statusInterval)
   }, [])
-  function loadproCategories() {
-    if (
-      newProCategory &&
-      !productiveCategories.includes(newProCategory) &&
-      !distractedCategories.includes(newProCategory)
-    ) {
-      setproductiveCategories([...productiveCategories, newProCategory])
-    }
-  }
-
-  function loaddisCategories() {
-    if (
-      newDisCategory &&
-      !distractedCategories.includes(newDisCategory) &&
-      !productiveCategories.includes(newDisCategory)
-    ) {
-      setdistractedCategories([...distractedCategories, newDisCategory])
-    }
-  }
-  function removeCategory(app) {
-    setproductiveCategories(productiveCategories.filter((c) => c != app))
-  }
-  function removedisCategory(app) {
-    setdistractedCategories(distractedCategories.filter((c) => c != app))
-  }
 
   return (
     <div className="grid gap-4">
@@ -583,123 +535,9 @@ export default function SettingsPage() {
                 <h3 className="text-lg font-medium text-slate-900 dark:text-slate-200 border-b border-slate-200 dark:border-slate-700/30 pb-2">
                   Manage Categories
                 </h3>
-                <div className="space-y-4">
-                  <div className="pt-4 border-t border-slate-700">
-                    <div className="space-y-3">
-                      <div>
-                        <div className="pt-4 border-t border-slate-700">
-                          <h4 className="text-md font-medium text-slate-800 dark:text-slate-300 mb-3">
-                            Manage Productive Categories
-                          </h4>
 
-                          <div className="flex flex-wrap gap-2 mb-3 ">
-                            {productiveCategories.map((app) => (
-                              <div
-                                key={app}
-                                className="bg-slate-200 dark:bg-[#05070D] text-slate-700 dark:text-slate-300 px-3 py-1 rounded-full text-sm flex items-center"
-                              >
-                                {app}
-                                <button
-                                  onClick={() => removeCategory(app)}
-                                  className="ml-2 text-slate-400 hover:text-slate-200"
-                                >
-                                  <svg
-                                    xmlns="http://www.w3.org/2000/svg"
-                                    className="h-4 w-4"
-                                    viewBox="0 0 20 20"
-                                    fill="currentColor"
-                                  >
-                                    <path
-                                      fillRule="evenodd"
-                                      d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z"
-                                      clipRule="evenodd"
-                                    />
-                                  </svg>
-                                </button>
-                              </div>
-                            ))}
-                          </div>
-
-                          <div className="flex bg-slate-50 dark:bg-[#05070D] border border-slate-300 dark:border-slate-700/30 rounded-l-md">
-                            <select
-                              value={newProCategory}
-                              onChange={(e) => setNewProCategory(e.target.value)}
-                              className="flex-1 bg-slate-50 dark:bg-[#05070D] border border-slate-300 dark:border-slate-700/30 rounded-l-md px-3 py-2 text-slate-900 dark:text-slate-200 focus:outline-none focus:ring-1 focus:ring-cyan-500 focus:border-cyan-500"
-                            >
-                              <option value="">Select Category</option>
-                              {allCategories.map((cat, idx) => (
-                                <option key={idx} value={cat}>
-                                  {cat}
-                                </option>
-                              ))}
-                            </select>
-                            <button
-                              onClick={loadproCategories}
-                              className="bg-cyan-600 hover:bg-cyan-700 text-white px-4 py-2 rounded-r-md transition-colors"
-                            >
-                              Add
-                            </button>
-                          </div>
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-
-                  <div className="pt-4 border-t border-slate-700">
-                    <h4 className="text-md font-medium text-slate-800 dark:text-slate-300 mb-3">
-                      Manage Distracted Categories
-                    </h4>
-
-                    <div className="flex flex-wrap gap-2 mb-3">
-                      {distractedCategories.map((app) => (
-                        <div
-                          key={app}
-                          className="bg-slate-200 dark:bg-[#05070D] text-slate-700 dark:text-slate-300 px-3 py-1 rounded-full text-sm flex items-center"
-                        >
-                          {app}
-                          <button
-                            onClick={() => removedisCategory(app)}
-                            className="ml-2 text-slate-400 hover:text-slate-200"
-                          >
-                            <svg
-                              xmlns="http://www.w3.org/2000/svg"
-                              className="h-4 w-4"
-                              viewBox="0 0 20 20"
-                              fill="currentColor"
-                            >
-                              <path
-                                fillRule="evenodd"
-                                d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z"
-                                clipRule="evenodd"
-                              />
-                            </svg>
-                          </button>
-                        </div>
-                      ))}
-                    </div>
-
-                    <div className="flex">
-                      <select
-                        value={newDisCategory}
-                        onChange={(e) => setNewDisCategory(e.target.value)}
-                        className="flex-1 bg-slate-50 dark:bg-[#05070D] border border-slate-300 dark:border-slate-700/30 rounded-l-md px-3 py-2 text-slate-900 dark:text-slate-200 focus:outline-none focus:ring-1 focus:ring-cyan-500 focus:border-cyan-500"
-                      >
-                        <option value="">Select Category</option>
-                        {allCategories.map((cat, idx) => (
-                          <option key={idx} value={cat}>
-                            {cat}
-                          </option>
-                        ))}
-                      </select>
-                      <button
-                        onClick={loaddisCategories}
-                        className="bg-cyan-600 hover:bg-cyan-700 text-white px-4 py-2 rounded-r-md transition-colors"
-                      >
-                        Add
-                      </button>
-                    </div>
-                  </div>
-                </div>
+                {/* Full category + classification-rule management (DB-driven) */}
+                <CategoryRulesPanel />
               </div>
             )}
 
@@ -1432,26 +1270,6 @@ export default function SettingsPage() {
                 </div>
               </div>
             )}
-
-            {/* Save Button */}
-            <div className="mt-6 flex justify-end">
-              <button
-                onClick={() => {
-                  try {
-                    window.activeWindow.send('save-categories', {
-                      productive: productiveCategories,
-                      distracted: distractedCategories
-                    })
-                  } catch (error) {
-                    console.error('Error saving settings:', error)
-                  }
-                }}
-                className="bg-cyan-600 hover:bg-cyan-700 text-white px-4 py-2 rounded-md transition-colors flex items-center"
-              >
-                <Save className="h-4 w-4 mr-2" />
-                Save Settings
-              </button>
-            </div>
           </div>
         </div>
       </div>

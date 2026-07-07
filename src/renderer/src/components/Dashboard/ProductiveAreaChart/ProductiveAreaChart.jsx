@@ -396,28 +396,11 @@ const ProductiveAreaChart = ({
             position={{ y: -30 }}
             wrapperStyle={{ outline: 'none' }}
           />
-          <Area
-            type="monotoneX"
-            dataKey="productive"
-            name="Productive"
-            stackId="1"
-            stroke={chartColors.productive}
-            strokeWidth={2}
-            fill="url(#colorProductive)"
-            dot={false}
-            activeDot={false}
-          />
-          <Area
-            type="monotoneX"
-            dataKey="neutral"
-            name="Neutral"
-            stackId="1"
-            stroke={chartColors.neutral}
-            strokeWidth={2}
-            fill="url(#colorNeutral)"
-            dot={false}
-            activeDot={false}
-          />
+          {/* Only Productive (cyan) and Distracting (red) are charted; neutral
+              time is intentionally omitted here (still shown in the stat cards).
+              Draw order matters for stacked areas: distracting is drawn first so
+              it sits at the BOTTOM, and productive is drawn last so it renders on
+              TOP — the dominant type visually dominates the chart. */}
           <Area
             type="monotoneX"
             dataKey="distracting"
@@ -426,6 +409,17 @@ const ProductiveAreaChart = ({
             stroke="#FF6B6B"
             strokeWidth={2}
             fill="url(#colorDistracting)"
+            dot={false}
+            activeDot={false}
+          />
+          <Area
+            type="monotoneX"
+            dataKey="productive"
+            name="Productive"
+            stackId="1"
+            stroke={chartColors.productive}
+            strokeWidth={2}
+            fill="url(#colorProductive)"
             dot={false}
             activeDot={false}
           />

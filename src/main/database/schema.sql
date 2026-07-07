@@ -9,13 +9,36 @@ CREATE TABLE IF NOT EXISTS app_metadata (
     updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
 );
 
--- Categories table to store productivity categories
+-- Categories table to store productivity categories.
+-- `color` and `icon` are optional presentation attributes so the renderer can
+-- drive its palette/iconography from the DB instead of hardcoded per-component
+-- maps (added columns are also backfilled by runSchemaMigrations for old DBs).
 CREATE TABLE IF NOT EXISTS categories (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     name TEXT NOT NULL UNIQUE,
     type TEXT NOT NULL CHECK (type IN ('productive', 'distracted', 'neutral')),
+    color TEXT,
+    icon TEXT,
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
     updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+);
+
+-- Category rules: the data-driven replacement for the hardcoded APP_CATEGORIES
+-- catalog in src/preload/categories.js. Each rule maps a text pattern to a
+-- category. `match_type` is 'app' (substring match against the exe/app key, the
+-- reliable signal) or 'keyword' (substring match against the window title/url).
+-- getCategory evaluates: user override -> 'app' rules -> 'keyword' rules ->
+-- Miscellaneous. `priority` lets specific rules win (higher first); ties broken
+-- by app-before-keyword then insertion order.
+CREATE TABLE IF NOT EXISTS category_rules (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    pattern TEXT NOT NULL,
+    category TEXT NOT NULL, -- references categories.name (not FK-enforced; free text like custom_category_mappings)
+    match_type TEXT NOT NULL CHECK (match_type IN ('app', 'keyword')) DEFAULT 'keyword',
+    priority INTEGER NOT NULL DEFAULT 0,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    UNIQUE (pattern, match_type)
 );
 
 -- Custom category mappings table
@@ -109,15 +132,79 @@ CREATE INDEX IF NOT EXISTS idx_focus_sessions_start_time ON focus_sessions(start
 CREATE INDEX IF NOT EXISTS idx_focus_sessions_type ON focus_sessions(type);
 CREATE INDEX IF NOT EXISTS idx_focus_sessions_status ON focus_sessions(status);
 CREATE INDEX IF NOT EXISTS idx_focus_interruptions_session_id ON focus_session_interruptions(focus_session_id);
+CREATE INDEX IF NOT EXISTS idx_category_rules_match_type ON category_rules(match_type);
 
--- Insert default categories (SQLite uses INSERT OR IGNORE instead of ON CONFLICT)
-INSERT OR IGNORE INTO categories (name, type) VALUES 
-    ('Code', 'productive'),
-    ('Browsing', 'neutral'),
-    ('Communication', 'neutral'),
-    ('Utilities', 'neutral'),
-    ('Entertainment', 'distracted'),
-    ('Miscellaneous', 'neutral');
+-- Insert default categories (SQLite uses INSERT OR IGNORE instead of ON CONFLICT).
+-- color is the hex used by the legacy APP_CATEGORIES map; icon is a lucide-react
+-- icon name the renderer can resolve. Social Media is new and distracting.
+INSERT OR IGNORE INTO categories (name, type, color, icon) VALUES
+    ('Code', 'productive', '#00d8ff', 'Code'),
+    ('Browsing', 'neutral', '#b381c9', 'Globe'),
+    ('Communication', 'neutral', '#5ac26d', 'MessageSquare'),
+    ('Utilities', 'neutral', '#36a2eb', 'Wrench'),
+    ('Entertainment', 'distracted', '#ff6384', 'Video'),
+    ('Social Media', 'distracted', '#f97316', 'Users'),
+    ('Miscellaneous', 'neutral', '#7a7a7a', 'Package');
+
+-- Seed category rules from the previously-hardcoded APP_CATEGORIES catalog so
+-- classification is data-driven with no loss of the built-in defaults. 'app'
+-- rules match the exe/app key; 'keyword' rules match the window title/url.
+-- Social-media patterns are pulled OUT of the old neutral Browsing bucket and
+-- given their own distracting category (this is the Twitter fix).
+INSERT OR IGNORE INTO category_rules (pattern, category, match_type, priority) VALUES
+    -- Code
+    ('Code.exe', 'Code', 'app', 10),
+    ('WindowsTerminal.exe', 'Code', 'app', 10),
+    ('denenv.exe', 'Code', 'app', 10),
+    ('stackoverflow.com', 'Code', 'app', 10),
+    ('github', 'Code', 'keyword', 0),
+    ('gitlab', 'Code', 'keyword', 0),
+    ('programming', 'Code', 'keyword', 0),
+    ('development', 'Code', 'keyword', 0),
+    ('debug', 'Code', 'keyword', 0),
+    -- Social Media (distracting) -- moved out of Browsing
+    ('twitter', 'Social Media', 'keyword', 5),
+    ('x.com', 'Social Media', 'keyword', 5),
+    ('facebook', 'Social Media', 'keyword', 5),
+    ('instagram', 'Social Media', 'keyword', 5),
+    ('reddit', 'Social Media', 'keyword', 5),
+    ('tiktok', 'Social Media', 'keyword', 5),
+    ('snapchat', 'Social Media', 'keyword', 5),
+    -- Communication
+    ('Skype.exe', 'Communication', 'app', 10),
+    ('ms-teams.exe', 'Communication', 'app', 10),
+    ('mail.google.com', 'Communication', 'app', 10),
+    ('email', 'Communication', 'keyword', 0),
+    ('gmail', 'Communication', 'keyword', 0),
+    ('outlook', 'Communication', 'keyword', 0),
+    ('slack', 'Communication', 'keyword', 0),
+    -- Browsing / learning (neutral)
+    ('udemy.com', 'Browsing', 'app', 10),
+    ('vulms.vu.edu.pk', 'Browsing', 'app', 10),
+    ('chatgpt.com', 'Browsing', 'app', 10),
+    ('tutorial', 'Browsing', 'keyword', 0),
+    ('course', 'Browsing', 'keyword', 0),
+    ('research', 'Browsing', 'keyword', 0),
+    ('study', 'Browsing', 'keyword', 0),
+    ('learning', 'Browsing', 'keyword', 0),
+    ('lecture', 'Browsing', 'keyword', 0),
+    ('linkedin', 'Browsing', 'keyword', 0),
+    -- Utilities
+    ('Notepad.exe', 'Utilities', 'app', 10),
+    ('explorer.exe', 'Utilities', 'app', 10),
+    ('TaskManager.exe', 'Utilities', 'app', 10),
+    ('Application Frame Host', 'Utilities', 'app', 10),
+    ('settings', 'Utilities', 'keyword', 0),
+    ('calculator', 'Utilities', 'keyword', 0),
+    -- Entertainment (distracting)
+    ('Spotify.exe', 'Entertainment', 'app', 10),
+    ('vlc.exe', 'Entertainment', 'app', 10),
+    ('youtube', 'Entertainment', 'keyword', 0),
+    ('netflix', 'Entertainment', 'keyword', 0),
+    ('music', 'Entertainment', 'keyword', 0),
+    ('movie', 'Entertainment', 'keyword', 0),
+    ('game', 'Entertainment', 'keyword', 0),
+    ('twitch', 'Entertainment', 'keyword', 0);
 
 -- SQLite triggers for updating updated_at timestamp
 CREATE TRIGGER IF NOT EXISTS update_app_usage_updated_at 
