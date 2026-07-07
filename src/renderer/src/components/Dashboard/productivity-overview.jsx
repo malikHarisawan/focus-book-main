@@ -2,7 +2,6 @@ import { useEffect, useState } from 'react'
 import { Activity, Clock, Flame, LineChart, RefreshCw, Trophy } from 'lucide-react'
 import { Card, CardContent, CardHeader, CardTitle } from '../ui/card'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '../ui/tabs'
-import { Badge } from '../ui/badge'
 import { Button } from '../ui/button'
 import { MetricCard } from './metric-card'
 import { TrendingDown, TrendingUp, Calendar } from '../shared/icons'
@@ -13,7 +12,6 @@ import AppUsageDetails from './AppUsageDetails'
 import { useDate } from '../../context/DateContext'
 import {
   processUsageChartData,
-  processMostUsedApps,
   getTotalFocusTime,
   getCategoryBreakdown,
   processProductiveChartData,
@@ -25,7 +23,6 @@ import {
 export default function ProductivityOverview() {
   const [view, setView] = useState('day')
   const [chartData, setChartData] = useState([])
-  const [appsData, setAppsData] = useState([])
   const [focusTime, setFocusTime] = useState(0)
   const [totalTime, setTotalTime] = useState('')
   const [apps, setApps] = useState([])
@@ -43,9 +40,6 @@ export default function ProductivityOverview() {
     handleDateChange(e.target.value)
   }
 
-  const capitalize = (str) => {
-    return str.charAt(0).toUpperCase() + str.slice(1)
-  }
   useEffect(() => {
     loadAndProcessData()
     handleVisibilityChange()
@@ -89,10 +83,6 @@ export default function ProductivityOverview() {
     console.log('📈 Area Chart data:', processedProductiveChartData)
     console.log('📈 Data length:', processedProductiveChartData ? processedProductiveChartData.length : 0)
     setProductiveData(processedProductiveChartData)
-
-    const processedAppsData = processMostUsedApps(jsonData, selectedDate, false) // Default to summary view
-    console.log('processedAppsData', processedAppsData)
-    setAppsData(processedAppsData)
 
     const focTime = getTotalFocusTime(jsonData, selectedDate, processedChartData, view)
     console.log('focustime', focTime)
@@ -220,12 +210,6 @@ export default function ProductivityOverview() {
             <div className="flex flex-col lg:flex-row items-start lg:items-center justify-between mb-2 gap-2">
               <TabsList className="p-0.5 w-full lg:w-auto bg-[#F4F7FE] border border-[#E8EDF1] dark:bg-[#1E293B] dark:border-[#1E293B] rounded-lg">
                 <TabsTrigger
-                  value="applications"
-                  className="text-xs px-3 py-1.5 rounded-md font-medium transition-all text-[#768396] dark:text-[#94A3B8] data-[state=active]:bg-white data-[state=active]:text-[#5051F9] data-[state=active]:shadow-sm dark:data-[state=active]:bg-[#22D3EE] dark:data-[state=active]:text-[#03050A]"
-                >
-                  Apps
-                </TabsTrigger>
-                <TabsTrigger
                   value="categories"
                   className="text-xs px-3 py-1.5 rounded-md font-medium transition-all text-[#768396] dark:text-[#94A3B8] data-[state=active]:bg-white data-[state=active]:text-[#5051F9] data-[state=active]:shadow-sm dark:data-[state=active]:bg-[#22D3EE] dark:data-[state=active]:text-[#03050A]"
                 >
@@ -244,33 +228,6 @@ export default function ProductivityOverview() {
                 </div>
               </div>
             </div>
-
-            <TabsContent value="applications" className="mt-0">
-              <div className="rounded-2xl border overflow-hidden min-h-[300px] max-h-[600px] flex flex-col bg-white border-[#E8EDF1] dark:bg-[#0B1220] dark:border-[#1E293B]">
-                <div className="grid grid-cols-12 text-xs p-2 border-b flex-shrink-0 text-[#768396] dark:text-[#94A3B8] font-normal border-[#E8EDF1] bg-[#F4F7FE] dark:border-[#1E293B] dark:bg-[#1E293B]">
-                  <div className="col-span-5 sm:col-span-6">Application</div>
-                  <div className="col-span-3 hidden sm:block">Category</div>
-                  <div className="col-span-4 sm:col-span-2">Time Spent</div>
-                  <div className="col-span-3 sm:col-span-1">Productivity</div>
-                </div>
-
-                <div className="divide-y divide-[#E8EDF1] dark:divide-[#1E293B] overflow-y-auto flex-1 custom-scrollbar">
-                  {appsData.map((app) => (
-                    <AppUsageRow
-                      key={app.name}
-                      name={capitalize(app.name)}
-                      category={app.category}
-                      timeSpent={
-                        app.time >= 60
-                          ? `${Math.floor(app.time / 60)}h ${app.time % 60}m`
-                          : `${app.time}m`
-                      }
-                      productivity={app.productivity}
-                    />
-                  ))}
-                </div>
-              </div>
-            </TabsContent>
 
             <TabsContent value="categories" className="mt-0">
               <div className="h-[280px] w-full relative rounded-2xl overflow-hidden bg-white dark:bg-[#0B1220] border border-[#E8EDF1] dark:border-[#1E293B]">
@@ -298,38 +255,6 @@ export default function ProductivityOverview() {
         </div>
       </CardContent>
     </Card>
-  )
-}
-
-// App usage row component
-function AppUsageRow({ name, category, timeSpent, productivity }) {
-  const getProductivityColor = () => {
-    switch (productivity) {
-      case 'Productive':
-        return 'bg-meta-green-50 text-meta-green-600 border-meta-green-200 dark:bg-meta-green-500/10 dark:text-meta-green-400 dark:border-meta-green-500/30'
-      case 'Neutral':
-        return 'bg-meta-orange-50 text-meta-orange-600 border-meta-orange-200 dark:bg-meta-orange-500/10 dark:text-meta-orange-400 dark:border-meta-orange-500/30'
-      case 'Distracting':
-        return 'bg-meta-red-50 text-meta-red-600 border-meta-red-200 dark:bg-meta-red-500/10 dark:text-meta-red-400 dark:border-meta-red-500/30'
-      default:
-        return 'bg-meta-gray-50 text-meta-gray-600 border-meta-gray-200 dark:bg-meta-gray-500/10 dark:text-meta-gray-400 dark:border-meta-gray-500/30'
-    }
-  }
-
-  return (
-    <div className="grid grid-cols-12 py-2 px-2 sm:px-3 text-xs sm:text-sm hover:bg-meta-gray-50 dark:hover:bg-dark-bg-hover">
-      <div className="col-span-5 sm:col-span-6 text-meta-gray-800 dark:text-dark-text-primary truncate pr-1">{name}</div>
-      <div className="col-span-3 text-meta-gray-600 dark:text-dark-text-secondary hidden sm:block truncate">{category}</div>
-      <div className="col-span-4 sm:col-span-2 text-meta-blue-600 dark:text-meta-blue-400">{timeSpent}</div>
-      <div className="col-span-3 sm:col-span-1">
-        <Badge variant="outline" className={`${getProductivityColor()} text-xs`}>
-          <span className="hidden sm:inline">{productivity}</span>
-          <span className="sm:hidden">
-            {productivity === 'Productive' ? 'P' : productivity === 'Neutral' ? 'N' : 'D'}
-          </span>
-        </Badge>
-      </div>
-    </div>
   )
 }
 
