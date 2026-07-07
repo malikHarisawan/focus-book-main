@@ -290,6 +290,72 @@ const accumulateProductivity = (bucket, app) => {
 
 const emptyPoint = (day) => ({ day, productive: 0, neutral: 0, distracting: 0 })
 
+// Format a Date as a LOCAL YYYY-MM-DD (not UTC). Using toISOString() here would
+// shift the day for non-UTC timezones (e.g. a local midnight rolls back a day),
+// which is exactly why the month view used to span 06-30..07-30 instead of the
+// intended 07-01..07-31.
+const toLocalDateStr = (d) => {
+  const y = d.getFullYear()
+  const m = String(d.getMonth() + 1).padStart(2, '0')
+  const day = String(d.getDate()).padStart(2, '0')
+  return `${y}-${m}-${day}`
+}
+
+// The list of YYYY-MM-DD dates covered by a given zoom/view level, anchored on
+// `date`. Mirrors the ranges the area chart uses so the summary cards and the
+// chart always describe the same window:
+//   hour/day -> just `date`; week -> the Sun..Sat week containing `date`;
+//   month    -> every day of `date`'s calendar month.
+export const getDatesForView = (date, viewType = 'day') => {
+  const dateObj = new Date(date)
+  if (viewType === 'week') {
+    const dates = []
+    for (let i = 0; i < 7; i++) {
+      const d = new Date(dateObj)
+      d.setDate(dateObj.getDate() - dateObj.getDay() + i)
+      dates.push(toLocalDateStr(d))
+    }
+    return dates
+  }
+  if (viewType === 'month') {
+    const year = dateObj.getFullYear()
+    const month = dateObj.getMonth()
+    const daysInMonth = new Date(year, month + 1, 0).getDate()
+    const dates = []
+    for (let day = 1; day <= daysInMonth; day++) {
+      dates.push(toLocalDateStr(new Date(year, month, day)))
+    }
+    return dates
+  }
+  // 'hour' and 'day' both describe a single day.
+  return [typeof date === 'string' ? date : toLocalDateStr(dateObj)]
+}
+
+// Aggregate productive / neutral / distracting / total SECONDS across the date
+// window for a view level. Used by the dashboard summary cards so they reflect
+// the current day/week/month view instead of always showing the selected day.
+export const getProductivityTotals = (jsonData, date, viewType = 'day') => {
+  const totals = { productive: 0, neutral: 0, distracting: 0 }
+  if (jsonData) {
+    for (const d of getDatesForView(date, viewType)) {
+      const apps = jsonData[d]?.apps
+      if (!apps) continue
+      for (const app of Object.values(apps)) {
+        accumulateProductivity(totals, app)
+      }
+    }
+  }
+  const productiveSeconds = Math.floor(totals.productive)
+  const neutralSeconds = Math.floor(totals.neutral)
+  const distractingSeconds = Math.floor(totals.distracting)
+  return {
+    productiveSeconds,
+    neutralSeconds,
+    distractingSeconds,
+    totalSeconds: productiveSeconds + neutralSeconds + distractingSeconds
+  }
+}
+
 export const processProductiveChartData = (jsonData, date, viewType = 'day') => {
   if (viewType === 'hour') {
     if (!jsonData || !jsonData[date]) {
@@ -342,14 +408,12 @@ export const processProductiveChartData = (jsonData, date, viewType = 'day') => 
     return fullDayData
   } else if (viewType === 'week') {
     const weekData = []
-    const dateObj = new Date(date)
     const dayNames = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']
+    // Reuse the shared (local-date) window so the chart and the summary cards
+    // agree on exactly which days the week covers.
+    const weekDates = getDatesForView(date, 'week')
 
-    for (let i = 0; i < 7; i++) {
-      const currentDate = new Date(dateObj)
-      currentDate.setDate(dateObj.getDate() - dateObj.getDay() + i)
-      const formattedDate = currentDate.toISOString().split('T')[0]
-
+    weekDates.forEach((formattedDate, i) => {
       const dayData = emptyPoint(dayNames[i])
 
       if (jsonData[formattedDate] && jsonData[formattedDate].apps) {
@@ -359,20 +423,17 @@ export const processProductiveChartData = (jsonData, date, viewType = 'day') => 
       }
 
       weekData.push(dayData)
-    }
+    })
 
     return weekData
   } else if (viewType === 'month') {
     const monthData = []
-    const dateObj = new Date(date)
-    const year = dateObj.getFullYear()
-    const month = dateObj.getMonth()
-    const daysInMonth = new Date(year, month + 1, 0).getDate()
+    // Shared local-date window (fixes the old toISOString() off-by-one that
+    // made the month span the previous day..30th in non-UTC timezones).
+    const monthDates = getDatesForView(date, 'month')
 
-    for (let day = 1; day <= daysInMonth; day++) {
-      const currentDate = new Date(year, month, day)
-      const formattedDate = currentDate.toISOString().split('T')[0]
-
+    monthDates.forEach((formattedDate, idx) => {
+      const day = idx + 1
       const dayData = emptyPoint(day.toString())
 
       if (jsonData[formattedDate] && jsonData[formattedDate].apps) {
@@ -382,7 +443,7 @@ export const processProductiveChartData = (jsonData, date, viewType = 'day') => 
       }
 
       monthData.push(dayData)
-    }
+    })
 
     return monthData
   }

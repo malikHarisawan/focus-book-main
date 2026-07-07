@@ -15,16 +15,16 @@ import {
   getCategoryBreakdown,
   processProductiveChartData,
   getTotalScreenTime,
-  formatAppsData,
-  getProductivityType,
+  getProductivityTotals,
   refreshCategoryMapping
 } from '../../utils/dataProcessor'
 export default function ProductivityOverview() {
-  const [view, setView] = useState('day')
+  // These hour-resolution chart helpers take a legacy per-hour 'day' view; the
+  // real day/week/month switching is driven by the chart's zoom (currentZoomLevel).
+  const view = 'day'
   const [chartData, setChartData] = useState([])
   const [focusTime, setFocusTime] = useState(0)
   const [totalTime, setTotalTime] = useState('')
-  const [apps, setApps] = useState([])
   const [rawData, setRawData] = useState(null)
   const [currentZoomLevel, setCurrentZoomLevel] = useState('hour')
   const { selectedDate, handleDateChange } = useDate()
@@ -73,8 +73,6 @@ export default function ProductivityOverview() {
     console.log('📅 Selected Date:', selectedDate)
     console.log('📅 Available dates in data:', jsonData ? Object.keys(jsonData) : 'No data')
     setRawData(jsonData)
-    const appsData = formatAppsData(jsonData, selectedDate, false) // Default to summary view
-    setApps(appsData)
     const processedChartData = processUsageChartData(jsonData, selectedDate, view)
     setChartData(processedChartData)
 
@@ -91,22 +89,20 @@ export default function ProductivityOverview() {
     console.log('screenTime', screenTime)
     setTotalTime(screenTime)
   }
-  const totalTimeSeconds = apps.reduce((total, app) => total + app.timeSpentSeconds, 0)
+  // Summary cards reflect the CURRENT view (day/week/month) via the chart's zoom
+  // level, not just the selected day. getProductivityTotals aggregates over the
+  // same date window the area chart draws, so the numbers always agree.
+  const { productiveSeconds, neutralSeconds, distractingSeconds, totalSeconds } =
+    getProductivityTotals(rawData, selectedDate, currentZoomLevel)
+
+  const totalTimeSeconds = totalSeconds
+  const productiveTime = productiveSeconds
+  const neutralTime = neutralSeconds
+  const distractingTime = distractingSeconds
+
   const totalHours = Math.floor(totalTimeSeconds / 3600)
   const totalMinutes = Math.floor((totalTimeSeconds % 3600) / 60)
   const totalTimeFormatted = `${totalHours}h ${totalMinutes}m`
-
-  const productiveTime = apps
-    .filter((app) => getProductivityType(app.category) === 'productive')
-    .reduce((total, app) => total + app.timeSpentSeconds, 0)
-
-  const neutralTime = apps
-    .filter((app) => getProductivityType(app.category) === 'neutral')
-    .reduce((total, app) => total + app.timeSpentSeconds, 0)
-
-  const distractingTime = apps
-    .filter((app) => getProductivityType(app.category) === 'distracted')
-    .reduce((total, app) => total + app.timeSpentSeconds, 0)
 
   // Round the three shares with the largest-remainder method so they always add
   // up to exactly 100% (independent Math.round calls can drift to 99% or 101%).
