@@ -1498,7 +1498,10 @@ contextBridge.exposeInMainWorld('activeWindow', {
   deleteCategoryRule: (id) => deleteCategoryRule(id),
   refreshData: () => loadData(),
   updateAppCategory: (appIdentifier, category, selectedDate, appToUpdate) =>
-    updateAppCategory(appIdentifier, category, selectedDate, appToUpdate)
+    updateAppCategory(appIdentifier, category, selectedDate, appToUpdate),
+  // Rule-based recategorization: creates/updates a classification rule and
+  // retags history so the change persists and applies to past + future data.
+  retagAppCategory: (app, category) => retagAppCategory(app, category)
 })
 
 function getFormattedStats(date) {
@@ -1537,6 +1540,52 @@ ipcRenderer.on('dismiss', (event, appName) => {
     }
   }
 })
+
+// Reduce a raw domain/URL to a stable, matchable host like "facebook.com":
+// strip protocol, "www.", path and query; keep the last two labels so
+// "www.facebook.com/reel/123" -> "facebook.com". A rule on this host then
+// matches every URL live tracking sees for that site (getCategory(active_url)).
+function toRuleDomain(rawDomain) {
+  if (!rawDomain) return ''
+  let host = String(rawDomain)
+    .replace(/^https?:\/\//, '')
+    .replace(/^www\./, '')
+    .split('/')[0]
+    .split('?')[0]
+    .toLowerCase()
+    .trim()
+  const parts = host.split('.').filter(Boolean)
+  // Keep the registrable domain (last two labels) for common TLDs; leave
+  // multi-part hosts (e.g. localhost, IPs) as-is.
+  if (parts.length > 2) host = parts.slice(-2).join('.')
+  return host
+}
+
+// Turn a UI category change into a persistent classification rule + a history
+// retag, via the main process. `app` is the row object from the Activity/
+// Dashboard table ({ name, domain, description, ... }). Browser rows (with a
+// domain) create a keyword rule on the host so ALL that site's URLs are
+// retagged; native apps create an app rule on the app name.
+async function retagAppCategory(app, category) {
+  try {
+    if (!app || !category) return { success: false, error: 'Missing app or category' }
+    const domain = app.domain ? toRuleDomain(app.domain) : ''
+    const matchType = domain ? 'domain' : 'app'
+    const pattern = domain || app.name || app.description
+    if (!pattern) return { success: false, error: 'Could not derive a rule pattern' }
+
+    const result = await ipcRenderer.invoke('retag-app-category', { matchType, pattern, category })
+
+    // Refresh local caches so this preload's live tracking uses the new rule
+    // immediately (the categories-updated broadcast also does this, but do it
+    // here too so there's no window where the next tick re-derives the old one).
+    categoryRules = await loadCategoryRules()
+    return { ...result, pattern, matchType }
+  } catch (error) {
+    console.error('Error in retagAppCategory:', error)
+    return { success: false, error: error.message }
+  }
+}
 
 async function updateAppCategory(appIdentifier, category, selectedDate, appKey) {
   try {

@@ -1,7 +1,6 @@
 import { useEffect, useState } from 'react'
 import { Activity, Clock, Flame, LineChart, RefreshCw, Trophy } from 'lucide-react'
 import { Card, CardContent, CardHeader, CardTitle } from '../ui/card'
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '../ui/tabs'
 import { Button } from '../ui/button'
 import { MetricCard } from './metric-card'
 import { TrendingDown, TrendingUp, Calendar } from '../shared/icons'
@@ -137,20 +136,14 @@ export default function ProductivityOverview() {
   }
 
   // Persist a category change for an app from the timeline breakdown panel.
-  // Uses the same updateAppCategory IPC as the Activity page (which writes a
-  // custom mapping + updates stored usage), then refreshes the DB-driven mapping
-  // and reloads the view. Previously this was a no-op stub.
+  // Creates/updates a classification rule and retags matching history (same
+  // rule-based flow as the Activity page), so the change persists instead of
+  // being overwritten by the next tracking tick. Then reloads the view.
   const handleCategoryChange = async (app, newCategory) => {
     try {
       if (!app || !newCategory) return
-      const appIdentifier = app.domain || app.name
-      const appKey = app.name
-      await window.activeWindow.updateAppCategory(
-        appIdentifier,
-        newCategory,
-        selectedDate,
-        appKey
-      )
+      const result = await window.activeWindow.retagAppCategory(app, newCategory)
+      if (!result?.success) throw new Error(result?.error || 'Retag failed')
       await refreshCategoryMapping()
       await loadAndProcessData()
     } catch (error) {
@@ -206,52 +199,40 @@ export default function ProductivityOverview() {
 
         {/* Charts Section */}
         <div className="mt-2">
-          <Tabs defaultValue="categories" className="w-full">
-            <div className="flex flex-col lg:flex-row items-start lg:items-center justify-between mb-2 gap-2">
-              <TabsList className="p-0.5 w-full lg:w-auto bg-[#F4F7FE] border border-[#E8EDF1] dark:bg-[#1E293B] dark:border-[#1E293B] rounded-lg">
-                <TabsTrigger
-                  value="categories"
-                  className="text-xs px-3 py-1.5 rounded-md font-medium transition-all text-[#768396] dark:text-[#94A3B8] data-[state=active]:bg-white data-[state=active]:text-[#5051F9] data-[state=active]:shadow-sm dark:data-[state=active]:bg-[#22D3EE] dark:data-[state=active]:text-[#03050A]"
-                >
-                  Timeline
-                </TabsTrigger>
-              </TabsList>
+          <div className="flex flex-col lg:flex-row items-start lg:items-center justify-between mb-2 gap-2">
+            <h3 className="text-sm font-medium text-[#232360] dark:text-white">Timeline</h3>
 
-              <div className="flex items-center gap-3 text-xs font-normal w-full lg:w-auto justify-center lg:justify-end text-[#768396] dark:text-[#94A3B8]">
-                <div className="flex items-center gap-1">
-                  <div className="h-2 w-2 rounded-full bg-[#5051F9] dark:bg-[#22D3EE]"></div>
-                  <span>Productive</span>
-                </div>
-                <div className="flex items-center gap-1">
-                  <div className="h-2 w-2 rounded-full bg-[#FF6B6B]"></div>
-                  <span>Distracting</span>
-                </div>
+            <div className="flex items-center gap-3 text-xs font-normal w-full lg:w-auto justify-center lg:justify-end text-[#768396] dark:text-[#94A3B8]">
+              <div className="flex items-center gap-1">
+                <div className="h-2 w-2 rounded-full bg-[#5051F9] dark:bg-[#22D3EE]"></div>
+                <span>Productive</span>
+              </div>
+              <div className="flex items-center gap-1">
+                <div className="h-2 w-2 rounded-full bg-[#FF6B6B]"></div>
+                <span>Distracting</span>
               </div>
             </div>
+          </div>
 
-            <TabsContent value="categories" className="mt-0">
-              <div className="h-[280px] w-full relative rounded-2xl overflow-hidden bg-white dark:bg-[#0B1220] border border-[#E8EDF1] dark:border-[#1E293B]">
-                <ProductiveAreaChart
-                  data={productiveData}
-                  rawData={rawData}
-                  selectedDate={selectedDate}
-                  onZoomLevelChange={setCurrentZoomLevel}
-                  onSelectionChange={handleSelectionChange}
-                />
-              </div>
+          <div className="h-[280px] w-full relative rounded-2xl overflow-hidden bg-white dark:bg-[#0B1220] border border-[#E8EDF1] dark:border-[#1E293B]">
+            <ProductiveAreaChart
+              data={productiveData}
+              rawData={rawData}
+              selectedDate={selectedDate}
+              onZoomLevelChange={setCurrentZoomLevel}
+              onSelectionChange={handleSelectionChange}
+            />
+          </div>
 
-              {/* Selected Range Breakdown */}
-              <AppUsageDetails
-                selectedApps={selectedApps}
-                selectedRange={selectedRange}
-                zoomLevel={currentZoomLevel}
-                isVisible={showAppDetails}
-                onCategoryChange={handleCategoryChange}
-                onClose={() => setShowAppDetails(false)}
-              />
-
-            </TabsContent>
-          </Tabs>
+          {/* Selected Range Breakdown */}
+          <AppUsageDetails
+            selectedApps={selectedApps}
+            selectedRange={selectedRange}
+            zoomLevel={currentZoomLevel}
+            isVisible={showAppDetails}
+            onCategoryChange={handleCategoryChange}
+            onClose={() => setShowAppDetails(false)}
+          />
         </div>
       </CardContent>
     </Card>

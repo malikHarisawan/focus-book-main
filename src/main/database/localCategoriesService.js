@@ -200,6 +200,36 @@ class LocalCategoriesService {
     })
   }
 
+  // Insert a rule, or if one with the same (pattern, match_type) already exists,
+  // update its category. Used by the "change category from Activity/Dashboard"
+  // flow, which turns a per-app tweak into a persistent classification rule.
+  // Returns { id, created } — created=true if a new rule was inserted.
+  async upsertCategoryRule(pattern, category, matchType = 'keyword', priority = 0) {
+    return this.db.executeWithRetry(async () => {
+      const existing = await this.db.findOne('categoryRules', {
+        pattern: pattern,
+        match_type: matchType
+      })
+      if (existing) {
+        if (existing.category !== category) {
+          await this.db.update(
+            'categoryRules',
+            { _id: existing._id },
+            { $set: { category: category } }
+          )
+        }
+        return { id: existing._id, created: false }
+      }
+      const inserted = await this.db.insert('categoryRules', {
+        pattern: pattern,
+        category: category,
+        match_type: matchType,
+        priority: priority
+      })
+      return { id: inserted && (inserted._id || inserted.id), created: true }
+    })
+  }
+
   // Update a rule's category/priority by its id.
   async updateCategoryRule(id, updates) {
     return this.db.executeWithRetry(async () => {

@@ -769,6 +769,36 @@ app.whenReady().then(async () => {
     }
   })
 
+  // Retag an app/domain's category from the Activity or Dashboard view. Instead
+  // of a per-app override (which the 30s tracker would overwrite because it
+  // re-derives the category every tick), this creates/updates a persistent
+  // classification RULE that live tracking respects, then retags existing
+  // history so past data is fixed too. One source of truth, no silent revert.
+  ipcMain.handle('retag-app-category', async (event, { matchType, pattern, category }) => {
+    try {
+      if (!pattern || !category) {
+        return { success: false, error: 'Missing pattern or category' }
+      }
+      const catSvc = hybridConnection.getCategoriesService()
+      const usageSvc = hybridConnection.getAppUsageService()
+
+      // 'domain' rows match by keyword (URL substring); native apps by 'app'.
+      const ruleMatchType = matchType === 'domain' ? 'keyword' : 'app'
+      const rule = await catSvc.upsertCategoryRule(pattern, category, ruleMatchType, 100)
+      const retagged = await usageSvc.retagByPattern(matchType, pattern, category)
+
+      // Reload rules in every preload (categories-updated) and refresh the
+      // renderer views (app-category-updated) so the change shows immediately.
+      broadcastCategoriesUpdated()
+      mainWindow?.webContents.send('app-category-updated', { pattern, category })
+
+      return { success: true, ruleCreated: rule?.created === true, retagged }
+    } catch (error) {
+      console.error('Error retagging app category:', error)
+      return { success: false, error: error.message }
+    }
+  })
+
   // Auto-updater IPC handlers
   ipcMain.handle('check-for-updates', async () => {
     try {

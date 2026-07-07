@@ -687,6 +687,42 @@ class LocalAppUsageService {
     })
   }
 
+  /**
+   * Retag existing usage history to a new category using a substring match,
+   * so a category change made in the UI also fixes past data (not just future
+   * tracking). Applies across ALL dates and hours.
+   *
+   * The WHERE column depends on how live tracking identifies the app:
+   *  - 'domain' (browser rows): match on the `domain` column, so every URL on
+   *    that site (e.g. all facebook.com pages) is retagged together.
+   *  - 'app' (native apps): match on `app_name` OR `description`, covering both
+   *    the friendly display name and the process description.
+   *
+   * Uses a direct LIKE statement because the query abstraction only supports
+   * equality/range operators, not substring matching. `pattern` is passed as a
+   * bound parameter, so it is not vulnerable to SQL injection.
+   *
+   * @returns {Promise<number>} number of rows updated
+   */
+  async retagByPattern(matchType, pattern, newCategory) {
+    return this.db.executeWithRetry(async () => {
+      if (!pattern || !newCategory) return 0
+      const like = `%${pattern.toLowerCase()}%`
+      let sql
+      let params
+      if (matchType === 'domain') {
+        sql = `UPDATE app_usage SET category = ?, updated_at = CURRENT_TIMESTAMP WHERE LOWER(domain) LIKE ?`
+        params = [newCategory, like]
+      } else {
+        sql = `UPDATE app_usage SET category = ?, updated_at = CURRENT_TIMESTAMP
+               WHERE LOWER(app_name) LIKE ? OR LOWER(description) LIKE ?`
+        params = [newCategory, like, like]
+      }
+      const result = await this.db.run(sql, params)
+      return (result && (result.changes ?? result.numReplaced)) || 0
+    })
+  }
+
   async getAppUsageByCategory(category, startDate, endDate) {
     return this.db.executeWithRetry(async () => {
       let query = { category: category }

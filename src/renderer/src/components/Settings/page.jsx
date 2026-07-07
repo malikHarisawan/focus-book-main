@@ -1,6 +1,7 @@
 'use client'
 
 import { useEffect, useState } from 'react'
+import { useSearchParams } from 'react-router-dom'
 import { useTheme, colorSchemes } from '../../context/ThemeContext'
 import BrowserBridgePanel from './BrowserBridgePanel'
 import CategoryRulesPanel from './CategoryRulesPanel'
@@ -26,7 +27,10 @@ import {
 } from 'lucide-react'
 
 export default function SettingsPage() {
-  const [activeTab, setActiveTab] = useState('profile')
+  // Honor a ?tab= deep link (e.g. from Activity's "Manage all rules" link) so
+  // we can open directly on the Categories Management tab.
+  const [searchParams] = useSearchParams()
+  const [activeTab, setActiveTab] = useState(() => searchParams.get('tab') || 'profile')
   const { theme, resolvedTheme, setThemeMode, primaryColor, secondaryColor, setPrimaryAccent, setSecondaryAccent } = useTheme()
   const [focusMode, setFocusMode] = useState(false)
   const [notifications, setNotifications] = useState(true)

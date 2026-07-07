@@ -20,7 +20,8 @@ import {
   CodeIcon,
   Tag,
   Check,
-  Sparkles
+  Sparkles,
+  Sliders
 } from 'lucide-react'
 import {
   DropdownMenu,
@@ -37,8 +38,8 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '.
 import { Card, CardContent, CardHeader, CardTitle } from '../ui/card'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '../ui/tabs'
 
+import { useNavigate } from 'react-router-dom'
 import { useToast } from '../../hooks/use-toast'
-import useCategoryChangeToast from './category-change-toast'
 import CategoryBadge from './category-badge'
 import BulkCategoryDialog from './bulk-categories-dialog'
 import SummaryTab from './SummaryTab'
@@ -87,7 +88,7 @@ export default function AppUsageTable() {
   const [summaryLoadedForDate, setSummaryLoadedForDate] = useState(null)
   const { selectedDate, handleDateChange } = useDate()
   const { toast } = useToast()
-  const { showCategoryChangeToast } = useCategoryChangeToast()
+  const navigate = useNavigate()
 
   useEffect(() => {
     loadApps()
@@ -256,7 +257,9 @@ export default function AppUsageTable() {
     }
   }
 
-  // Update the handleCategoryChange function to show a toast notification
+  // Change a category from the Activity table. This creates/updates a
+  // classification RULE (not a per-app override the tracker would overwrite)
+  // and retags matching history, so the change persists across past + future.
   const handleCategoryChange = async (appId, newCategory) => {
     const appToUpdate = apps.find((app) => app.id === appId)
     if (appToUpdate) {
@@ -264,26 +267,44 @@ export default function AppUsageTable() {
       const productivityType = getProductivityType(newCategory)
       const newProductivity = getProductivityDisplay(productivityType)
 
-      // Update local state with both category and productivity
+      // Optimistically update local state with both category and productivity
       setApps(apps.map((app) => (app.id === appId ? { ...app, category: newCategory, productivity: newProductivity } : app)))
-      showCategoryChangeToast(appToUpdate.name, newCategory)
 
       try {
-        const appIdentifier = appToUpdate.domain || appToUpdate.name
-        const key = appToUpdate.key
-        await window.activeWindow.updateAppCategory(appIdentifier, newCategory, selectedDate, key)
+        const result = await window.activeWindow.retagAppCategory(appToUpdate, newCategory)
+        if (!result?.success) {
+          throw new Error(result?.error || 'Retag failed')
+        }
 
-        // Refresh the category mapping to ensure consistency across the app
+        // Convey the rule-based scope so the user understands it applies broadly.
+        const scope =
+          result.matchType === 'domain'
+            ? `All “${result.pattern}” activity`
+            : `“${appToUpdate.name}”`
+        toast({
+          title: result.ruleCreated ? 'Rule created' : 'Rule updated',
+          description: `${scope} is now categorized as “${newCategory}”.`,
+          duration: 3500
+        })
+
+        // Refresh the category mapping and reload so retagged rows show.
         await refreshCategoryMapping()
-        
-        // Clear summary cache and reload since category changed
+        await loadApps()
+
+        // Clear summary cache; only regenerate if the Summary tab is open.
         clearSummaryCache(selectedDate)
-        loadSummary(true)
+        setSummaryLoadedForDate(null)
+        if (activeTabRef.current === 'summary') {
+          setSummaryLoadedForDate(selectedDate)
+          loadSummary(true)
+        }
       } catch (error) {
         console.error('Failed to save category change permanently:', error)
+        // Roll back the optimistic update on failure.
+        await loadApps()
         toast({
           title: 'Error',
-          description: 'Failed to save category change permanently',
+          description: 'Failed to save category change.',
           variant: 'destructive'
         })
       }
@@ -549,6 +570,16 @@ export default function AppUsageTable() {
                                       )}
                                     </DropdownMenuItem>
                                   ))}
+                                  <DropdownMenuSeparator className="bg-gray-300 dark:bg-slate-700" />
+                                  <DropdownMenuItem
+                                    className="flex items-center text-primary hover:bg-gray-100 dark:hover:bg-slate-800 cursor-pointer text-xs"
+                                    onClick={() =>
+                                      navigate('/settings?tab=Categories Management')
+                                    }
+                                  >
+                                    <Sliders className="h-3.5 w-3.5 mr-2" />
+                                    Manage all rules →
+                                  </DropdownMenuItem>
                                 </DropdownMenuSubContent>
                               </DropdownMenuSub>
 

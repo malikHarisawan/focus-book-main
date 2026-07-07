@@ -151,6 +151,8 @@ export function formatAppsData(rawData, date) {
       key: key,
       name: displayName, // Use original case for display
       category: value.category,
+      domain: value.domain || appMap.get(name)?.domain || '',
+      description: value.description || appMap.get(name)?.description || '',
       timeSpentSeconds: prevTime + value.time
     })
   }
@@ -169,6 +171,8 @@ export function formatAppsData(rawData, date) {
       key: app.key,
       name: app.name,
       category: app.category,
+      domain: app.domain || '',
+      description: app.description || '',
       timeSpent: formatAppsTime(Math.floor(app.timeSpentSeconds / 1000)),
       timeSpentSeconds: Math.floor(app.timeSpentSeconds / 1000),
       productivity: getProductivity(app.category),
