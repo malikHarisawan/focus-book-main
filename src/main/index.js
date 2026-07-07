@@ -1121,7 +1121,50 @@ ipcMain.handle('ai-service-reset-memory', async () => {
       return { error: error.message }
     }
   })
-  
+
+  // --- Generic UI-state store ({userData}/ui-state.json) ---
+  // A small key/value JSON file for renderer UI flags (onboarding progress,
+  // dismissed cards, etc.). Kept SEPARATE from config.json because
+  // save-ai-config overwrites that whole file; this store merges patches so
+  // multiple independent flags can coexist without clobbering each other.
+  const uiStatePath = () => path.join(app.getPath('userData'), 'ui-state.json')
+
+  ipcMain.handle('get-ui-state', async () => {
+    try {
+      const p = uiStatePath()
+      if (!fs.existsSync(p)) return {}
+      const parsed = JSON.parse(fs.readFileSync(p, 'utf-8'))
+      return parsed && typeof parsed === 'object' ? parsed : {}
+    } catch (error) {
+      console.error('Error reading UI state:', error)
+      return {}
+    }
+  })
+
+  ipcMain.handle('set-ui-state', async (event, patch) => {
+    try {
+      if (!patch || typeof patch !== 'object') {
+        return { success: false, error: 'Patch must be an object' }
+      }
+      const p = uiStatePath()
+      let current = {}
+      if (fs.existsSync(p)) {
+        try {
+          const parsed = JSON.parse(fs.readFileSync(p, 'utf-8'))
+          if (parsed && typeof parsed === 'object') current = parsed
+        } catch (parseError) {
+          console.warn('Could not parse ui-state.json, overwriting:', parseError.message)
+        }
+      }
+      const merged = { ...current, ...patch }
+      fs.writeFileSync(p, JSON.stringify(merged, null, 2), 'utf-8')
+      return { success: true, state: merged }
+    } catch (error) {
+      console.error('Error saving UI state:', error)
+      return { success: false, error: error.message }
+    }
+  })
+
   ipcMain.handle('cancel-focus-session', async (event, sessionId) => {
     try {
       const currentSession = focusSessionService.getCurrentSession()

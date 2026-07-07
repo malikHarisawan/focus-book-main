@@ -1433,7 +1433,10 @@ contextBridge.exposeInMainWorld('electronAPI', {
   resetAiMemory: () => ipcRenderer.invoke('ai-service-reset-memory'),
   getAiConfig: () => ipcRenderer.invoke('get-ai-config'),
   saveAiConfig: (config) => ipcRenderer.invoke('save-ai-config', config),
-  // Python Error Recovery API
+  // Generic UI-state store (onboarding flags, dismissed cards). setUiState
+  // merges the patch into ui-state.json rather than overwriting.
+  getUiState: () => ipcRenderer.invoke('get-ui-state'),
+  setUiState: (patch) => ipcRenderer.invoke('set-ui-state', patch),
   // Browser Extension Bridge API
   getBrowserBridgeStatus: () => ipcRenderer.invoke('get-browser-bridge-status'),
   // Auto-startup API

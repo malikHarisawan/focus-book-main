@@ -8,6 +8,7 @@ import ProductiveAreaChart from './ProductiveAreaChart'
 import StatCard from './StatCard'
 import SmartDatePicker from '../shared/smart-date-picker'
 import AppUsageDetails from './AppUsageDetails'
+import GettingStartedCard from '../Onboarding/GettingStartedCard'
 import { useDate } from '../../context/DateContext'
 import {
   processUsageChartData,
@@ -170,6 +171,9 @@ export default function ProductivityOverview() {
         </div>
       </CardHeader>
       <CardContent className="p-2 dark:bg-[#05070D] bg-[#F4F7FE]">
+        {/* First-run getting-started checklist (self-hides when dismissed/done) */}
+        <GettingStartedCard />
+
         {/* Summary Cards Row */}
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 mb-3">
           <StatCard
