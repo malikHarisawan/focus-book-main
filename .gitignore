@@ -64,7 +64,11 @@ venv.bak/
 # AI_agent specific ignores
 AI_agent/venv/
 AI_agent/build/
-AI_agent/dist/
+# Ignore built AI-service artifacts but keep the empty dist/ dir (via .gitkeep)
+# so electron-builder's extraResources path always exists — a plain `npm run
+# build:win` then never fails on a missing AI_agent/dist even without Python.
+AI_agent/dist/*
+!AI_agent/dist/.gitkeep
 AI_agent/.langgraph_api/
 AI_agent/__pycache__/
 AI_agent/*.pyc
