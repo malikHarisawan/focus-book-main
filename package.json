@@ -5,22 +5,25 @@
   "main": "./out/main/index.js",
   "author": "example.com",
   "homepage": "https://electron-vite.org",
+  "engines": {
+    "node": ">=22.12.0"
+  },
   "scripts": {
     "format": "prettier --write .",
     "lint": "eslint --cache .",
     "start": "electron-vite preview",
     "dev": "electron-vite dev",
     "build": "electron-vite build",
-    "build-ai-service": "cd AI_agent && python build_service.py",
     "rebuild-native": "electron-rebuild -f",
-    "prebuild": "npm run build-ai-service",
-    "postinstall": "npm run install-python-deps",
-    "install-python-deps": "python -m pip install -r AI_agent\\requirements.txt",
     "build:unpack": "npm run build && electron-builder --dir",
     "build:win": "npm run build && electron-builder --win",
     "build:mac": "npm run build && electron-builder --mac",
     "build:linux": "npm run build && electron-builder --linux",
-    "setup": "npm install && python -m pip install -r AI_agent\\requirements.txt"
+    "//ai": "The AI service is an OPTIONAL Python component. These scripts are the ONLY place Python is used, and they are opt-in. Neither `npm install` nor `npm run build` needs Python.",
+    "install-python-deps": "python -m pip install -r AI_agent\\requirements.txt",
+    "build-ai-service": "cd AI_agent && python build_service.py",
+    "build:win:ai": "npm run build-ai-service && npm run build:win",
+    "setup": "npm install && npm run install-python-deps"
   },
   "dependencies": {
     "@electron-toolkit/preload": "^3.0.1",
@@ -52,13 +55,14 @@
     "remark-gfm": "^4.0.1",
     "sqlite3": "^5.1.7",
     "tailwind-variants": "^1.0.0",
-    "winreg": "^1.2.5"
+    "winreg": "^1.2.5",
+    "ws": "^8.21.0"
   },
   "devDependencies": {
     "@electron-toolkit/eslint-config": "^2.0.0",
     "@electron-toolkit/eslint-config-prettier": "^3.0.0",
     "@electron/packager": "^18.3.6",
-    "@electron/rebuild": "^3.7.2",
+    "@electron/rebuild": "^4.2.0",
     "@vitejs/plugin-react": "^4.3.4",
     "electron": "^33.0.0",
     "electron-builder": "^25.1.8",

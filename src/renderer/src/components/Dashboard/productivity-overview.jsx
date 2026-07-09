@@ -1,8 +1,6 @@
 import { useEffect, useState } from 'react'
-import { Activity, Clock, Flame, LineChart, RefreshCw, Trophy, ChevronDown, ChevronUp } from 'lucide-react'
+import { Activity, Clock, Flame, LineChart, RefreshCw, Trophy } from 'lucide-react'
 import { Card, CardContent, CardHeader, CardTitle } from '../ui/card'
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '../ui/tabs'
-import { Badge } from '../ui/badge'
 import { Button } from '../ui/button'
 import { MetricCard } from './metric-card'
 import { TrendingDown, TrendingUp, Calendar } from '../shared/icons'
@@ -13,22 +11,20 @@ import AppUsageDetails from './AppUsageDetails'
 import { useDate } from '../../context/DateContext'
 import {
   processUsageChartData,
-  processMostUsedApps,
   getTotalFocusTime,
   getCategoryBreakdown,
   processProductiveChartData,
   getTotalScreenTime,
-  formatAppsData,
-  extractDomainName,
-  getProductivityType
+  getProductivityTotals,
+  refreshCategoryMapping
 } from '../../utils/dataProcessor'
 export default function ProductivityOverview() {
-  const [view, setView] = useState('day')
+  // These hour-resolution chart helpers take a legacy per-hour 'day' view; the
+  // real day/week/month switching is driven by the chart's zoom (currentZoomLevel).
+  const view = 'day'
   const [chartData, setChartData] = useState([])
-  const [appsData, setAppsData] = useState([])
   const [focusTime, setFocusTime] = useState(0)
   const [totalTime, setTotalTime] = useState('')
-  const [apps, setApps] = useState([])
   const [rawData, setRawData] = useState(null)
   const [currentZoomLevel, setCurrentZoomLevel] = useState('hour')
   const { selectedDate, handleDateChange } = useDate()
@@ -38,16 +34,11 @@ export default function ProductivityOverview() {
   const [selectedApps, setSelectedApps] = useState([])
   const [selectedRange, setSelectedRange] = useState(null)
   const [showAppDetails, setShowAppDetails] = useState(false)
-  const [expandedApp, setExpandedApp] = useState(null)
-  const [appDetailedData, setAppDetailedData] = useState([])
 
   const handleDate = (e) => {
     handleDateChange(e.target.value)
   }
 
-  const capitalize = (str) => {
-    return str.charAt(0).toUpperCase() + str.slice(1)
-  }
   useEffect(() => {
     loadAndProcessData()
     handleVisibilityChange()
@@ -73,20 +64,22 @@ export default function ProductivityOverview() {
     }
   }
   const loadAndProcessData = async () => {
+    // Ensure the DB-driven category productivity map is populated before any
+    // processing function reads it, otherwise the first render races the
+    // import-time load and shows everything as Neutral.
+    await refreshCategoryMapping()
     const jsonData = await window.activeWindow.getAppUsageStats()
+    console.log('📊 Raw JSON Data:', jsonData)
+    console.log('📅 Selected Date:', selectedDate)
+    console.log('📅 Available dates in data:', jsonData ? Object.keys(jsonData) : 'No data')
     setRawData(jsonData)
-    const appsData = formatAppsData(jsonData, selectedDate, false) // Default to summary view
-    setApps(appsData)
     const processedChartData = processUsageChartData(jsonData, selectedDate, view)
     setChartData(processedChartData)
 
     const processedProductiveChartData = processProductiveChartData(jsonData, selectedDate, 'hour')
-    console.log('Area Chart data', processedProductiveChartData)
+    console.log('📈 Area Chart data:', processedProductiveChartData)
+    console.log('📈 Data length:', processedProductiveChartData ? processedProductiveChartData.length : 0)
     setProductiveData(processedProductiveChartData)
-
-    const processedAppsData = processMostUsedApps(jsonData, selectedDate, false) // Default to summary view
-    console.log('processedAppsData', processedAppsData)
-    setAppsData(processedAppsData)
 
     const focTime = getTotalFocusTime(jsonData, selectedDate, processedChartData, view)
     console.log('focustime', focTime)
@@ -96,25 +89,37 @@ export default function ProductivityOverview() {
     console.log('screenTime', screenTime)
     setTotalTime(screenTime)
   }
-  const totalTimeSeconds = apps.reduce((total, app) => total + app.timeSpentSeconds, 0)
+  // Summary cards reflect the CURRENT view (day/week/month) via the chart's zoom
+  // level, not just the selected day. getProductivityTotals aggregates over the
+  // same date window the area chart draws, so the numbers always agree.
+  const { productiveSeconds, neutralSeconds, distractingSeconds, totalSeconds } =
+    getProductivityTotals(rawData, selectedDate, currentZoomLevel)
+
+  const totalTimeSeconds = totalSeconds
+  const productiveTime = productiveSeconds
+  const neutralTime = neutralSeconds
+  const distractingTime = distractingSeconds
+
   const totalHours = Math.floor(totalTimeSeconds / 3600)
   const totalMinutes = Math.floor((totalTimeSeconds % 3600) / 60)
   const totalTimeFormatted = `${totalHours}h ${totalMinutes}m`
 
-  const productiveTime = apps
-    .filter((app) => getProductivityType(app.category) === 'productive')
-    .reduce((total, app) => total + app.timeSpentSeconds, 0)
-
-  const neutralTime = apps
-    .filter((app) => getProductivityType(app.category) === 'neutral')
-    .reduce((total, app) => total + app.timeSpentSeconds, 0)
-
-  const distractingTime = apps
-    .filter((app) => getProductivityType(app.category) === 'distracted')
-    .reduce((total, app) => total + app.timeSpentSeconds, 0)
-  const productivePercentage = Math.round((productiveTime / totalTimeSeconds) * 100)
-  const neutralPercentage = Math.round((neutralTime / totalTimeSeconds) * 100)
-  const distractingPercentage = Math.round((distractingTime / totalTimeSeconds) * 100)
+  // Round the three shares with the largest-remainder method so they always add
+  // up to exactly 100% (independent Math.round calls can drift to 99% or 101%).
+  const [productivePercentage, neutralPercentage, distractingPercentage] = (() => {
+    if (!totalTimeSeconds) return [0, 0, 0]
+    const raw = [productiveTime, neutralTime, distractingTime].map((t) => (t / totalTimeSeconds) * 100)
+    const floors = raw.map((v) => Math.floor(v))
+    let remainder = 100 - floors.reduce((a, b) => a + b, 0)
+    // Hand the leftover points to the largest fractional parts first.
+    const order = raw
+      .map((v, i) => ({ i, frac: v - floors[i] }))
+      .sort((a, b) => b.frac - a.frac)
+    for (let k = 0; k < order.length && remainder > 0; k++, remainder--) {
+      floors[order[k].i] += 1
+    }
+    return floors
+  })()
 
   // Handle selection changes from ProductiveAreaChart
   const handleSelectionChange = (apps, range) => {
@@ -126,84 +131,37 @@ export default function ProductivityOverview() {
     }
   }
 
-  // Handle category change for selected apps
-  const handleCategoryChange = (appIds, newCategory) => {
-    // This would integrate with the category change system
-    // For now, just log the change
-    console.log('Category change requested:', { appIds, newCategory })
-    // TODO: Implement actual category change logic
-  }
-
-  // Handle app detail expansion
-  const handleAppDetailToggle = async (appName) => {
-    if (expandedApp === appName) {
-      // Collapse if already expanded
-      setExpandedApp(null)
-      setAppDetailedData([])
-    } else {
-      // Expand new app
-      setExpandedApp(appName)
-
-      // Load detailed data for this specific app by going directly to raw data
-      const jsonData = await window.activeWindow.getAppUsageStats()
-      const rawApps = jsonData[selectedDate]?.apps || {}
-
-      console.log('🔍 Expanding details for:', appName)
-      console.log('📅 Selected date:', selectedDate)
-      console.log('📊 Raw apps data:', Object.keys(rawApps).length, 'entries')
-
-      const thisAppDetails = []
-
-      // Filter raw app data to find entries that match this service
-      for (const [originalAppName, data] of Object.entries(rawApps)) {
-        // Use the same logic as formatAppsData: prefer description, fallback to domain name
-        let serviceName
-        if (data.description && data.description.trim()) {
-          serviceName = data.description
-        } else {
-          serviceName = extractDomainName(data.domain, originalAppName)
-        }
-        
-        // Debug: log first few comparisons
-        if (thisAppDetails.length < 3) {
-          console.log(`  Comparing: "${serviceName}" === "${appName}"?`, serviceName === appName)
-          console.log(`    Original: "${originalAppName}", Description: "${data.description}", Domain: "${data.domain}"`)
-        }
-        
-        if (serviceName === appName) {
-          thisAppDetails.push({
-            name: originalAppName,
-            time: Math.floor(data.time / 1000 / 60), // Convert to minutes
-            category: data.category,
-            domain: data.domain
-          })
-        }
-      }
-
-      console.log(`✅ Found ${thisAppDetails.length} matching entries for "${appName}"`)
-
-      // Sort by time spent (descending)
-      thisAppDetails.sort((a, b) => b.time - a.time)
-
-      setAppDetailedData(thisAppDetails)
+  // Persist a category change for an app from the timeline breakdown panel.
+  // Creates/updates a classification rule and retags matching history (same
+  // rule-based flow as the Activity page), so the change persists instead of
+  // being overwritten by the next tracking tick. Then reloads the view.
+  const handleCategoryChange = async (app, newCategory) => {
+    try {
+      if (!app || !newCategory) return
+      const result = await window.activeWindow.retagAppCategory(app, newCategory)
+      if (!result?.success) throw new Error(result?.error || 'Retag failed')
+      await refreshCategoryMapping()
+      await loadAndProcessData()
+    } catch (error) {
+      console.error('Error changing category from dashboard:', error)
     }
   }
 
   return (
-    <Card className="bg-white border-[#E8EDF1] shadow-sm dark:bg-[#212329] dark:border-[#282932] backdrop-blur-sm overflow-hidden transition-colors h-full">
-      <CardHeader className="border-b bg-white border-[#E8EDF1] dark:bg-[#212329] dark:border-[#282932] py-3 px-4">
-        <div className="flex flex-col lg:flex-row items-start lg:items-center justify-between gap-3">
+    <Card className="bg-white border-[#E8EDF1] shadow-sm dark:bg-[#0B1220] dark:border-[#1E293B] backdrop-blur-sm overflow-hidden transition-colors">
+      <CardHeader className="border-b bg-white border-[#E8EDF1] dark:bg-[#0B1220] dark:border-[#1E293B] py-2 px-3">
+        <div className="flex flex-row items-center justify-between gap-2">
           <CardTitle className="text-[#232360] dark:text-white flex items-center font-medium tracking-tight">
             <Activity className="mr-2 h-5 w-5 text-[#5051F9] flex-shrink-0" />
             <span>Productivity Overview</span>
           </CardTitle>
-          <div className="flex items-center gap-2 w-full lg:w-auto">
+          <div className="flex items-center gap-2 flex-shrink-0">
             <SmartDatePicker zoomLevel={currentZoomLevel} onDateChange={loadAndProcessData} />
             <Button
               onClick={loadAndProcessData}
               variant="ghost"
               size="icon"
-              className="h-9 w-9 text-[#768396] hover:text-[#232360] hover:bg-[#F4F7FE] dark:text-[#898999] dark:hover:text-white dark:hover:bg-[#282932] flex-shrink-0 transition-colors"
+              className="h-9 w-9 text-[#768396] hover:text-[#232360] hover:bg-[#F4F7FE] dark:text-[#94A3B8] dark:hover:text-white dark:hover:bg-[#1E293B] flex-shrink-0 transition-colors"
               title="Refresh data"
             >
               <RefreshCw className="h-4 w-4" />
@@ -211,334 +169,69 @@ export default function ProductivityOverview() {
           </div>
         </div>
       </CardHeader>
-      <CardContent className="p-3 dark:bg-[#1E1F25] bg-[#F4F7FE]">
-        {/* Compact Single Row Summary */}
-        <div className="mb-2 rounded-xl p-3 bg-white dark:bg-[#212329] border border-[#E8EDF1] dark:border-[#282932] shadow-sm">
-          {/* Header Row: Score + Total Time */}
-          <div className="flex items-center justify-between mb-2">
-            <div className="flex items-center gap-2">
-              {/* Mini Donut Chart */}
-              <div className="relative w-12 h-12 flex-shrink-0">
-                <svg className="transform -rotate-90 w-12 h-12">
-                  <circle
-                    cx="24"
-                    cy="24"
-                    r="18"
-                    stroke="currentColor"
-                    strokeWidth="5"
-                    fill="transparent"
-                    className="text-[#E8EDF1] dark:text-[#282932]"
-                  />
-                  <circle
-                    cx="24"
-                    cy="24"
-                    r="18"
-                    stroke="url(#scoreGradient)"
-                    strokeWidth="4"
-                    fill="transparent"
-                    strokeDasharray={`${2 * Math.PI * 18}`}
-                    strokeDashoffset={`${2 * Math.PI * 18 * (1 - (isNaN(productivePercentage) ? 0 : productivePercentage / 100))}`}
-                    strokeLinecap="round"
-                    className="transition-all duration-1000"
-                  />
-                  <defs>
-                    <linearGradient id="scoreGradient" x1="0%" y1="0%" x2="100%" y2="0%">
-                      <stop offset="0%" stopColor="#5051F9" />
-                      <stop offset="100%" stopColor="#1EA7FF" />
-                    </linearGradient>
-                  </defs>
-                </svg>
-                <div className="absolute inset-0 flex items-center justify-center">
-                  <span className="text-sm font-semibold text-[#5051F9]">
-                    {isNaN(productivePercentage) ? '0' : productivePercentage}%
-                  </span>
-                </div>
-              </div>
-              {/* Score Label */}
-              <div>
-                <div className="text-sm font-medium text-[#232360] dark:text-white">
-                  {productivePercentage >= 70 ? 'Excellent!' :
-                   productivePercentage >= 40 ? 'Good Progress' :
-                   'Needs Focus'}
-                </div>
-                <div className="text-xs text-[#768396] font-normal">
-                  Productivity Score
-                </div>
-              </div>
-            </div>
-            {/* Total Screen Time */}
-            <div className="text-right">
-              <div className="text-lg font-semibold text-[#232360] dark:text-white">
-                {totalTimeFormatted}
-              </div>
-              <div className="text-xs text-[#768396] font-normal">
-                Total Screen Time
-              </div>
-            </div>
-          </div>
-
-          {/* Stacked Progress Bar */}
-          <div className="relative w-full rounded-full h-2 overflow-hidden bg-[#E8EDF1] dark:bg-[#282932] mb-2">
-            <div
-              className="absolute top-0 left-0 h-full bg-gradient-to-r from-[#5051F9] to-[#1EA7FF] transition-all duration-500"
-              style={{ width: `${isNaN(productivePercentage) ? 0 : productivePercentage}%` }}
-            ></div>
-            <div
-              className="absolute top-0 h-full bg-gradient-to-r from-[#1EA7FF] to-[#5CBBFF] transition-all duration-500"
-              style={{
-                left: `${isNaN(productivePercentage) ? 0 : productivePercentage}%`,
-                width: `${isNaN(neutralPercentage) ? 0 : neutralPercentage}%`
-              }}
-            ></div>
-            <div
-              className="absolute top-0 h-full bg-gradient-to-r from-[#FF6B6B] to-[#FF9999] transition-all duration-500"
-              style={{
-                left: `${(isNaN(productivePercentage) ? 0 : productivePercentage) + (isNaN(neutralPercentage) ? 0 : neutralPercentage)}%`,
-                width: `${isNaN(distractingPercentage) ? 0 : distractingPercentage}%`
-              }}
-            ></div>
-          </div>
-
-          {/* Time Breakdown - Horizontal Pills */}
-          <div className="flex flex-wrap gap-2">
-            {/* Productive */}
-            <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-[#5051F9]/10 border border-[#5051F9]/20">
-              <div className="h-2 w-2 rounded-full bg-[#5051F9]"></div>
-              <span className="text-sm font-medium text-[#5051F9]">
-                {Math.floor(productiveTime / 3600)}h {Math.floor((productiveTime % 3600) / 60)}m
-              </span>
-              <span className="text-xs text-[#5051F9]/70">
-                ({isNaN(productivePercentage) ? 0 : productivePercentage}%)
-              </span>
-            </div>
-
-            {/* Neutral */}
-            <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-[#1EA7FF]/10 border border-[#1EA7FF]/20">
-              <div className="h-2 w-2 rounded-full bg-[#1EA7FF]"></div>
-              <span className="text-sm font-medium text-[#1EA7FF]">
-                {Math.floor(neutralTime / 3600)}h {Math.floor((neutralTime % 3600) / 60)}m
-              </span>
-              <span className="text-xs text-[#1EA7FF]/70">
-                ({isNaN(neutralPercentage) ? 0 : neutralPercentage}%)
-              </span>
-            </div>
-
-            {/* Distracting */}
-            <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-[#FF6B6B]/10 border border-[#FF6B6B]/20">
-              <div className="h-2 w-2 rounded-full bg-[#FF6B6B]"></div>
-              <span className="text-sm font-medium text-[#FF6B6B]">
-                {Math.floor(distractingTime / 3600)}h {Math.floor((distractingTime % 3600) / 60)}m
-              </span>
-              <span className="text-xs text-[#FF6B6B]/70">
-                ({isNaN(distractingPercentage) ? 0 : distractingPercentage}%)
-              </span>
-            </div>
-          </div>
+      <CardContent className="p-2 dark:bg-[#05070D] bg-[#F4F7FE]">
+        {/* Summary Cards Row */}
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 mb-3">
+          <StatCard
+            title="Productive Time"
+            value={`${Math.floor(productiveTime / 3600)}h ${Math.floor((productiveTime % 3600) / 60)}m`}
+            percentage={isNaN(productivePercentage) ? 0 : productivePercentage}
+            color="green"
+          />
+          <StatCard
+            title="Neutral Time"
+            value={`${Math.floor(neutralTime / 3600)}h ${Math.floor((neutralTime % 3600) / 60)}m`}
+            percentage={isNaN(neutralPercentage) ? 0 : neutralPercentage}
+            color="blue"
+          />
+          <StatCard
+            title="Distracting Time"
+            value={`${Math.floor(distractingTime / 3600)}h ${Math.floor((distractingTime % 3600) / 60)}m`}
+            percentage={isNaN(distractingPercentage) ? 0 : distractingPercentage}
+            color="red"
+          />
+          <StatCard title="Total Time" value={totalTimeFormatted} />
         </div>
 
         {/* Charts Section */}
         <div className="mt-2">
-          <Tabs defaultValue="categories" className="w-full">
-            <div className="flex flex-col lg:flex-row items-start lg:items-center justify-between mb-2 gap-2">
-              <TabsList className="p-0.5 w-full lg:w-auto bg-[#F4F7FE] border border-[#E8EDF1] dark:bg-[#282932] dark:border-[#282932] rounded-lg">
-                <TabsTrigger
-                  value="applications"
-                  className="text-xs px-3 py-1.5 rounded-md font-medium transition-all text-[#768396] dark:text-[#898999] data-[state=active]:bg-white data-[state=active]:text-[#5051F9] data-[state=active]:shadow-sm dark:data-[state=active]:bg-[#5051F9] dark:data-[state=active]:text-white"
-                >
-                  Apps
-                </TabsTrigger>
-                <TabsTrigger
-                  value="categories"
-                  className="text-xs px-3 py-1.5 rounded-md font-medium transition-all text-[#768396] dark:text-[#898999] data-[state=active]:bg-white data-[state=active]:text-[#5051F9] data-[state=active]:shadow-sm dark:data-[state=active]:bg-[#5051F9] dark:data-[state=active]:text-white"
-                >
-                  Timeline
-                </TabsTrigger>
-              </TabsList>
+          <div className="flex flex-col lg:flex-row items-start lg:items-center justify-between mb-2 gap-2">
+            <h3 className="text-sm font-medium text-[#232360] dark:text-white">Timeline</h3>
 
-              <div className="flex items-center gap-3 text-xs font-normal w-full lg:w-auto justify-center lg:justify-end text-[#768396] dark:text-[#898999]">
-                <div className="flex items-center gap-1">
-                  <div className="h-2 w-2 rounded-full bg-[#5051F9]"></div>
-                  <span>Productive</span>
-                </div>
-                <div className="flex items-center gap-1">
-                  <div className="h-2 w-2 rounded-full bg-[#1EA7FF]"></div>
-                  <span>Neutral</span>
-                </div>
-                <div className="flex items-center gap-1">
-                  <div className="h-2 w-2 rounded-full bg-[#FF6B6B]"></div>
-                  <span>Distracting</span>
-                </div>
+            <div className="flex items-center gap-3 text-xs font-normal w-full lg:w-auto justify-center lg:justify-end text-[#768396] dark:text-[#94A3B8]">
+              <div className="flex items-center gap-1">
+                <div className="h-2 w-2 rounded-full bg-[#5051F9] dark:bg-[#22D3EE]"></div>
+                <span>Productive</span>
+              </div>
+              <div className="flex items-center gap-1">
+                <div className="h-2 w-2 rounded-full bg-[#FF6B6B]"></div>
+                <span>Distracting</span>
               </div>
             </div>
+          </div>
 
-            <TabsContent value="applications" className="mt-0">
-              <div className="rounded-2xl border overflow-hidden h-48 sm:h-52 lg:h-56 flex flex-col bg-white border-[#E8EDF1] dark:bg-[#212329] dark:border-[#282932]">
-                <div className="grid grid-cols-12 text-xs p-2 border-b flex-shrink-0 text-[#768396] dark:text-[#898999] font-normal border-[#E8EDF1] bg-[#F4F7FE] dark:border-[#282932] dark:bg-[#282932]">
-                  <div className="col-span-4 sm:col-span-5">Application</div>
-                  <div className="col-span-2 hidden sm:block">Category</div>
-                  <div className="col-span-3 sm:col-span-2">Time Spent</div>
-                  <div className="col-span-3 sm:col-span-2">Productivity</div>
-                  <div className="col-span-2 sm:col-span-1">Details</div>
-                </div>
+          <div className="h-[280px] w-full relative rounded-2xl overflow-hidden bg-white dark:bg-[#0B1220] border border-[#E8EDF1] dark:border-[#1E293B]">
+            <ProductiveAreaChart
+              data={productiveData}
+              rawData={rawData}
+              selectedDate={selectedDate}
+              onZoomLevelChange={setCurrentZoomLevel}
+              onSelectionChange={handleSelectionChange}
+            />
+          </div>
 
-                <div className="divide-y divide-[#E8EDF1] dark:divide-[#282932] overflow-y-auto flex-1 custom-scrollbar">
-                  {appsData.map((app) => {
-                    const maxAppTime = Math.max(...appsData.map(a => a.time), 1)
-                    const timePercent = (app.time / maxAppTime) * 100
-                    const isExpanded = expandedApp === app.name
-                    const detailsForThisApp = isExpanded ? appDetailedData : []
-
-                    return (
-                      <AppUsageRow
-                        key={app.name}
-                        name={capitalize(app.name)}
-                        category={app.category}
-                        timeSpent={
-                          app.time >= 60
-                            ? `${Math.floor(app.time / 60)}h ${app.time % 60}m`
-                            : `${app.time}m`
-                        }
-                        timePercent={timePercent}
-                        productivity={app.productivity}
-                        isExpanded={isExpanded}
-                        detailedData={detailsForThisApp}
-                        onToggleDetails={() => handleAppDetailToggle(app.name)}
-                      />
-                    )
-                  })}
-                </div>
-              </div>
-            </TabsContent>
-
-            <TabsContent value="categories" className="mt-0">
-              <div className="h-72 lg:h-80 w-full relative rounded-2xl overflow-hidden bg-white dark:bg-[#212329] border border-[#E8EDF1] dark:border-[#282932]">
-                <ProductiveAreaChart
-                  data={productiveData}
-                  rawData={rawData}
-                  selectedDate={selectedDate}
-                  onZoomLevelChange={setCurrentZoomLevel}
-                  onSelectionChange={handleSelectionChange}
-                />
-              </div>
-
-              {/* Selected Range Breakdown */}
-              <AppUsageDetails
-                selectedApps={selectedApps}
-                selectedRange={selectedRange}
-                zoomLevel={currentZoomLevel}
-                isVisible={showAppDetails}
-                onCategoryChange={handleCategoryChange}
-                onClose={() => setShowAppDetails(false)}
-              />
-
-            </TabsContent>
-          </Tabs>
+          {/* Selected Range Breakdown */}
+          <AppUsageDetails
+            selectedApps={selectedApps}
+            selectedRange={selectedRange}
+            zoomLevel={currentZoomLevel}
+            isVisible={showAppDetails}
+            onCategoryChange={handleCategoryChange}
+            onClose={() => setShowAppDetails(false)}
+          />
         </div>
       </CardContent>
     </Card>
-  )
-}
-
-// App usage row component
-function AppUsageRow({ name, category, timeSpent, timePercent = 100, productivity, isExpanded, detailedData = [], onToggleDetails }) {
-  const getProductivityColor = () => {
-    switch (productivity) {
-      case 'Productive':
-        return 'bg-meta-green-50 text-meta-green-600 border-meta-green-200 dark:bg-meta-green-500/10 dark:text-meta-green-400 dark:border-meta-green-500/30'
-      case 'Neutral':
-        return 'bg-meta-orange-50 text-meta-orange-600 border-meta-orange-200 dark:bg-meta-orange-500/10 dark:text-meta-orange-400 dark:border-meta-orange-500/30'
-      case 'Distracting':
-        return 'bg-meta-red-50 text-meta-red-600 border-meta-red-200 dark:bg-meta-red-500/10 dark:text-meta-red-400 dark:border-meta-red-500/30'
-      default:
-        return 'bg-meta-gray-50 text-meta-gray-600 border-meta-gray-200 dark:bg-meta-gray-500/10 dark:text-meta-gray-400 dark:border-meta-gray-500/30'
-    }
-  }
-
-  // Prefer showing domain names in breakdown when available
-  const formatDomain = (domain) => {
-    if (!domain || typeof domain !== 'string') return ''
-    try {
-      let d = domain.trim()
-      
-      // Handle special schemes
-      if (d.startsWith('chrome://') || d.startsWith('edge://') || d.startsWith('brave://')) {
-        return d.split('://')[1].split('/')[0] || d
-      }
-      
-      // Remove protocol
-      d = d.replace(/^https?:\/\//i, '')
-      d = d.replace(/^ftp:\/\//i, '')
-      
-      // Remove www prefix
-      d = d.replace(/^www\./i, '')
-      
-      // Remove path, query, and hash
-      d = d.split('/')[0]
-      d = d.split('?')[0]
-      d = d.split('#')[0]
-      
-      // Remove port if present
-      d = d.split(':')[0]
-      
-      return d || domain
-    } catch (e) {
-      return domain
-    }
-  }
-
-  return (
-    <div>
-      {/* Main Row */}
-      <div className="grid grid-cols-12 py-2 px-2 sm:px-3 text-xs sm:text-sm hover:bg-meta-gray-50 dark:hover:bg-dark-bg-hover">
-        <div className="col-span-4 sm:col-span-5 text-meta-gray-800 dark:text-dark-text-primary truncate pr-1">{name}</div>
-        <div className="col-span-2 text-meta-gray-600 dark:text-dark-text-secondary hidden sm:block truncate">{category}</div>
-        <div className="col-span-3 sm:col-span-2 text-meta-blue-600 dark:text-meta-blue-400">{timeSpent}</div>
-        <div className="col-span-3 sm:col-span-2">
-          <Badge variant="outline" className={`${getProductivityColor()} text-xs`}>
-            <span className="hidden sm:inline">{productivity}</span>
-            <span className="sm:hidden">
-              {productivity === 'Productive' ? 'P' : productivity === 'Neutral' ? 'N' : 'D'}
-            </span>
-          </Badge>
-        </div>
-        <div className="col-span-2 sm:col-span-1 flex justify-center">
-          <Button
-            variant="ghost"
-            size="sm"
-            className="h-6 w-6 p-0 text-meta-gray-500 dark:text-dark-text-secondary hover:text-meta-blue-600 dark:hover:text-meta-blue-400"
-            onClick={onToggleDetails}
-            title={isExpanded ? 'Hide details' : 'Show details'}
-          >
-            {isExpanded ? <ChevronUp className="h-3 w-3" /> : <ChevronDown className="h-3 w-3" />}
-          </Button>
-        </div>
-      </div>
-
-      {/* Inline Breakdown - Minimalistic */}
-      {isExpanded && detailedData.length > 0 && (
-        <div className="bg-meta-gray-50 dark:bg-dark-bg-secondary px-4 sm:px-6 py-2 border-t border-meta-gray-200 dark:border-dark-border-primary">
-          <div className="space-y-1 max-h-32 overflow-y-auto custom-scrollbar">
-            {detailedData.map((detail, index) => (
-              <div key={index} className="flex items-center justify-between py-1.5 text-xs">
-                <div className="flex-1 text-meta-gray-700 dark:text-dark-text-secondary truncate pr-3 pl-4">
-                  <span className="text-meta-gray-400 dark:text-meta-gray-600 mr-2">└</span>
-                  {formatDomain(detail.domain) || detail.name}
-                </div>
-                <div className="text-meta-blue-600 dark:text-meta-blue-400 font-mono text-xs">
-                  {detail.time >= 60
-                    ? `${Math.floor(detail.time / 60)}h ${detail.time % 60}m`
-                    : `${detail.time}m`
-                  }
-                </div>
-              </div>
-            ))}
-          </div>
-          <div className="text-xs text-meta-gray-500 mt-2 pl-4">
-            {detailedData.length} {detailedData.length === 1 ? 'entry' : 'entries'}
-          </div>
-        </div>
-      )}
-    </div>
   )
 }
 

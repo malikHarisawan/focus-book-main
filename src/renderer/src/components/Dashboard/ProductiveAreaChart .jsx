@@ -20,13 +20,13 @@ const ProductiveAreaChart = ({ data, rawData, selectedDate, onZoomLevelChange })
   const chartColors = {
     productive: '#5051F9', // Primary purple - for productive time
     unproductive: '#FF6B6B', // Red/Salmon - for unproductive/distracting time
-    neutral: '#1EA7FF', // Cyan blue - for neutral
+    neutral: '#22D3EE', // Cyan blue - for neutral
     selection: '#5051F9', // Selection same as primary
-    grid: resolvedTheme === 'dark' ? '#282932' : '#E8EDF1',
-    text: resolvedTheme === 'dark' ? '#898999' : '#768396',
-    bg: resolvedTheme === 'dark' ? '#212329' : '#ffffff',
-    bgSecondary: resolvedTheme === 'dark' ? '#282932' : '#F4F7FE',
-    border: resolvedTheme === 'dark' ? '#282932' : '#E8EDF1',
+    grid: resolvedTheme === 'dark' ? '#1E293B' : '#E8EDF1',
+    text: resolvedTheme === 'dark' ? '#94A3B8' : '#768396',
+    bg: resolvedTheme === 'dark' ? '#0B1220' : '#ffffff',
+    bgSecondary: resolvedTheme === 'dark' ? '#1E293B' : '#F4F7FE',
+    border: resolvedTheme === 'dark' ? '#1E293B' : '#E8EDF1',
   }
   const [selectedRange, setSelectedRange] = useState(null)
   const [aggregatedData, setAggregatedData] = useState({ productive: 0, unproductive: 0, total: 0 })
@@ -290,7 +290,7 @@ const ProductiveAreaChart = ({ data, rawData, selectedDate, onZoomLevelChange })
           : 0
 
       return (
-        <div className="bg-white dark:bg-[#252630] p-3 rounded-lg border border-slate-200 dark:border-slate-700/50 shadow-lg backdrop-blur-sm">
+        <div className="bg-white dark:bg-[#111C34] p-3 rounded-lg border border-slate-200 dark:border-slate-700/50 shadow-lg backdrop-blur-sm">
           <p className="text-slate-900 dark:text-white font-medium mb-2">{getTooltipTitle()}</p>
           <div className="text-xs text-slate-500 dark:text-slate-400 mb-2">{getZoomLevelDisplay().detail}</div>
           <div className="space-y-1">
@@ -321,7 +321,7 @@ const ProductiveAreaChart = ({ data, rawData, selectedDate, onZoomLevelChange })
 
   if (!currentData || currentData.length === 0) {
     return (
-      <div className="bg-white dark:bg-[#1a1b23] p-4 rounded-xl h-[250px] flex items-center justify-center border border-slate-200 dark:border-slate-700/50">
+      <div className="bg-white dark:bg-[#05070D] p-4 rounded-xl h-[250px] flex items-center justify-center border border-slate-200 dark:border-slate-700/50">
         {isLoading ? (
           <div className="flex items-center gap-2 text-cyan-500">
             <div className="animate-spin w-4 h-4 border-2 border-cyan-500 border-t-transparent rounded-full"></div>
@@ -336,7 +336,7 @@ const ProductiveAreaChart = ({ data, rawData, selectedDate, onZoomLevelChange })
 
   return (
     
-    <div ref={containerRef} className="bg-white dark:bg-[#1a1b23] p-4 rounded-xl border border-slate-200 dark:border-slate-700/50" tabIndex={0}>
+    <div ref={containerRef} className="bg-white dark:bg-[#05070D] p-4 rounded-xl border border-slate-200 dark:border-slate-700/50" tabIndex={0}>
       <div className="space-y-3 mb-4">
         <div className="flex justify-between items-center">
           <div className="flex items-center gap-3">
@@ -358,7 +358,7 @@ const ProductiveAreaChart = ({ data, rawData, selectedDate, onZoomLevelChange })
             <button
               onClick={zoomIn}
               disabled={zoomLevel === 'hour'}
-              className="text-[#5051F9] hover:text-[#6B6CFA] disabled:text-[#768396] dark:disabled:text-[#898999] disabled:cursor-not-allowed text-xs p-2 rounded-lg border border-[#5051F9]/50 hover:border-[#5051F9] disabled:border-[#E8EDF1] dark:disabled:border-[#282932] transition-all duration-200 hover:bg-[#5051F9]/10"
+              className="text-[#5051F9] hover:text-[#6B6CFA] disabled:text-[#768396] dark:disabled:text-[#94A3B8] disabled:cursor-not-allowed text-xs p-2 rounded-lg border border-[#5051F9]/50 hover:border-[#5051F9] disabled:border-[#E8EDF1] dark:disabled:border-[#1E293B] transition-all duration-200 hover:bg-[#5051F9]/10"
               title="Zoom In (+) - More detailed view"
             >
               <ZoomIn size={12} />
@@ -366,7 +366,7 @@ const ProductiveAreaChart = ({ data, rawData, selectedDate, onZoomLevelChange })
             <button
               onClick={zoomOut}
               disabled={zoomLevel === 'month'}
-              className="text-[#5051F9] hover:text-[#6B6CFA] disabled:text-[#768396] dark:disabled:text-[#898999] disabled:cursor-not-allowed text-xs p-2 rounded-lg border border-[#5051F9]/50 hover:border-[#5051F9] disabled:border-[#E8EDF1] dark:disabled:border-[#282932] transition-all duration-200 hover:bg-[#5051F9]/10"
+              className="text-[#5051F9] hover:text-[#6B6CFA] disabled:text-[#768396] dark:disabled:text-[#94A3B8] disabled:cursor-not-allowed text-xs p-2 rounded-lg border border-[#5051F9]/50 hover:border-[#5051F9] disabled:border-[#E8EDF1] dark:disabled:border-[#1E293B] transition-all duration-200 hover:bg-[#5051F9]/10"
               title="Zoom Out (-) - Broader time view"
             >
               <ZoomOut size={12} />
@@ -391,7 +391,7 @@ const ProductiveAreaChart = ({ data, rawData, selectedDate, onZoomLevelChange })
 
         {/* Breadcrumb navigation */}
         <div className="flex items-center gap-2">
-          <span className="text-xs text-[#768396] dark:text-[#898999]">View:</span>
+          <span className="text-xs text-[#768396] dark:text-[#94A3B8]">View:</span>
           {getBreadcrumbPath().map((level, index) => (
             <div key={level} className="flex items-center gap-1">
               <button
@@ -403,13 +403,13 @@ const ProductiveAreaChart = ({ data, rawData, selectedDate, onZoomLevelChange })
                 className={`text-xs px-2 py-1 rounded-md transition-colors ${
                   level === zoomLevel
                     ? 'bg-gradient-to-r from-[#5051F9] to-[#6B6CFA] text-white'
-                    : 'text-[#768396] dark:text-[#898999] hover:text-[#5051F9] hover:bg-[#F4F7FE] dark:hover:bg-[#282932]'
+                    : 'text-[#768396] dark:text-[#94A3B8] hover:text-[#5051F9] hover:bg-[#F4F7FE] dark:hover:bg-[#1E293B]'
                 }`}
               >
                 {level.charAt(0).toUpperCase() + level.slice(1)}
               </button>
               {index < getBreadcrumbPath().length - 1 && (
-                <ChevronRight size={12} className="text-[#768396] dark:text-[#898999]" />
+                <ChevronRight size={12} className="text-[#768396] dark:text-[#94A3B8]" />
               )}
             </div>
           ))}
@@ -417,29 +417,29 @@ const ProductiveAreaChart = ({ data, rawData, selectedDate, onZoomLevelChange })
 
         {/* Zoom progress indicator */}
         <div className="flex items-center gap-2">
-          <span className="text-xs text-[#768396] dark:text-[#898999]">Detail Level:</span>
-          <div className="flex-1 h-1 bg-[#E8EDF1] dark:bg-[#282932] rounded-full overflow-hidden">
+          <span className="text-xs text-[#768396] dark:text-[#94A3B8]">Detail Level:</span>
+          <div className="flex-1 h-1 bg-[#E8EDF1] dark:bg-[#1E293B] rounded-full overflow-hidden">
             <div
               className="h-full bg-gradient-to-r from-[#5051F9] to-[#6B6CFA] transition-all duration-300 ease-out"
               style={{ width: `${getZoomProgress()}%` }}
             />
           </div>
-          <span className="text-xs text-[#768396] dark:text-[#898999]">{Math.round(getZoomProgress())}%</span>
+          <span className="text-xs text-[#768396] dark:text-[#94A3B8]">{Math.round(getZoomProgress())}%</span>
         </div>
 
         {/* Help panel */}
         {showHelp && (
-          <div className="bg-[#F4F7FE] dark:bg-[#282932] border border-[#E8EDF1] dark:border-[#282932] rounded-lg p-3 text-xs space-y-2">
+          <div className="bg-[#F4F7FE] dark:bg-[#1E293B] border border-[#E8EDF1] dark:border-[#1E293B] rounded-lg p-3 text-xs space-y-2">
             <div className="text-[#5051F9] font-medium">Chart Controls:</div>
             <div className="text-[#232360] dark:text-white space-y-1">
               <div>
-                • <kbd className="bg-[#E8EDF1] dark:bg-[#1E1F25] px-1 rounded">Mouse Wheel</kbd> - Zoom in/out
+                • <kbd className="bg-[#E8EDF1] dark:bg-[#05070D] px-1 rounded">Mouse Wheel</kbd> - Zoom in/out
               </div>
               <div>
-                • <kbd className="bg-[#E8EDF1] dark:bg-[#1E1F25] px-1 rounded">+/-</kbd> keys - Zoom in/out
+                • <kbd className="bg-[#E8EDF1] dark:bg-[#05070D] px-1 rounded">+/-</kbd> keys - Zoom in/out
               </div>
               <div>
-                • <kbd className="bg-[#E8EDF1] dark:bg-[#1E1F25] px-1 rounded">0</kbd> key - Reset to default
+                • <kbd className="bg-[#E8EDF1] dark:bg-[#05070D] px-1 rounded">0</kbd> key - Reset to default
               </div>
               <div>
                 • <strong>Click & Drag</strong> on chart to select time range

@@ -41,6 +41,9 @@ class AIServiceManager {
     this.maxRetries = 3
     this.healthCheckInterval = null
     this.lastConfig = {};
+    // Why AI is unavailable, for a clear UI state: null | 'missing-binary' |
+    // 'unhealthy' | 'crashed'. Null when running or not yet started.
+    this.unavailableReason = null
   }
 
   /**
@@ -94,9 +97,13 @@ class AIServiceManager {
     const isDev = process.env.NODE_ENV === 'development'
     
     if (isDev) {
-      // In development, use virtual environment Python
-      const venvPython = path.join(__dirname, '../../AI_agent/venv/Scripts/python.exe')
-      
+      // In development, use the virtual-environment Python. venv layout differs
+      // by OS: Scripts/python.exe on Windows, bin/python on macOS/Linux.
+      const venvPython =
+        process.platform === 'win32'
+          ? path.join(__dirname, '../../AI_agent/venv/Scripts/python.exe')
+          : path.join(__dirname, '../../AI_agent/venv/bin/python')
+
       return {
         command: venvPython,
         args: [path.join(__dirname, '../../AI_agent/start_service.py')]
@@ -168,7 +175,20 @@ class AIServiceManager {
       
       // Get service executable info
       const { command, args } = this.getServiceExecutablePath()
-      
+
+      // Preflight: don't attempt to spawn a binary that isn't there. This turns a
+      // confusing spawn 'error' + 3 retries into a clear, immediate unavailable
+      // state (e.g. missing dev venv, or a prod build without the bundled exe).
+      if (!fs.existsSync(command)) {
+        this.isStarting = false
+        this.isRunning = false
+        this.unavailableReason = 'missing-binary'
+        const msg = `AI service executable not found at ${command} — AI features are unavailable.`
+        console.warn(msg)
+        throw new Error(msg)
+      }
+      this.unavailableReason = null
+
       const {
         openaiKey = null,
         geminiKey = null,
@@ -266,19 +286,23 @@ class AIServiceManager {
         await new Promise(resolve => setTimeout(resolve, 2000))
       }
       
-      // Mark service as running regardless of health check
-      // The periodic health checks will monitor actual status
+      // Gate isRunning on a real health check. Previously this was set true
+      // regardless, so sendMessage would accept requests and then fail on the
+      // HTTP call. Now the service is only "running" once /docs responds.
       this.isStarting = false
-      this.isRunning = true
+      this.isRunning = isHealthy
       this.retryCount = 0
-      
-      // Start health checks
+      this.unavailableReason = isHealthy ? null : 'unhealthy'
+
+      // Always start the periodic monitor: it flips isRunning true if the service
+      // becomes healthy later (slow MCP/LLM startup), and detects crashes. This
+      // avoids leaving a slow-but-fine service marked unavailable forever.
       this.startHealthCheck()
-      
+
       if (isHealthy) {
         console.log('✅ AI service is healthy and ready')
       } else {
-        console.warn('⚠️ AI service health check failed, but service appears to be starting...')
+        console.warn('⚠️ AI service not healthy yet; monitoring for recovery.')
       }
 
       return this.port
@@ -367,10 +391,19 @@ class AIServiceManager {
   * Schedules a 30s interval to probe health; on failure, triggers restart handling.
    */
   startHealthCheck() {
+    // Avoid stacking intervals if called more than once.
+    if (this.healthCheckInterval) return
     this.healthCheckInterval = setInterval(async () => {
       const isHealthy = await this.checkHealth()
-      if (!isHealthy && this.isRunning) {
+      if (isHealthy && !this.isRunning) {
+        // Service came up after the initial window (slow MCP/LLM startup).
+        // Recover into the running state instead of staying unavailable forever.
+        this.isRunning = true
+        this.unavailableReason = null
+        console.log('✅ AI service became healthy on a later check')
+      } else if (!isHealthy && this.isRunning) {
         console.warn('AI service health check failed')
+        this.isRunning = false
         this.handleProcessExit()
       }
     }, 30000) // Check every 30 seconds
@@ -390,12 +423,16 @@ class AIServiceManager {
     if (this.retryCount < this.maxRetries && !app.isQuiting) {
       this.retryCount++
       console.log(`Attempting to restart AI service (attempt ${this.retryCount}/${this.maxRetries})`)
-      
+
       setTimeout(() => {
         this.start(this.lastConfig).catch(error => {
           console.error('Failed to restart AI service:', error)
         })
       }, 5000) // Wait 5 seconds before restart
+    } else if (!app.isQuiting) {
+      // Out of retries — settle into a clear unavailable state for the UI.
+      this.unavailableReason = 'crashed'
+      console.warn('AI service exhausted restart attempts; AI features are unavailable.')
     }
   }
 
@@ -407,7 +444,9 @@ class AIServiceManager {
     return {
       isRunning: this.isRunning,
       port: this.port,
-      retryCount: this.retryCount
+      retryCount: this.retryCount,
+      // Surfaced so the UI can show a clear reason instead of a generic error.
+      unavailableReason: this.isRunning ? null : this.unavailableReason
     }
   }
 
@@ -475,61 +514,7 @@ class AIServiceManager {
     })
   }
 
-  async resetMemory() {
-    if (!this.isRunning || !this.port) {
-      throw new Error('AI service is not running')
-    }
-
-    return new Promise((resolve, reject) => {
-      const http = require('http')
-
-      const options = {
-        hostname: '127.0.0.1',
-        port: this.port,
-        path: '/reset',
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json'
-        },
-        timeout: 10000 // 10 second timeout for reset
-      }
-
-      const req = http.request(options, (res) => {
-        let responseData = ''
-
-        res.on('data', (chunk) => {
-          responseData += chunk
-        })
-
-        res.on('end', () => {
-          try {
-            if (res.statusCode !== 200) {
-              reject(new Error(`HTTP ${res.statusCode}: ${res.statusMessage}`))
-              return
-            }
-
-            const jsonResponse = JSON.parse(responseData)
-            resolve(jsonResponse)
-          } catch (error) {
-            reject(new Error(`Failed to parse response: ${error.message}`))
-          }
-        })
-      })
-
-      req.on('error', (error) => {
-        reject(new Error(`Reset request failed: ${error.message}`))
-      })
-
-      req.on('timeout', () => {
-        req.destroy()
-        reject(new Error('Reset request timeout'))
-      })
-
-      req.end()
-    })
-  } 
-
-/**
+  /**
    * Reset the AI service conversation memory
    */
   async resetMemory() {

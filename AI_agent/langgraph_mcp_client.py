@@ -25,13 +25,29 @@ import sys
 # Get the directory where this script is located
 current_dir = os.path.dirname(os.path.abspath(__file__))
 
-# Pass environment variables to MCP server subprocess
-# This ensures the subprocess has access to FOCUSBOOK_DB_PATH
-server_params = StdioServerParameters(
-    command=sys.executable,
-    args=[os.path.join(current_dir, "math_mcp_server.py")],
-    env=os.environ.copy()  # Pass all environment variables to subprocess
-)
+# Launch the MCP server as a stdio subprocess.
+#
+# In a normal Python run, sys.executable is the interpreter, so we run
+# `python math_mcp_server.py`. But under PyInstaller --onefile, sys.executable
+# is ai_service.exe itself (there is no separate python), so `ai_service.exe
+# math_mcp_server.py` would just re-launch the WEB SERVER — spawning another
+# service that spawns another MCP subprocess, an infinite cascade.
+#
+# To make the frozen exe re-entrant, when frozen we invoke the exe with a
+# sentinel flag (--run-mcp-server); start_service.py detects it and runs the
+# MCP server code instead of the web server.
+if getattr(sys, "frozen", False):
+    server_params = StdioServerParameters(
+        command=sys.executable,
+        args=["--run-mcp-server"],
+        env=os.environ.copy()
+    )
+else:
+    server_params = StdioServerParameters(
+        command=sys.executable,
+        args=[os.path.join(current_dir, "math_mcp_server.py")],
+        env=os.environ.copy()  # Pass all environment variables to subprocess
+    )
 
 async def create_graph(session):
     """

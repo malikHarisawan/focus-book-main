@@ -7,11 +7,25 @@ const {
   Tray,
   Menu,
   globalShortcut,
-  nativeImage
+  nativeImage,
+  dialog,
+  shell
 } = require('electron')
-const { autoUpdater } = require('electron-updater')
+// NOTE: do NOT destructure `autoUpdater` here. In electron-updater, `autoUpdater`
+// is a lazy getter that instantiates NsisUpdater on first property access, which
+// reads app.getVersion() — if that happens at module load time (before the app is
+// ready) it crashes the whole main process on startup. We require the module now
+// but only read the `.autoUpdater` getter later, from inside getAutoUpdater(),
+// which is called after app.whenReady().
+const electronUpdater = require('electron-updater')
+let _autoUpdater = null
+function getAutoUpdater() {
+  if (!_autoUpdater) {
+    _autoUpdater = electronUpdater.autoUpdater
+  }
+  return _autoUpdater
+}
 // const { is } = require('@electron-toolkit/utils') // Removed to fix production build issue
-const { exec, spawn } = require('child_process')
 const path = require('path')
 const fs = require('fs')
 
@@ -46,6 +60,96 @@ function getIconPath() {
   return iconPath
 }
 
+// Close a distracting native app by its PID using Node's built-in process.kill —
+// no external `taskkill`. Tries a graceful SIGTERM first so the app can save,
+// then escalates to SIGKILL if it's still alive after a short grace period.
+// Targets the single foreground PID, not every instance of the exe.
+function closeAppByPid(pid, appName) {
+  const numericPid = parseInt(pid, 10)
+  if (!numericPid || Number.isNaN(numericPid)) {
+    console.log(`Cannot close ${appName}: no valid PID (got ${pid})`)
+    return
+  }
+
+  const isAlive = () => {
+    try {
+      process.kill(numericPid, 0) // signal 0 = existence check, doesn't kill
+      return true
+    } catch {
+      return false
+    }
+  }
+
+  try {
+    process.kill(numericPid, 'SIGTERM')
+    console.log(`Sent SIGTERM to ${appName} (pid ${numericPid})`)
+  } catch (error) {
+    if (error.code === 'ESRCH') {
+      console.log(`${appName} (pid ${numericPid}) was already closed`)
+    } else {
+      console.warn(`Could not signal ${appName} (pid ${numericPid}): ${error.message}`)
+    }
+    return
+  }
+
+  // Escalate to a forced kill if it ignored SIGTERM.
+  setTimeout(() => {
+    if (!isAlive()) {
+      console.log(`Successfully closed ${appName} (pid ${numericPid})`)
+      return
+    }
+    try {
+      process.kill(numericPid, 'SIGKILL')
+      console.log(`Force-closed ${appName} (pid ${numericPid}) after SIGTERM timeout`)
+    } catch (error) {
+      if (error.code !== 'ESRCH') {
+        console.warn(`Failed to force-close ${appName} (pid ${numericPid}): ${error.message}`)
+      }
+    }
+  }, 2000)
+}
+
+// Tell the user why an auto tab-close couldn't happen, instead of silently doing
+// nothing. Uses a native notification so it works even though the popup is gone.
+function notifyTabCloseUnavailable(reason) {
+  const { Notification } = require('electron')
+  if (!Notification.isSupported()) return
+  const body =
+    reason === 'no-extension'
+      ? 'Install and connect the FocusBook browser extension to auto-close distracting tabs.'
+      : reason === 'private'
+        ? "This tab is in a private/incognito window FocusBook can't close automatically."
+        : "Couldn't close the tab automatically. Please close it manually."
+  try {
+    new Notification({ title: 'FocusBook', body }).show()
+  } catch (error) {
+    console.warn('Could not show tab-close notification:', error.message)
+  }
+}
+
+// In-memory cache for the exclusion list. The list changes only when the user
+// adds/removes/clears an exclusion (all of which call invalidateExclusionCache),
+// but filterExcludedApps runs on every dashboard/activity refresh. Caching avoids
+// a SQLite round-trip on each of those frequent reads.
+let exclusionCache = null
+
+function invalidateExclusionCache() {
+  exclusionCache = null
+}
+
+// Returns { apps: [], domains: [] }, served from cache when available.
+async function getCachedExclusionList(categoriesService) {
+  if (exclusionCache) {
+    return exclusionCache
+  }
+  const exclusionList = await categoriesService.getExclusionList()
+  exclusionCache = {
+    apps: exclusionList.apps || [],
+    domains: exclusionList.domains || []
+  }
+  return exclusionCache
+}
+
 // Helper function to filter excluded apps from usage data
 async function filterExcludedApps(data, categoriesService) {
   if (!data || typeof data !== 'object') {
@@ -53,8 +157,8 @@ async function filterExcludedApps(data, categoriesService) {
   }
 
   try {
-    // Get the exclusion list (returns { apps: [], domains: [] })
-    const exclusionList = await categoriesService.getExclusionList()
+    // Get the exclusion list (returns { apps: [], domains: [] }) — cached
+    const exclusionList = await getCachedExclusionList(categoriesService)
     const excludedApps = new Set(exclusionList.apps || [])
     const excludedDomains = new Set(exclusionList.domains || [])
 
@@ -132,7 +236,7 @@ const { hybridConnection } = require('./database/hybridConnection')
 const focusSessionService = require('./database/focusSessionService')
 const PopupManager = require('./popupManager')
 const AIServiceManager = require('./aiServiceManager')
-const PythonErrorRecovery = require('./pythonErrorRecovery')
+const BrowserBridge = require('./browserBridge')
 // const backgroundSyncService = require('./database/backgroundSyncService') // Commented out for simplified architecture
 
 let mainWindow = null
@@ -143,17 +247,73 @@ let timeDisplay = 0
 let timerInterval = null
 let app_name = null
 let n_pid = null
+// Context for the currently-shown popup: { isBrowser, exe, title } — used by the
+// stay-focused handler to close a browser tab via the extension bridge.
+let popup_context = null
 let isCleaningUp = false
 let popupManager = new PopupManager()
 let aiServiceManager = new AIServiceManager()
-let pythonErrorRecovery = new PythonErrorRecovery()
+let browserBridge = new BrowserBridge(app.getPath('userData'))
+
+// Window sizing. Default opens comfortably for the dashboard; the minimum is
+// smaller so it can shrink (sidebar collapses) without the layout breaking.
+const DEFAULT_WINDOW = { width: 1280, height: 800 }
+const MIN_WINDOW = { width: 860, height: 600 }
+const WINDOW_STATE_FILE = path.join(app.getPath('userData'), 'window-state.json')
+
+// Load the last-saved window bounds, if any. Returns null when absent/invalid.
+function loadWindowState() {
+  try {
+    if (!fs.existsSync(WINDOW_STATE_FILE)) return null
+    const state = JSON.parse(fs.readFileSync(WINDOW_STATE_FILE, 'utf8'))
+    if (typeof state.width !== 'number' || typeof state.height !== 'number') return null
+    return state
+  } catch (error) {
+    console.warn('Could not read window state:', error.message)
+    return null
+  }
+}
+
+// Persist the current window bounds (and maximized flag) so the next launch
+// restores them. Debounced by the caller via resize/move listeners.
+function saveWindowState() {
+  try {
+    if (!mainWindow || mainWindow.isDestroyed()) return
+    const isMaximized = mainWindow.isMaximized()
+    // Use normal bounds so a maximized window still remembers its restored size.
+    const bounds = mainWindow.getNormalBounds()
+    fs.writeFileSync(
+      WINDOW_STATE_FILE,
+      JSON.stringify({ ...bounds, isMaximized })
+    )
+  } catch (error) {
+    console.warn('Could not save window state:', error.message)
+  }
+}
+
+// Only accept a saved position if it still lands on a currently-connected
+// display, so unplugging a monitor doesn't strand the window off-screen.
+function boundsAreVisible(bounds) {
+  if (typeof bounds.x !== 'number' || typeof bounds.y !== 'number') return false
+  return screen.getAllDisplays().some((display) => {
+    const wa = display.workArea
+    return (
+      bounds.x < wa.x + wa.width &&
+      bounds.x + bounds.width > wa.x &&
+      bounds.y < wa.y + wa.height &&
+      bounds.y + bounds.height > wa.y
+    )
+  })
+}
 
 function createWindow() {
-  mainWindow = new BrowserWindow({
-    width: 1200,
-    height: 800,
-    minWidth: 900,
-    minHeight: 650,
+  const saved = loadWindowState()
+
+  const windowOptions = {
+    width: DEFAULT_WINDOW.width,
+    height: DEFAULT_WINDOW.height,
+    minWidth: MIN_WINDOW.width,
+    minHeight: MIN_WINDOW.height,
     resizable: true,
     maximizable: true,
     minimizable: true,
@@ -163,6 +323,9 @@ function createWindow() {
     frame: false,
     title: 'FocusBook',
     titleBarStyle: 'hidden',
+    // Use the same logo as the system tray for the window/taskbar icon so they
+    // match. getIconPath() resolves icon.png in both dev and packaged builds.
+    icon: getIconPath(),
     backgroundColor: '#0f172a',
     webPreferences: {
       nodeIntegration: true,
@@ -170,7 +333,35 @@ function createWindow() {
       preload: path.join(__dirname, '../preload/index.js'),
       sandbox: false
     }
-  })
+  }
+
+  // Restore saved size, and position too if it's still on a visible display.
+  if (saved) {
+    windowOptions.width = Math.max(saved.width, MIN_WINDOW.width)
+    windowOptions.height = Math.max(saved.height, MIN_WINDOW.height)
+    if (boundsAreVisible(saved)) {
+      windowOptions.x = saved.x
+      windowOptions.y = saved.y
+    }
+  }
+
+  mainWindow = new BrowserWindow(windowOptions)
+
+  // Re-maximize if that's how the user left it.
+  if (saved && saved.isMaximized) {
+    mainWindow.maximize()
+  }
+
+  // Persist bounds when the user resizes, moves, or (un)maximizes the window.
+  let saveTimer = null
+  const scheduleSave = () => {
+    clearTimeout(saveTimer)
+    saveTimer = setTimeout(saveWindowState, 400)
+  }
+  mainWindow.on('resize', scheduleSave)
+  mainWindow.on('move', scheduleSave)
+  mainWindow.on('maximize', saveWindowState)
+  mainWindow.on('unmaximize', saveWindowState)
 
   if (process.env.NODE_ENV === 'development' && process.env['ELECTRON_RENDERER_URL']) {
     mainWindow.loadURL(process.env['ELECTRON_RENDERER_URL'])
@@ -267,38 +458,54 @@ function createPopUp() {
   }
 }
 
-// Configure auto-updater
-autoUpdater.autoDownload = false
-autoUpdater.autoInstallOnAppQuit = true
+// Configure auto-updater.
+// IMPORTANT: this MUST be called after app.whenReady(). Touching `autoUpdater`
+// at module load time instantiates NsisUpdater, which reads app.getVersion()
+// before Electron's `app` is ready and crashes the whole main process on
+// startup. Keep all autoUpdater access inside this function.
+let autoUpdaterConfigured = false
+function configureAutoUpdater() {
+  if (autoUpdaterConfigured) return
+  autoUpdaterConfigured = true
 
-autoUpdater.on('update-available', (info) => {
-  console.log('🔔 Update available:', info.version)
-  // Notify user about update
-  if (mainWindow) {
-    mainWindow.webContents.send('update-available', info)
-  }
-})
+  const updater = getAutoUpdater()
+  updater.autoDownload = false
+  updater.autoInstallOnAppQuit = true
 
-autoUpdater.on('update-downloaded', (info) => {
-  console.log('✅ Update downloaded:', info.version)
-  // Notify user that update is ready
-  if (mainWindow) {
-    mainWindow.webContents.send('update-downloaded', info)
-  }
-})
+  updater.on('update-available', (info) => {
+    console.log('🔔 Update available:', info.version)
+    // Notify user about update
+    if (mainWindow) {
+      mainWindow.webContents.send('update-available', info)
+    }
+  })
 
-autoUpdater.on('error', (err) => {
-  console.error('❌ Auto-updater error:', err)
-})
+  updater.on('update-downloaded', (info) => {
+    console.log('✅ Update downloaded:', info.version)
+    // Notify user that update is ready
+    if (mainWindow) {
+      mainWindow.webContents.send('update-downloaded', info)
+    }
+  })
 
-app.whenReady().then(async () => {
+  updater.on('error', (err) => {
+    console.error('❌ Auto-updater error:', err)
+  })
+}
+
+// Heavy backend initialization (SQLite, focus sessions, AI service, Python).
+// Runs in the BACKGROUND after the window is already on screen so the user is
+// never staring at an empty desktop. IPC data handlers await
+// hybridConnection.whenReady() before touching the database, so any data
+// request that arrives before this finishes simply waits rather than failing.
+async function initializeBackendServices() {
   try {
     await hybridConnection.connect()
     console.log('✅ SQLite database system initialized successfully')
 
     // Initialize data aggregation service
     // Data aggregation functionality is now handled directly by app usage service
-    
+
     // Initialize focus session service
     try {
       await focusSessionService.getLocalService().initializeService()
@@ -306,19 +513,10 @@ app.whenReady().then(async () => {
     } catch (error) {
       console.error('❌ Failed to initialize focus session service:', error.message)
     }
-    
+
   } catch (error) {
     console.error('❌ Failed to initialize database system:', error.message)
     console.log('📋 The app will continue to run with reduced functionality.')
-  }
-
-  // Check for updates (only in production)
-  if (!process.env.NODE_ENV || process.env.NODE_ENV === 'production') {
-    setTimeout(() => {
-      autoUpdater.checkForUpdates()
-        .then(() => console.log('✅ Checked for updates'))
-        .catch((err) => console.error('❌ Failed to check for updates:', err))
-    }, 5000) // Check after 5 seconds
   }
 
   // Enable auto-startup on first run (for fresh installs)
@@ -369,30 +567,69 @@ app.whenReady().then(async () => {
       }
     }
 
-    await aiServiceManager.start(aiConfig)
-    console.log('✅ AI service started successfully')
+    // Only start the AI service if a key is actually configured. The service's
+    // startup requires a valid provider key and exits otherwise, so starting it
+    // keyless just crash-loops it on every launch. AI features stay unavailable
+    // until the user adds a key in Settings (which restarts the service).
+    const hasKey = Boolean((aiConfig.openaiKey || '').trim() || (aiConfig.geminiKey || '').trim())
+    if (hasKey) {
+      await aiServiceManager.start(aiConfig)
+      console.log('✅ AI service started successfully')
+    } else {
+      console.log('📋 No AI key configured — AI service not started (add one in Settings to enable).')
+    }
   } catch (error) {
     console.error('❌ Failed to start AI service:', error.message)
     console.log('📋 AI insights will not be available.')
   }
 
-  // Initialize Python error recovery system
+
+  // Initialize the browser extension bridge (WebSocket URL source). This is a
+  // separate health domain from Python error recovery: it self-heals on
+  // reconnect and never latches into a permanent no-URL state.
   try {
-    await pythonErrorRecovery.checkPythonAvailability()
-    await pythonErrorRecovery.checkPythonDependencies()
-    const status = pythonErrorRecovery.getStatus()
-    if (status.pythonAvailable && !status.fallbackMode) {
-      console.log('✅ Python environment verified successfully')
+    const started = await browserBridge.start()
+    if (started) {
+      console.log('✅ Browser bridge started (extension is the URL source)')
     } else {
-      console.log('⚠️ Python environment not available, using fallback mode for browser detection')
+      console.log('⚠️ Browser bridge could not bind a port; extension URLs unavailable until restart')
     }
   } catch (error) {
-    console.error('❌ Python error recovery initialization failed:', error.message)
+    console.error('❌ Browser bridge initialization failed:', error.message)
+  }
+}
+
+app.whenReady().then(async () => {
+  // On Windows, associate the app with an explicit AppUserModelID so the
+  // taskbar uses our window icon (matching electron-builder's appId) instead of
+  // the default Electron icon, and groups windows correctly.
+  if (process.platform === 'win32') {
+    app.setAppUserModelId('com.focusbook.app')
   }
 
+  // Show the window IMMEDIATELY. Everything below this line (DB, AI service,
+  // Python) previously blocked window creation, forcing the user to wait
+  // ~10s+ staring at nothing. The window now paints first and populates data
+  // as soon as the database is ready.
   createWindow()
 
-  ipcMain.on('show-popup-message', async (event, appName, pid) => {
+  // Kick off the heavy initialization in the background — do NOT await it here.
+  initializeBackendServices().catch((error) => {
+    console.error('❌ Background initialization error:', error)
+  })
+
+  // Check for updates (only in production). Configure the updater here — after
+  // the app is ready — so instantiating it can safely read app.getVersion().
+  if (!process.env.NODE_ENV || process.env.NODE_ENV === 'production') {
+    configureAutoUpdater()
+    setTimeout(() => {
+      getAutoUpdater().checkForUpdates()
+        .then(() => console.log('✅ Checked for updates'))
+        .catch((err) => console.error('❌ Failed to check for updates:', err))
+    }, 5000) // Check after 5 seconds
+  }
+
+  ipcMain.on('show-popup-message', async (event, appName, pid, context) => {
     if (isCleaningUp) return
 
     try {
@@ -414,6 +651,7 @@ app.whenReady().then(async () => {
       console.log('pid', pid, 'appName', appName)
       app_name = appName
       n_pid = pid || null
+      popup_context = context || null
 
       // Record popup shown and create popup
       popupManager.recordPopupShown(appName)
@@ -449,6 +687,7 @@ app.whenReady().then(async () => {
 
   ipcMain.handle('load-categories', async (event) => {
     try {
+      await hybridConnection.whenReady()
       const categoriesService = hybridConnection.getCategoriesService()
       return await categoriesService.getCategoriesForSettings()
     } catch (error) {
@@ -457,10 +696,136 @@ app.whenReady().then(async () => {
     }
   })
 
+  // Full category metadata (name, type, color, icon) for the renderer to drive its
+  // palette/icons/lists from the DB instead of hardcoded per-component maps.
+  ipcMain.handle('get-all-categories', async () => {
+    try {
+      await hybridConnection.whenReady()
+      const categoriesService = hybridConnection.getCategoriesService()
+      return await categoriesService.getAllCategories()
+    } catch (error) {
+      console.error('Error loading all categories:', error)
+      return []
+    }
+  })
+
+  // --- Category + rule CRUD (Settings "Categories Management") ---
+  // Broadcast so any open window refreshes its DB-driven category cache.
+  const broadcastCategoriesUpdated = () => {
+    BrowserWindow.getAllWindows().forEach((w) => {
+      w.webContents.send('categories-updated', null)
+    })
+  }
+
+  ipcMain.handle('category-add', async (event, { name, type, color, icon }) => {
+    try {
+      const svc = hybridConnection.getCategoriesService()
+      const result = await svc.addCategory(name, type, color, icon)
+      broadcastCategoriesUpdated()
+      return result
+    } catch (error) {
+      console.error('Error adding category:', error)
+      return false
+    }
+  })
+
+  ipcMain.handle('category-update', async (event, { name, updates }) => {
+    try {
+      const svc = hybridConnection.getCategoriesService()
+      const result = await svc.updateCategory(name, updates)
+      broadcastCategoriesUpdated()
+      return result
+    } catch (error) {
+      console.error('Error updating category:', error)
+      return false
+    }
+  })
+
+  ipcMain.handle('category-delete', async (event, { name }) => {
+    try {
+      const svc = hybridConnection.getCategoriesService()
+      const result = await svc.deleteCategory(name)
+      broadcastCategoriesUpdated()
+      return result
+    } catch (error) {
+      console.error('Error deleting category:', error)
+      return false
+    }
+  })
+
+  ipcMain.handle('rule-add', async (event, { pattern, category, matchType, priority }) => {
+    try {
+      const svc = hybridConnection.getCategoriesService()
+      const result = await svc.addCategoryRule(pattern, category, matchType, priority)
+      broadcastCategoriesUpdated()
+      return result
+    } catch (error) {
+      console.error('Error adding category rule:', error)
+      return false
+    }
+  })
+
+  ipcMain.handle('rule-update', async (event, { id, updates }) => {
+    try {
+      const svc = hybridConnection.getCategoriesService()
+      const result = await svc.updateCategoryRule(id, updates)
+      broadcastCategoriesUpdated()
+      return result
+    } catch (error) {
+      console.error('Error updating category rule:', error)
+      return false
+    }
+  })
+
+  ipcMain.handle('rule-delete', async (event, { id }) => {
+    try {
+      const svc = hybridConnection.getCategoriesService()
+      const result = await svc.deleteCategoryRule(id)
+      broadcastCategoriesUpdated()
+      return result
+    } catch (error) {
+      console.error('Error deleting category rule:', error)
+      return false
+    }
+  })
+
+  // Retag an app/domain's category from the Activity or Dashboard view. Instead
+  // of a per-app override (which the 30s tracker would overwrite because it
+  // re-derives the category every tick), this creates/updates a persistent
+  // classification RULE that live tracking respects, then retags existing
+  // history so past data is fixed too. One source of truth, no silent revert.
+  ipcMain.handle('retag-app-category', async (event, { matchType, pattern, category }) => {
+    try {
+      if (!pattern || !category) {
+        return { success: false, error: 'Missing pattern or category' }
+      }
+      const catSvc = hybridConnection.getCategoriesService()
+      const usageSvc = hybridConnection.getAppUsageService()
+
+      // 'domain' rows match by keyword (URL substring); native apps by 'app'.
+      const ruleMatchType = matchType === 'domain' ? 'keyword' : 'app'
+      const rule = await catSvc.upsertCategoryRule(pattern, category, ruleMatchType, 100)
+      const retagged = await usageSvc.retagByPattern(matchType, pattern, category)
+
+      // Reload rules in every preload (categories-updated) and refresh the
+      // renderer views (app-category-updated) so the change shows immediately.
+      broadcastCategoriesUpdated()
+      mainWindow?.webContents.send('app-category-updated', { pattern, category })
+
+      return { success: true, ruleCreated: rule?.created === true, retagged }
+    } catch (error) {
+      console.error('Error retagging app category:', error)
+      return { success: false, error: error.message }
+    }
+  })
+
   // Auto-updater IPC handlers
   ipcMain.handle('check-for-updates', async () => {
     try {
-      const result = await autoUpdater.checkForUpdates()
+      // Ensure listeners are attached even if the startup check never ran
+      // (e.g. dev mode or a manual check before the 5s timer fires).
+      configureAutoUpdater()
+      const result = await getAutoUpdater().checkForUpdates()
       return result
     } catch (error) {
       console.error('Error checking for updates:', error)
@@ -470,7 +835,8 @@ app.whenReady().then(async () => {
 
   ipcMain.handle('download-update', async () => {
     try {
-      await autoUpdater.downloadUpdate()
+      configureAutoUpdater()
+      await getAutoUpdater().downloadUpdate()
       return true
     } catch (error) {
       console.error('Error downloading update:', error)
@@ -479,11 +845,12 @@ app.whenReady().then(async () => {
   })
 
   ipcMain.handle('install-update', () => {
-    autoUpdater.quitAndInstall()
+    getAutoUpdater().quitAndInstall()
   })
 
   ipcMain.handle('load-data', async () => {
     try {
+      await hybridConnection.whenReady()
       const appUsageService = hybridConnection.getAppUsageService()
       const categoriesService = hybridConnection.getCategoriesService()
       const data = await appUsageService.getAppUsageData()
@@ -540,6 +907,7 @@ app.whenReady().then(async () => {
 
   ipcMain.handle('load-custom-categories', async () => {
     try {
+      await hybridConnection.whenReady()
       const categoriesService = hybridConnection.getCategoriesService()
       return await categoriesService.getCustomCategoryMappings()
     } catch (error) {
@@ -555,6 +923,17 @@ app.whenReady().then(async () => {
     } catch (error) {
       console.error('Error saving custom categories:', error)
       return false
+    }
+  })
+
+  ipcMain.handle('load-category-rules', async () => {
+    try {
+      await hybridConnection.whenReady()
+      const categoriesService = hybridConnection.getCategoriesService()
+      return await categoriesService.getCategoryRules()
+    } catch (error) {
+      console.error('Error loading category rules:', error)
+      return []
     }
   })
 
@@ -762,7 +1141,194 @@ ipcMain.handle('ai-service-reset-memory', async () => {
       return { error: error.message }
     }
   })
-  
+
+  // --- Generic UI-state store ({userData}/ui-state.json) ---
+  // A small key/value JSON file for renderer UI flags (onboarding progress,
+  // dismissed cards, etc.). Kept SEPARATE from config.json because
+  // save-ai-config overwrites that whole file; this store merges patches so
+  // multiple independent flags can coexist without clobbering each other.
+  const uiStatePath = () => path.join(app.getPath('userData'), 'ui-state.json')
+
+  ipcMain.handle('get-ui-state', async () => {
+    try {
+      const p = uiStatePath()
+      if (!fs.existsSync(p)) return {}
+      const parsed = JSON.parse(fs.readFileSync(p, 'utf-8'))
+      return parsed && typeof parsed === 'object' ? parsed : {}
+    } catch (error) {
+      console.error('Error reading UI state:', error)
+      return {}
+    }
+  })
+
+  ipcMain.handle('set-ui-state', async (event, patch) => {
+    try {
+      if (!patch || typeof patch !== 'object') {
+        return { success: false, error: 'Patch must be an object' }
+      }
+      const p = uiStatePath()
+      let current = {}
+      if (fs.existsSync(p)) {
+        try {
+          const parsed = JSON.parse(fs.readFileSync(p, 'utf-8'))
+          if (parsed && typeof parsed === 'object') current = parsed
+        } catch (parseError) {
+          console.warn('Could not parse ui-state.json, overwriting:', parseError.message)
+        }
+      }
+      const merged = { ...current, ...patch }
+      fs.writeFileSync(p, JSON.stringify(merged, null, 2), 'utf-8')
+      return { success: true, state: merged }
+    } catch (error) {
+      console.error('Error saving UI state:', error)
+      return { success: false, error: error.message }
+    }
+  })
+
+  // Resolve the bundled (read-only source) browser-extension folder. In dev it
+  // lives at the project root; electron-builder copies it into resources/extension
+  // for packaged apps (see electron-builder.yml `from: extension -> to: extension`).
+  const getBundledExtensionDir = () => {
+    const isDev = process.env.NODE_ENV === 'development'
+    const candidates = isDev
+      ? [path.join(__dirname, '../../extension')]
+      : [
+          path.join(process.resourcesPath, 'extension'),
+          path.join(__dirname, '../../extension'),
+          path.join(__dirname, 'extension')
+        ]
+    for (const dir of candidates) {
+      if (fs.existsSync(dir)) return dir
+    }
+    return candidates[0]
+  }
+
+  // The extension folder we actually reveal and stamp the token into. In a
+  // per-machine install the bundled copy under Program Files is read-only for
+  // standard users, so we can't stamp the token there. To make auto-pairing work
+  // regardless of install type, we mirror the bundled extension into a writable
+  // per-user directory (userData/extension) and reveal that copy.
+  //
+  // In dev, the project's extension/ folder is already writable and is what the
+  // developer edits, so we use it directly and skip the copy.
+  const getExtensionDir = () => {
+    const isDev = process.env.NODE_ENV === 'development'
+    const bundled = getBundledExtensionDir()
+    if (isDev) return bundled
+
+    const target = path.join(app.getPath('userData'), 'extension')
+    try {
+      syncExtensionCopy(bundled, target)
+      return target
+    } catch (error) {
+      // Copy failed (odd permissions on userData?): fall back to the bundled
+      // path. Stamping may then fail on a read-only install, but the manual
+      // token flow still works.
+      console.warn('Could not prepare writable extension copy:', error.message)
+      return bundled
+    }
+  }
+
+  // Mirror the bundled extension into `target`, skipping the token stamp file so
+  // a previously-stamped token isn't clobbered by the empty placeholder.
+  //
+  // Copies when the target is missing, when a source file differs in size, or
+  // when the app version has changed since the last sync. The version gate makes
+  // updates deterministic even if the installer doesn't preserve mtimes across
+  // the resources -> userData boundary: every app update ships a new version, so
+  // the whole extension is refreshed on first launch after an update.
+  const syncExtensionCopy = (source, target) => {
+    if (!fs.existsSync(source)) return
+    fs.mkdirSync(target, { recursive: true })
+
+    const stampPath = path.join(target, '.version')
+    let lastVersion = null
+    try {
+      lastVersion = fs.readFileSync(stampPath, 'utf-8').trim()
+    } catch {
+      lastVersion = null
+    }
+    const versionChanged = lastVersion !== app.getVersion()
+
+    for (const name of fs.readdirSync(source)) {
+      // Never overwrite the stamped token file from the source placeholder.
+      if (name === 'focusbook-token.js') continue
+      const srcPath = path.join(source, name)
+      const dstPath = path.join(target, name)
+      const srcStat = fs.statSync(srcPath)
+      if (srcStat.isDirectory()) continue // extension is flat; ignore any nested dirs
+      let needsCopy = versionChanged
+      if (!needsCopy) {
+        try {
+          const dstStat = fs.statSync(dstPath)
+          needsCopy = srcStat.size !== dstStat.size
+        } catch {
+          needsCopy = true // target missing
+        }
+      }
+      if (needsCopy) fs.copyFileSync(srcPath, dstPath)
+    }
+
+    if (versionChanged) {
+      try {
+        fs.writeFileSync(stampPath, app.getVersion())
+      } catch {
+        // non-fatal: worst case we re-copy identical files next launch
+      }
+    }
+  }
+
+  // Stamp the current pairing token into the extension folder so that loading the
+  // unpacked extension connects automatically — no copy/paste. The extension's
+  // service worker reads focusbook-token.js when its storage has no user-entered
+  // token (see extension/background.js getBundledToken). Returns true on success.
+  const writeExtensionToken = (dir) => {
+    try {
+      const status = browserBridge?.getStatus?.()
+      const token = status?.token
+      if (!token) return false
+      const file = path.join(dir, 'focusbook-token.js')
+      const contents =
+        '// Auto-generated by the FocusBook desktop app. Do not edit by hand.\n' +
+        `globalThis.FOCUSBOOK_BUNDLED_TOKEN = ${JSON.stringify(token)}\n`
+      fs.writeFileSync(file, contents)
+      return true
+    } catch (error) {
+      console.warn('Could not stamp extension token:', error.message)
+      return false
+    }
+  }
+
+  // Prepare the writable copy and stamp the token at startup so an already-loaded
+  // extension re-pairs on the next app launch, and so the folder is pre-paired
+  // even before the user opens Settings.
+  try {
+    const dir = getExtensionDir()
+    if (fs.existsSync(dir)) writeExtensionToken(dir)
+  } catch (error) {
+    console.warn('Extension token stamp on startup failed:', error.message)
+  }
+
+  // Open the extension folder in the OS file manager so the user can point their
+  // browser's "Load unpacked" at it. Stamps the pairing token first so the loaded
+  // extension connects on its own. Returns the path so the UI can show it.
+  ipcMain.handle('open-extension-folder', async () => {
+    try {
+      const dir = getExtensionDir()
+      if (!fs.existsSync(dir)) {
+        return { success: false, error: 'Extension folder not found', path: dir }
+      }
+      const paired = writeExtensionToken(dir)
+      // openPath returns '' on success, or an error string.
+      const err = await shell.openPath(dir)
+      if (err) return { success: false, error: err, path: dir }
+      return { success: true, path: dir, paired }
+    } catch (error) {
+      console.error('Error opening extension folder:', error)
+      return { success: false, error: error.message }
+    }
+  })
+
   ipcMain.handle('cancel-focus-session', async (event, sessionId) => {
     try {
       const currentSession = focusSessionService.getCurrentSession()
@@ -874,6 +1440,7 @@ ipcMain.handle('ai-service-reset-memory', async () => {
   // Data Aggregation IPC handlers
   ipcMain.handle('get-aggregated-data-by-date', async (event, date) => {
     try {
+      await hybridConnection.whenReady()
       const appUsageService = hybridConnection.getAppUsageService()
       const categoriesService = hybridConnection.getCategoriesService()
       if (!appUsageService) {
@@ -889,6 +1456,7 @@ ipcMain.handle('ai-service-reset-memory', async () => {
 
   ipcMain.handle('get-all-aggregated-data', async () => {
     try {
+      await hybridConnection.whenReady()
       const appUsageService = hybridConnection.getAppUsageService()
       const categoriesService = hybridConnection.getCategoriesService()
       if (!appUsageService) {
@@ -902,8 +1470,41 @@ ipcMain.handle('ai-service-reset-memory', async () => {
     }
   })
 
+  // Export handler: the renderer serializes the data (it already has it) and hands
+  // us the string; we show a native Save dialog and write the file. Returns
+  // { success, canceled?, filePath?, error? } so the UI can give clear feedback.
+  ipcMain.handle('export-data', async (event, { content, format, defaultName }) => {
+    try {
+      if (typeof content !== 'string' || !content) {
+        return { success: false, error: 'Nothing to export' }
+      }
+      const ext = format === 'json' ? 'json' : 'csv'
+      const filters =
+        ext === 'json'
+          ? [{ name: 'JSON', extensions: ['json'] }]
+          : [{ name: 'CSV', extensions: ['csv'] }]
+
+      const result = await dialog.showSaveDialog(mainWindow, {
+        title: 'Export FocusBook Data',
+        defaultPath: defaultName || `focusbook-export.${ext}`,
+        filters: [...filters, { name: 'All Files', extensions: ['*'] }]
+      })
+
+      if (result.canceled || !result.filePath) {
+        return { success: false, canceled: true }
+      }
+
+      fs.writeFileSync(result.filePath, content, 'utf8')
+      return { success: true, filePath: result.filePath }
+    } catch (error) {
+      console.error('Error exporting data:', error)
+      return { success: false, error: error.message }
+    }
+  })
+
   ipcMain.handle('get-formatted-usage-data', async (event, startDate, endDate) => {
     try {
+      await hybridConnection.whenReady()
       const appUsageService = hybridConnection.getAppUsageService()
       const categoriesService = hybridConnection.getCategoriesService()
       if (!appUsageService) {
@@ -919,6 +1520,7 @@ ipcMain.handle('ai-service-reset-memory', async () => {
 
   ipcMain.handle('get-productivity-summary', async (event, date) => {
     try {
+      await hybridConnection.whenReady()
       const appUsageService = hybridConnection.getAppUsageService()
       if (!appUsageService) {
         throw new Error('App usage service not initialized')
@@ -1038,7 +1640,8 @@ ipcMain.handle('ai-service-reset-memory', async () => {
 
       // Notify all windows that exclusion list has been updated
       if (result) {
-        const updatedList = await categoriesService.getExclusionList()
+        invalidateExclusionCache()
+        const updatedList = await getCachedExclusionList(categoriesService)
         mainWindow?.webContents.send('exclusion-list-updated', updatedList)
       }
 
@@ -1056,7 +1659,8 @@ ipcMain.handle('ai-service-reset-memory', async () => {
 
       // Notify all windows that exclusion list has been updated
       if (result) {
-        const updatedList = await categoriesService.getExclusionList()
+        invalidateExclusionCache()
+        const updatedList = await getCachedExclusionList(categoriesService)
         mainWindow?.webContents.send('exclusion-list-updated', updatedList)
       }
 
@@ -1083,6 +1687,7 @@ ipcMain.handle('ai-service-reset-memory', async () => {
       const result = await categoriesService.clearExclusionList()
 
       // Notify all windows that exclusion list has been cleared
+      invalidateExclusionCache()
       mainWindow?.webContents.send('exclusion-list-updated', { apps: [], domains: [] })
 
       return result
@@ -1185,6 +1790,15 @@ function cleanup() {
     })
   }
 
+  // Stop the browser extension bridge WebSocket server.
+  if (browserBridge) {
+    try {
+      browserBridge.stop()
+    } catch (err) {
+      console.error('Error stopping browser bridge:', err)
+    }
+  }
+
   // Disconnect from hybrid database system
   hybridConnection.disconnect().catch((err) => {
     console.error('Error disconnecting from database:', err)
@@ -1218,92 +1832,33 @@ ipcMain.on('stay-focused', (event) => {
     popupWindow.close()
     popupWindow = null
 
-    // Check if we're dealing with a Chrome/Brave browser tab (URL) vs regular application (.exe)
-    if (app_name && (app_name.startsWith('http') || (app_name.includes('.') && !app_name.endsWith('.exe'))) && n_pid) {
-      // This is a URL/domain from Chrome/Brave - use Python script to close tab
-      // In production, scripts are in extraResources; in dev, they're in the project root
-      const isDev = process.env.NODE_ENV === 'development' || !process.resourcesPath
-      const closeScriptPath = isDev
-        ? path.join(__dirname, '../../scripts/closeTab.py')
-        : path.join(process.resourcesPath, 'scripts/closeTab.py')
+    // Browser tab vs regular application. A browser popup carries context.isBrowser
+    // (set in the preload); app_name for browsers is the URL/domain.
+    const isBrowserTab =
+      popup_context?.isBrowser ||
+      (app_name && (app_name.startsWith('http') || (app_name.includes('.') && !app_name.endsWith('.exe'))))
 
-      console.log(`Close script path (isDev=${isDev}): ${closeScriptPath}`)
-
-      // Check if Python script exists
-      if (!fs.existsSync(closeScriptPath)) {
-        console.warn('Python closeTab script not found, cannot close browser tab')
-        console.log('User requested to close distracting tab but script is unavailable')
-        return
-      }
-
-      try {
-        const pythonProcess = spawn('python', [closeScriptPath, n_pid, app_name])
-        
-        // Set timeout for Python process
-        const timeout = setTimeout(() => {
-          pythonProcess.kill('SIGKILL')
-          console.warn('Python closeTab script timeout')
-        }, 10000) // 10 second timeout
-
-        pythonProcess.stdout.on('data', (data) => {
-          clearTimeout(timeout)
-          try {
-            const result = JSON.parse(data.toString())
-            if (result.success) {
-              console.log(`Successfully closed Chrome tab: ${result.closed_domain}`)
-            } else if (result.error) {
-              console.warn(`Python script error: ${result.error}`)
-            } else {
-              console.log(`Tab not closed: ${result.reason}`)
-            }
-          } catch {
-            console.log('Python script output:', data.toString())
-          }
-        })
-
-        pythonProcess.stderr.on('data', (data) => {
-          clearTimeout(timeout)
-          console.warn('Python script error:', data.toString())
-        })
-        
-        pythonProcess.on('error', (err) => {
-          clearTimeout(timeout)
-          console.warn('Failed to start Python closeTab process:', err.message)
-          console.log('User requested to close tab but Python execution failed')
-        })
-        
-        pythonProcess.on('close', (code) => {
-          clearTimeout(timeout)
-          if (code !== 0) {
-            console.warn(`Python closeTab script exited with code ${code}`)
-          }
-        })
-        
-      } catch (error) {
-        console.warn('Error executing Python closeTab script:', error.message)
-        console.log('User requested to close tab but script execution failed')
+    if (isBrowserTab && popup_context?.exe) {
+      // Close the tab via the browser extension bridge (no Python). The bridge
+      // asks the extension to chrome.tabs.remove the real active tab. When the
+      // extension isn't connected we tell the user instead of silently no-op'ing.
+      const result = browserBridge.closeActiveTab({
+        exe: popup_context.exe,
+        title: popup_context.title
+      })
+      if (result.ok) {
+        console.log('Requested tab close via extension bridge')
+      } else {
+        console.log(`Could not close tab via extension: ${result.reason}`)
+        notifyTabCloseUnavailable(result.reason)
       }
     } else if (app_name && app_name.endsWith('.exe')) {
-      // This is a regular application - use taskkill
-      try {
-        exec(`taskkill /IM "${app_name}" /F`, { timeout: 5000 }, (error, stdout, stderr) => {
-          if (error) {
-            if (error.code === 128) {
-              console.log(`Application ${app_name} was not running or already closed`)
-            } else {
-              console.warn(`Error closing app ${app_name}: ${error.message}`)
-            }
-            return
-          }
-          if (stderr && !stderr.includes('SUCCESS')) {
-            console.warn(`Warning while closing ${app_name}: ${stderr}`)
-            return
-          }
-          console.log(`Successfully closed application: ${app_name}`)
-        })
-      } catch (error) {
-        console.warn(`Failed to execute taskkill for ${app_name}:`, error.message)
-      }
+      // Regular application. Use Node's built-in process.kill on the specific
+      // foreground PID instead of shelling out to `taskkill /IM /F` (which is
+      // Windows-only, force-kills EVERY instance of the exe, and risks unsaved
+      // work). This is cross-platform and targets just the offending window's
+      // process, trying a graceful SIGTERM before a forced SIGKILL.
+      closeAppByPid(n_pid, app_name)
     } else {
       console.log(`App close requested but cannot determine closure method for: ${app_name} (invalid format or missing PID)`)
       console.log('This may be a system process or already closed application')
@@ -1357,15 +1912,21 @@ ipcMain.on('categoriesUpdated', (event, catTags) => {
   })
 })
 
-// Debug endpoint for Python error recovery status
-ipcMain.handle('get-python-status', () => {
-  return pythonErrorRecovery.getStatus()
+// Browser extension bridge: the URL-source seam. The preload calls this only
+// after the focus tracker has confirmed a Chromium browser is foreground. It
+// resolves state ONLY — it never opens, closes, or mutates a usage span.
+ipcMain.handle('resolve-browser-url', (event, windowInfo) => {
+  try {
+    return browserBridge.resolve(windowInfo || {})
+  } catch (error) {
+    console.error('Error resolving browser URL:', error)
+    return { source: 'degraded' }
+  }
 })
 
-// Manual reset for Python error recovery
-ipcMain.handle('reset-python-recovery', () => {
-  pythonErrorRecovery.reset()
-  return { success: true, message: 'Python error recovery system reset' }
+// Bridge status + token for the Settings UI.
+ipcMain.handle('get-browser-bridge-status', () => {
+  return browserBridge.getStatus()
 })
 
 ipcMain.on('start-focus', (event, isFocused) => {

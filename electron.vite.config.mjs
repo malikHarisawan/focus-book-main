@@ -57,15 +57,15 @@ export default defineConfig({
             console.error(`AI Service Manager file not found: ${aiServiceManagerSrc}`)
           }
 
-          // Copy pythonErrorRecovery.js specifically
-          const pythonErrorRecoverySrc = resolve(srcMainDir, 'pythonErrorRecovery.js')
-          const pythonErrorRecoveryDest = resolve(outMainDir, 'pythonErrorRecovery.js')
+          // Copy browserBridge.js specifically (WebSocket URL-source bridge)
+          const browserBridgeSrc = resolve(srcMainDir, 'browserBridge.js')
+          const browserBridgeDest = resolve(outMainDir, 'browserBridge.js')
 
-          if (existsSync(pythonErrorRecoverySrc)) {
-            copyFileSync(pythonErrorRecoverySrc, pythonErrorRecoveryDest)
-            console.log(`Copied ${pythonErrorRecoverySrc} to ${pythonErrorRecoveryDest}`)
+          if (existsSync(browserBridgeSrc)) {
+            copyFileSync(browserBridgeSrc, browserBridgeDest)
+            console.log(`Copied ${browserBridgeSrc} to ${browserBridgeDest}`)
           } else {
-            console.error(`Python Error Recovery file not found: ${pythonErrorRecoverySrc}`)
+            console.error(`Browser Bridge file not found: ${browserBridgeSrc}`)
           }
         }
       }

@@ -9,12 +9,12 @@ const buttonVariants = cva(
   {
     variants: {
       variant: {
-        default: 'bg-[#5051F9] text-white hover:bg-[#4142E0] active:bg-[#4142E0] shadow-sm',
+        default: 'bg-[#5051F9] text-white hover:bg-[#4142E0] active:bg-[#4142E0] shadow-sm dark:bg-[#22D3EE] dark:text-[#03050A] dark:hover:bg-[#4FDDF0] dark:active:bg-[#4FDDF0] dark:shadow-[0_0_16px_rgba(34,211,238,0.25)]',
         destructive: 'bg-[#FF6B6B] text-white hover:bg-[#E65C5C] active:bg-[#E65C5C] shadow-sm',
-        outline: 'border border-[#E8EDF1] dark:border-[#282932] bg-transparent text-[#232360] dark:text-white hover:bg-[#F4F7FE] dark:hover:bg-[#282932]',
-        secondary: 'bg-[#F4F7FE] dark:bg-[#282932] text-[#232360] dark:text-white hover:bg-[#E8EDF1] dark:hover:bg-[#212329]',
-        ghost: 'hover:bg-[#F4F7FE] dark:hover:bg-[#282932] text-[#768396] dark:text-[#898999] hover:text-[#232360] dark:hover:text-white',
-        link: 'text-[#5051F9] underline-offset-4 hover:underline hover:text-[#4142E0]'
+        outline: 'border border-[#E8EDF1] dark:border-[#1E293B] bg-transparent text-[#232360] dark:text-white hover:bg-[#F4F7FE] dark:hover:bg-[#1E293B]',
+        secondary: 'bg-[#F4F7FE] dark:bg-[#1E293B] text-[#232360] dark:text-white hover:bg-[#E8EDF1] dark:hover:bg-[#0B1220]',
+        ghost: 'hover:bg-[#F4F7FE] dark:hover:bg-[#1E293B] text-[#768396] dark:text-[#94A3B8] hover:text-[#232360] dark:hover:text-white',
+        link: 'text-[#5051F9] dark:text-[#22D3EE] underline-offset-4 hover:underline hover:text-[#4142E0] dark:hover:text-[#4FDDF0]'
       },
       size: {
         default: 'h-9 px-3 py-2',

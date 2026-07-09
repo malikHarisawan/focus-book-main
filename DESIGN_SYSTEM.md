@@ -34,17 +34,19 @@
 | `text-primary` | #232360 | Headings, primary text |
 | `text-secondary` | #768396 | Body text, labels |
 
-*Dark Mode:*
+*Dark Mode (Cyber palette):*
 | Token | Hex | Usage |
 |-------|-----|-------|
-| `background` | #1E1F25 | Page background |
-| `background-card` | #212329 | Card backgrounds, elevated surfaces |
-| `background-input` | #282932 | Input fields, borders |
+| `background` | #0B1120 | Page background (gradient #070B14 → #0B1120 → #0F172A) |
+| `background-deep` | #070B14 | Deepest insets, page-level wells |
+| `background-card` | #0F172A | Card backgrounds, elevated surfaces (rendered translucent @ 60% + backdrop-blur) |
+| `background-input` | #1E293B | Input fields, borders, hover surfaces |
 | `text-primary` | #FFFFFF | Headings, primary text |
-| `text-secondary` | #898999 | Body text, labels |
+| `text-secondary` | #94A3B8 | Body text, labels (slate-400) |
 | `text-tertiary` | #768396 | Muted text, placeholders |
+| `accent-secondary` | #22D3EE | Cyan accent — active nav, logo gradient, chart blue, glow borders |
 
-- **Rationale:** High contrast for readability with a soothing, modern feel. Dark mode uses subtle elevation through background color variation rather than heavy shadows.
+- **Rationale:** Dark mode uses a "cyber" slate/navy palette (black → slate-900 gradient) with cyan accents and glassmorphism (translucent cards + backdrop-blur) for a modern, high-focus feel. All slate values align with Tailwind's native `slate` scale, so components using either `slate-*` utilities or the hex tokens stay consistent. Light mode is unchanged.
 
 **Semantic Colors:**
 | Purpose | Hex | Usage |
@@ -193,11 +195,12 @@ Page:        #F4F7FE
 Borders:     #E8EDF1
 ```
 
-**Dark Mode Backgrounds:**
+**Dark Mode Backgrounds (Cyber):**
 ```
-Page:        #1E1F25
-Cards:       #212329
-Inputs:      #282932
+Page:        #0B1120  (gradient: #070B14 → #0B1120 → #0F172A)
+Cards:       #0F172A  (translucent @ 60% + backdrop-blur)
+Inputs:      #1E293B
+Accent:      #22D3EE  (cyan)
 ```
 
 **Fonts:**

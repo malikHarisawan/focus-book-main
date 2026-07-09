@@ -7,6 +7,7 @@ This script is called by the Electron main process to start the AI service.
 import os
 import sys
 import asyncio
+import multiprocessing
 import uvicorn
 from pathlib import Path
 from dotenv import load_dotenv
@@ -62,9 +63,27 @@ def setup_environment():
 
     return port
 
+def run_mcp_server():
+    """Run the bundled MCP server over stdio.
+
+    This is the re-entrant path for the frozen exe: langgraph_mcp_client.py
+    launches `ai_service.exe --run-mcp-server` as the MCP stdio subprocess, and
+    we dispatch here instead of starting the web server. In a normal (unfrozen)
+    run this path is never taken — the client runs math_mcp_server.py directly.
+    """
+    from math_mcp_server import mcp
+    mcp.run(transport='stdio')
+
+
 def main():
     """Main startup function"""
-    
+
+    # Re-entrant dispatch MUST come first: if invoked as the MCP server, run that
+    # and nothing else (no web server, no environment/port setup).
+    if '--run-mcp-server' in sys.argv:
+        run_mcp_server()
+        return
+
     try:
         port = setup_environment()
         
@@ -89,4 +108,10 @@ def main():
         sys.exit(1)
 
 if __name__ == "__main__":
+    # CRITICAL for PyInstaller --onefile: without freeze_support(), any transitive
+    # use of multiprocessing (uvicorn/anyio and some deps) makes the frozen exe
+    # re-launch itself, so each child re-runs main() and spawns another server —
+    # producing a cascade of processes and a startup that never completes. This
+    # must run before anything spawns a process.
+    multiprocessing.freeze_support()
     main()

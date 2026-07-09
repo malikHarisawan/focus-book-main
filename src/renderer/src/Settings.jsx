@@ -32,7 +32,7 @@ export default function Settings() {
         session.
       </p>
 
-      <div className="flex flex-wrap gap-2 bg-[#2a283e] p-4 rounded-lg mb-4">
+      <div className="flex flex-wrap gap-2 bg-[#111C34] p-4 rounded-lg mb-4">
         {selectedCategories.map((cat, idx) => (
           <span
             key={idx}

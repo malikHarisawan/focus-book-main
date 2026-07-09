@@ -1,20 +1,91 @@
 const { contextBridge, ipcRenderer } = require('electron')
 const activeWindows = require('electron-active-window')
-const { spawn } = require('child_process')
 import APP_CATEGORIES from './categories'
-const { exec } = require('child_process')
+const { execFile } = require('child_process')
 const util = require('util')
-const execPromise = util.promisify(exec)
-const path = require('path')
-const fs = require('fs')
-const PythonErrorRecovery = require('../main/pythonErrorRecovery')
+const execFilePromise = util.promisify(execFile)
 let appUsageData = {}
 let lastActiveApp = null
 let lastUpdateTime = Date.now()
 let Distracted_List = ['Entertainment']
 let customCategoryMappings = {}
-let pythonErrorRecovery = new PythonErrorRecovery()
 let exclusionList = { apps: [], domains: [] }
+// DB-driven classification rules, loaded from the category_rules table. Each rule
+// is { pattern, category, match_type: 'app'|'keyword', priority }. Falls back to
+// the hardcoded APP_CATEGORIES only if the table is empty/unreachable. See the
+// categorization design notes; getCategory consumes this.
+let categoryRules = []
+
+// Chromium browsers whose active tab is enriched by the extension bridge.
+// Extracting this set widens support to Edge without duplicating the
+// exe-comparison logic that was previously hardcoded to chrome/brave.
+const BROWSER_EXES = new Set(['chrome.exe', 'brave.exe', 'msedge.exe'])
+function isBrowserExe(windowClass) {
+  return BROWSER_EXES.has(String(windowClass || '').toLowerCase())
+}
+
+// Sentinel appKey used when the foreground browser window is a private/PWA
+// context the extension cannot see. We never guess a URL for these.
+const PRIVATE_BROWSER_KEY = 'browser:private'
+
+// Resolve the human-friendly display name for a non-browser app.
+//
+// Windows exposes a FileDescription per executable (the "Description" field in
+// file properties), which is usually a clean product name — "Visual Studio Code"
+// for Code.exe, "ClickUp" for ClickUp.exe, "Google Chrome" for chrome.exe. Using
+// it as the stored name gives one canonical row per app and fixes duplicates that
+// arose when the raw exe string was spelled differently across window switches
+// (e.g. "vscode.exe" vs "VS Code").
+//
+// The description is NOT always usable, so we fall back to a cleaned exe name:
+//   - some binaries have no FileDescription (blank) — e.g. Task Manager
+//   - some report the file name itself as the description — e.g. Notepad reports
+//     "Notepad.exe", which is no better than the exe
+// In those cases we strip a trailing ".exe" from the exe name and use that.
+//
+// NOTE: this only affects the display/storage name. Categorization stays keyed on
+// the exe name (see updateAppTime / getCategory) so app classification is
+// unchanged. See [[categorization-exe-first]].
+function stripExe(name) {
+  return String(name || '').replace(/\.exe$/i, '').trim()
+}
+
+function resolveDisplayName(description, exeName) {
+  const cleanedExe = stripExe(exeName)
+  const desc = String(description || '').trim()
+
+  // Reject descriptions that are empty, the "unknown" sentinel, or literally a
+  // ".exe" file name (e.g. Notepad reports "Notepad.exe") — none of these read
+  // better than the cleaned exe name. A description that merely matches the exe's
+  // base name (e.g. "Electron" for electron.exe, "Obsidian" for Obsidian.exe) is
+  // a legitimate product name and is kept, preserving its original casing.
+  const descIsUseless =
+    !desc || desc === 'Unknown application' || /\.exe$/i.test(desc)
+
+  if (descIsUseless) {
+    return cleanedExe || 'Unknown application'
+  }
+  return desc
+}
+
+// Resolve the active-tab URL for a foreground browser window via the extension
+// bridge in the main process. Returns a normalized shape the tracking code
+// consumes. `source` distinguishes:
+//   'extension' -> real URL from live BrowserState
+//   'private'   -> live connection but focused window is incognito/PWA
+//   'degraded'  -> no live/matching connection; attribute by window title
+async function resolveBrowserUrl(currentWindow) {
+  try {
+    const result = await ipcRenderer.invoke('resolve-browser-url', {
+      exe: currentWindow.windowClass,
+      title: currentWindow.windowName
+    })
+    return result || { source: 'degraded' }
+  } catch (error) {
+    console.error('Error resolving browser URL via bridge:', error)
+    return { source: 'degraded' }
+  }
+}
 
 
 // Initialize tracking data
@@ -49,6 +120,10 @@ loadCategories()
 
 let active_url = null
 let active_domain = null
+// Enrichment state for the current browser sample from the extension bridge:
+// 'extension' (real URL), 'private' (incognito/PWA), 'degraded' (title-only),
+// or null when the foreground app is not a browser.
+let active_browser_source = null
 let isFocusSessionActive = false
 let dismissedApps = {}
 let isCoolDown = false
@@ -72,118 +147,95 @@ const PRODUCTIVITY_CONFIG = {
 }
 loadData()
 
-// Cache for Chrome tab info to avoid repeated slow Python calls
-const chromeTabCache = new Map()
-const CHROME_TAB_CACHE_TTL = 15000 // 15 seconds cache (increased to reduce intrusive clipboard method frequency)
-const CHROME_TAB_CACHE_TTL_SUCCESS = 30000 // 30 seconds for successful URL extractions
+// Cache for process details (executable path + description) keyed by
+// `${pid}:${exeName}`. A process's executable path and file description never
+// change during its lifetime, so once resolved we never need to spawn a
+// subprocess for that process again. This eliminates the biggest source of
+// system load: previously every tracking slice re-spawned wmic + powershell
+// for the same processes.
+const processDetailsCache = new Map()
+const PROCESS_DETAILS_CACHE_TTL = 10 * 60 * 1000 // 10 minutes
 
-// Cleanup old cache entries every 30 seconds to prevent memory leaks
+// Cleanup stale process-detail entries every 5 minutes to bound memory.
 setInterval(() => {
   const now = Date.now()
-  for (const [key, value] of chromeTabCache.entries()) {
-    const maxAge = value.hasUrl ? CHROME_TAB_CACHE_TTL_SUCCESS : CHROME_TAB_CACHE_TTL
-    if (now - value.timestamp > maxAge * 2) {
-      chromeTabCache.delete(key)
+  for (const [key, entry] of processDetailsCache.entries()) {
+    if (now - entry.timestamp > PROCESS_DETAILS_CACHE_TTL) {
+      processDetailsCache.delete(key)
     }
   }
-}, 30000)
+}, 5 * 60 * 1000)
 
-async function getActiveChromeTab(pid) {
+// Resolve a process's executable path AND file description in a SINGLE
+// PowerShell invocation. This replaces the old approach that spawned `wmic`
+// (deprecated, slow, CPU-heavy) for the path and then a SECOND `powershell`
+// process for the description — two heavyweight spawns per call.
+async function fetchProcessDetails(pid) {
+  // One process, emitting "path|description". Get-Process gives the path;
+  // its .Description property is the FileDescription from the exe's version info.
+  //
+  // Use execFile (not exec) so the command string is passed straight to
+  // powershell.exe without going through cmd.exe. The PowerShell script below
+  // contains its own double quotes ("$($p.Path)|..."); routing it through the
+  // cmd.exe shell (as exec does) would let those inner quotes close the outer
+  // -Command quoting, and cmd would then choke on the bare `$` — which failed
+  // every lookup and made every app resolve to "Unknown application".
+  const psCommand =
+    `$p = Get-Process -Id ${pid} -ErrorAction SilentlyContinue; ` +
+    `if ($p) { "$($p.Path)|$($p.Description)" }`
+
+  const { stdout } = await execFilePromise(
+    'powershell',
+    ['-NoProfile', '-NonInteractive', '-Command', psCommand],
+    { timeout: 8000 }
+  )
+
+  const raw = stdout.trim()
+  if (!raw) {
+    return { description: 'Unknown application' }
+  }
+
+  const sepIndex = raw.indexOf('|')
+  const executablePath = sepIndex >= 0 ? raw.slice(0, sepIndex).trim() : raw.trim()
+  const rawDescription = sepIndex >= 0 ? raw.slice(sepIndex + 1).trim() : ''
+
+  // Fall back to the exe file name when the binary has no FileDescription.
+  const description =
+    rawDescription || (executablePath ? executablePath.split('\\').pop() : 'Unknown application')
+
+  return { executablePath: executablePath || null, description }
+}
+
+async function getProcessDetails(pid, appClass = '') {
+  // Guard: without a PID we cannot look anything up.
   if (!pid) {
-    console.warn('Invalid PID: Cannot fetch Chrome tab info')
-    return null
+    return { description: 'Unknown application' }
   }
 
-  // Check cache first with dynamic TTL based on success
-  const cacheKey = `${pid}`
-  const cached = chromeTabCache.get(cacheKey)
-  if (cached) {
-    const ttl = cached.hasUrl ? CHROME_TAB_CACHE_TTL_SUCCESS : CHROME_TAB_CACHE_TTL
-    if ((Date.now() - cached.timestamp) < ttl) {
-      console.log(`Using cached Chrome tab info for PID ${pid} (TTL: ${ttl/1000}s, has URL: ${cached.hasUrl})`)
-      return cached.data
-    }
+  // Key on PID + executable name. Windows recycles PIDs after a process exits,
+  // so a bare PID could collide with a different app; including the exe name
+  // means a reused PID belonging to a new executable misses the cache and is
+  // re-resolved rather than returning stale details.
+  const cacheKey = `${pid}:${appClass}`
+
+  // Serve from cache when available — the common case during steady tracking,
+  // where the foreground process stays the same across many slices. Zero spawns.
+  const cached = processDetailsCache.get(cacheKey)
+  if (cached && Date.now() - cached.timestamp < PROCESS_DETAILS_CACHE_TTL) {
+    return cached.data
   }
-
-  // In production, scripts are in extraResources; in dev, they're in the project root
-  const isDev = process.env.NODE_ENV === 'development' || !process.resourcesPath
-  const getURLScriptPath = isDev
-    ? path.join(__dirname, '../../scripts/get_active_url.py')
-    : path.join(process.resourcesPath, 'scripts/get_active_url.py')
-
-  console.log(`Script path (isDev=${isDev}): ${getURLScriptPath}`)
-  const fallbackValue = { url: 'Browser Tab', title: 'Browser Tab' }
 
   try {
-    const output = await pythonErrorRecovery.executePythonScript(
-      getURLScriptPath,
-      [pid.toString()],
-      {
-        timeout: 12000, // Reduced from 15s to 12s with optimized Python script
-        fallbackValue: fallbackValue,
-        retryCount: 1  // Reduced from 2 to 1 since we now have better fallbacks in Python
-      }
-    )
-
-    if (output === fallbackValue) {
-      // Cache fallback too to avoid repeated failures (shorter TTL)
-      chromeTabCache.set(cacheKey, { data: fallbackValue, timestamp: Date.now(), hasUrl: false })
-      return fallbackValue
-    }
-
-    try {
-      const result = JSON.parse(output)
-      // Cache successful result with longer TTL if we got a real URL
-      const hasUrl = result.url && result.url !== null && result.url !== 'Browser Tab'
-      chromeTabCache.set(cacheKey, { data: result, timestamp: Date.now(), hasUrl })
-      console.log(`Cached Chrome tab info: hasUrl=${hasUrl}, domain=${result.domain}`)
-      return result
-    } catch (parseError) {
-      console.warn('Error parsing Python script output:', parseError.message)
-      chromeTabCache.set(cacheKey, { data: fallbackValue, timestamp: Date.now(), hasUrl: false })
-      return fallbackValue
-    }
-  } catch (error) {
-    console.warn('Python script execution failed:', error.message)
-    chromeTabCache.set(cacheKey, { data: fallbackValue, timestamp: Date.now(), hasUrl: false })
-    return fallbackValue
-  }
-}
-
-async function getAppDescription(executablePath) {
-  try {
-    const escapedPath = executablePath.replace(/'/g, "''").replace(/"/g, '`"')
-
-    const powershellCommand = `(Get-ItemProperty -Path '${escapedPath}' -ErrorAction SilentlyContinue).VersionInfo.FileDescription`
-    const { stdout } = await execPromise(`powershell -command "${powershellCommand}"`)
-    return stdout.trim() || executablePath.split('\\').pop()
-  } catch (error) {
-    console.error('Error getting app description:', error)
-    return executablePath ? executablePath.split('\\').pop() : 'Unknown application'
-  }
-}
-
-async function getProcessDetails(pid) {
-  try {
-    const { stdout: wmiOutput } = await execPromise(
-      `wmic process where ProcessId=${pid} get ExecutablePath /format:list`
-    )
-    const execPathMatch = wmiOutput.match(/ExecutablePath=(.+)/)
-    const executablePath = execPathMatch ? execPathMatch[1].trim() : null
-
-    if (!executablePath) {
-      return { description: 'Unknown application' }
-    }
-
-    const description = await getAppDescription(executablePath)
-
-    return {
-      executablePath,
-      description
-    }
+    const details = await fetchProcessDetails(pid)
+    processDetailsCache.set(cacheKey, { data: details, timestamp: Date.now() })
+    return details
   } catch (error) {
     console.error('Error getting process details:', error)
-    return { description: 'Unknown application' }
+    const fallback = { description: 'Unknown application' }
+    // Cache the fallback too so a persistently-failing PID doesn't re-spawn
+    // PowerShell on every single tracking slice.
+    processDetailsCache.set(cacheKey, { data: fallback, timestamp: Date.now() })
+    return fallback
   }
 }
 
@@ -298,47 +350,49 @@ async function updateAppUsage() {
     const currentAppClass = currentWindow.windowClass
     const currentAppName = currentWindow.windowName
 
-    // Get current URL for browser detection
+    // Get current URL for browser detection from the browser extension bridge.
     let current_url = null
     let current_domain = null
-    if (currentAppClass === 'chrome.exe' || currentAppClass === 'brave.exe') {
-      const pid = await getChromePid(currentWindow)
-      if (pid) {
-        const chromeTabInfo = await getActiveChromeTab(pid)
-        console.log('Chrome tab info received:', chromeTabInfo)
+    let current_browser_source = null
+    if (isBrowserExe(currentAppClass)) {
+      const resolved = await resolveBrowserUrl(currentWindow)
 
-        // Check if this is a fallback response (Python script failed)
-        if (chromeTabInfo.url === 'Browser Tab' && chromeTabInfo.title === 'Browser Tab') {
-          console.log('Python script fallback detected - clearing active URL')
-          current_url = null
-          current_domain = null
-        } else {
-          current_url = String(chromeTabInfo.active_app)
-          current_domain = chromeTabInfo.domain || chromeTabInfo.active_app
-          if (current_url === 'undefined' || current_url === 'null' || !current_url) {
-            current_url = null
-          }
-          if (current_domain === 'undefined' || current_domain === 'null' || !current_domain) {
-            current_domain = null
-          }
-          console.log('Extracted domain:', current_domain, 'URL:', current_url)
-        }
+      if (resolved.source === 'extension') {
+        current_url = resolved.url || null
+        current_domain = resolved.domain || null
+        current_browser_source = 'extension'
+        console.log('Bridge URL:', current_url, 'domain:', current_domain)
+      } else if (resolved.source === 'private') {
+        // Foreground browser window is incognito/PWA: known-private, never a
+        // guessed URL. Keyed separately downstream.
+        current_url = null
+        current_domain = null
+        current_browser_source = 'private'
+        console.log('Bridge: foreground browser window is private/PWA')
+      } else {
+        // 'degraded': no live/matching connection. Attribute by window title
+        // via the existing title-extraction path in updateChromeTime.
+        current_url = null
+        current_domain = null
+        current_browser_source = 'degraded'
+        console.log('Bridge: no live connection, degrading to title-only')
       }
     }
 
     // Check if app has changed - either different application or different browser tab
     hasAppSwitched =
       (lastActiveApp && currentAppClass !== lastActiveApp.windowClass) ||
-      ((currentAppClass === 'chrome.exe' || currentAppClass === 'brave.exe') &&
+      (isBrowserExe(currentAppClass) &&
         lastActiveApp &&
         lastActiveApp.windowClass === currentAppClass &&
         (currentAppName !== lastActiveApp.windowName || current_url !== active_url))
 
     // Update active_url and active_domain for current tracking - always update, even if null
-    if (currentAppClass === 'chrome.exe' || currentAppClass === 'brave.exe') {
+    if (isBrowserExe(currentAppClass)) {
       active_url = current_url
       active_domain = current_domain
-      console.log('Updated active_url to:', active_url, 'domain:', active_domain)
+      active_browser_source = current_browser_source
+      console.log('Updated active_url to:', active_url, 'domain:', active_domain, 'source:', active_browser_source)
     }
 
     if (hasAppSwitched) {
@@ -347,10 +401,9 @@ async function updateAppUsage() {
       )
     }
 
-    let appIdentifier =
-      currentWindow.windowClass == 'chrome.exe' || currentWindow.windowClass === 'brave.exe'
-        ? getCategory(active_url || currentWindow.windowName || currentWindow.windowClass)
-        : getCategory(currentWindow.windowClass)
+    let appIdentifier = isBrowserExe(currentWindow.windowClass)
+      ? getCategory(active_url || currentWindow.windowName || currentWindow.windowClass)
+      : getCategory(currentWindow.windowClass)
 
     console.log('appIdentifier ==>> ', appIdentifier)
     const isFocused = !Distracted_List.includes(appIdentifier)
@@ -536,7 +589,7 @@ async function updateUsageData(currentWindow, hasAppSwitched) {
 
     // Check if it's a browser and if the domain is excluded
     let isDomainExcluded = false
-    if ((appClass === 'chrome.exe' || appClass === 'brave.exe') && active_domain) {
+    if (isBrowserExe(appClass) && active_domain) {
       isDomainExcluded = exclusionList.domains.some(excludedDomain =>
         active_domain.toLowerCase().includes(excludedDomain.toLowerCase()) ||
         (active_url && active_url.toLowerCase().includes(excludedDomain.toLowerCase()))
@@ -586,11 +639,11 @@ async function updateUsageData(currentWindow, hasAppSwitched) {
       }
 
       const appClass = lastActiveApp.windowClass
-      const appDescription = await getProcessDetails(lastActiveApp.windowPid)
+      const appDescription = await getProcessDetails(lastActiveApp.windowPid, appClass)
       //  const appDescription = processInfo ? processInfo.description : appClass;
 
-      if (appClass == 'chrome.exe' || appClass == 'brave.exe') {
-        // active_url is already set in the main detection logic above
+      if (isBrowserExe(appClass)) {
+        // active_url / active_browser_source are set in the detection logic above
         updateChromeTime(
           formattedDate,
           lastActiveApp.windowName,
@@ -598,7 +651,8 @@ async function updateUsageData(currentWindow, hasAppSwitched) {
           active_url,
           recordTime,
           formattedHour,
-          hasAppSwitched
+          hasAppSwitched,
+          active_browser_source
         )
       } else {
         updateAppTime(
@@ -625,40 +679,55 @@ function updateAppTime(
   formattedHour,
   hasAppSwitched
 ) {
-  if (!appUsageData[formattedDate].apps.hasOwnProperty(appClass)) {
-    appUsageData[formattedDate].apps[appClass] = {
+  // Categorize by the exe name first, then fall back to the process
+  // description. The exe (e.g. "Code.exe") is the reliable key that matches
+  // the explicit apps list in categories.js; the description is a softer hint
+  // used only when the exe isn't recognized. (Previously this preferred the
+  // description, so a failed/absent description silently forced Miscellaneous
+  // even for exes that are explicitly categorized.)
+  const appCategory = getCategory(appClass || description)
+
+  // Store/display under the friendly name (e.g. "Visual Studio Code") rather than
+  // the raw exe string. This collapses duplicate rows that used to appear when the
+  // exe was spelled differently across window switches (e.g. "vscode.exe" vs
+  // "VS Code"). Categorization above still uses appClass (the exe), so app
+  // classification is unaffected.
+  const appKey = resolveDisplayName(description, appClass)
+
+  if (!appUsageData[formattedDate].apps.hasOwnProperty(appKey)) {
+    appUsageData[formattedDate].apps[appKey] = {
       time: 0,
-      category: getCategory(description || appClass),
+      category: appCategory,
       description: description,
       timestamps: []
     }
   }
 
-  appUsageData[formattedDate].apps[appClass].time += timeSpent
-  appUsageData[formattedDate].apps[appClass].category = getCategory(description || appClass)
+  appUsageData[formattedDate].apps[appKey].time += timeSpent
+  appUsageData[formattedDate].apps[appKey].category = appCategory
 
   // Only add timestamps when app is switched or on first entry
-  if (hasAppSwitched || appUsageData[formattedDate].apps[appClass].timestamps.length === 0) {
-    appUsageData[formattedDate].apps[appClass].timestamps.push({
+  if (hasAppSwitched || appUsageData[formattedDate].apps[appKey].timestamps.length === 0) {
+    appUsageData[formattedDate].apps[appKey].timestamps.push({
       start: new Date().toString(),
       duration: timeSpent
     })
   } else {
     // Update the duration of the last timestamp entry instead of adding a new one
-    const lastIndex = appUsageData[formattedDate].apps[appClass].timestamps.length - 1
+    const lastIndex = appUsageData[formattedDate].apps[appKey].timestamps.length - 1
     if (lastIndex >= 0) {
       // Check if the last timestamp is recent (within last 5 seconds)
-      const lastTimestamp = appUsageData[formattedDate].apps[appClass].timestamps[lastIndex]
+      const lastTimestamp = appUsageData[formattedDate].apps[appKey].timestamps[lastIndex]
       const lastStart = new Date(lastTimestamp.start)
       const now = new Date()
       const timeDiff = now - lastStart
-      
+
       // If last timestamp is recent, update it
       if (timeDiff < 5000) {
         lastTimestamp.duration += timeSpent
       } else {
         // Otherwise, add a new timestamp
-        appUsageData[formattedDate].apps[appClass].timestamps.push({
+        appUsageData[formattedDate].apps[appKey].timestamps.push({
           start: new Date().toString(),
           duration: timeSpent
         })
@@ -666,21 +735,19 @@ function updateAppTime(
     }
   }
 
-  if (!appUsageData[formattedDate][formattedHour].hasOwnProperty(appClass)) {
-    appUsageData[formattedDate][formattedHour][appClass] = {
+  if (!appUsageData[formattedDate][formattedHour].hasOwnProperty(appKey)) {
+    appUsageData[formattedDate][formattedHour][appKey] = {
       time: 0,
-      category: getCategory(description || appClass),
+      category: appCategory,
       description: description,
       timestamps: []
     }
   }
 
-  appUsageData[formattedDate][formattedHour][appClass].time += timeSpent
-  appUsageData[formattedDate][formattedHour][appClass].category = getCategory(
-    description || appClass
-  )
+  appUsageData[formattedDate][formattedHour][appKey].time += timeSpent
+  appUsageData[formattedDate][formattedHour][appKey].category = appCategory
 
-  const timestamps = appUsageData[formattedDate][formattedHour][appClass].timestamps
+  const timestamps = appUsageData[formattedDate][formattedHour][appKey].timestamps
 
   if (timestamps.length === 0) {
     // First entry for this app in this hour
@@ -707,9 +774,9 @@ function updateAppTime(
       })
     }
   }
-  if (appUsageData[formattedDate][formattedHour][appClass].time > 3600000) {
+  if (appUsageData[formattedDate][formattedHour][appKey].time > 3600000) {
     console.warn(
-      `Hour ${formattedHour} for ${appClass} exceeds 1 hour: ${appUsageData[formattedDate][formattedHour][appClass].time}ms`
+      `Hour ${formattedHour} for ${appKey} exceeds 1 hour: ${appUsageData[formattedDate][formattedHour][appKey].time}ms`
     )
   }
 }
@@ -721,38 +788,59 @@ function updateChromeTime(
   active_url,
   timeSpent,
   formattedHour,
-  hasAppSwitched
+  hasAppSwitched,
+  browserSource = 'extension'
 ) {
-  // Use active_url as the key for better app identification, fallback to windowName
-  // If active_url is null and windowName contains site info, try to extract it
-  let appKey = active_url || windowName
+  // Determine the appKey by URL source:
+  //   'private'  -> known incognito/PWA context; bucket under a fixed sentinel,
+  //                 never a guessed URL or title-derived key.
+  //   otherwise  -> active_url when present, else fall back to the window title
+  //                 (this is the 'degraded' title-only path).
+  let appKey
+  const isDegraded = browserSource === 'degraded'
 
-  // If we don't have active_url but windowName might contain useful info, try to extract site name
-  if (!active_url && windowName && windowName !== 'Google Chrome' && windowName !== 'Brave') {
-    // Try to extract site name from window title (e.g. "Facebook - Google Chrome" -> "Facebook")
-    const siteMatch = windowName.match(/^(.+?)\s*-\s*(Google Chrome|Brave)$/i)
-    if (siteMatch) {
-      appKey = siteMatch[1].trim()
+  if (browserSource === 'private') {
+    appKey = PRIVATE_BROWSER_KEY
+  } else {
+    // Use active_url as the key for better app identification, fallback to windowName
+    // If active_url is null and windowName contains site info, try to extract it
+    appKey = active_url || windowName
+
+    // If we don't have active_url but windowName might contain useful info, try to extract site name
+    if (!active_url && windowName && windowName !== 'Google Chrome' && windowName !== 'Brave') {
+      // Try to extract site name from window title (e.g. "Facebook - Google Chrome" -> "Facebook")
+      const siteMatch = windowName.match(/^(.+?)\s*-\s*(Google Chrome|Brave|Microsoft Edge|Edge)$/i)
+      if (siteMatch) {
+        appKey = siteMatch[1].trim()
+      }
     }
   }
 
-  console.log(`UpdateChromeTime: appKey="${appKey}", active_url="${active_url}", windowName="${windowName}"`)
+  console.log(`UpdateChromeTime: appKey="${appKey}", active_url="${active_url}", windowName="${windowName}", source="${browserSource}"`)
+
+  // Categorize once from a single expression so the daily aggregate and the
+  // hourly entry can never disagree. (Previously the hourly entry omitted
+  // `appKey`, so a Chrome tab with no active_url was categorized off its window
+  // title in the daily row but as "Unknown application" -> Miscellaneous hourly.)
+  const chromeCategory =
+    browserSource === 'private'
+      ? getCategory(description || 'Browsing')
+      : getCategory(active_url || appKey || description || windowName)
 
   if (!appUsageData[formattedDate].apps.hasOwnProperty(appKey)) {
     appUsageData[formattedDate].apps[appKey] = {
       time: 0,
-      category: getCategory(active_url || appKey || description || windowName),
+      category: chromeCategory,
       domain: active_domain || active_url,
       description: description,
+      degraded: isDegraded,
       timestamps: []
     }
     console.log(`Created new app entry for: ${appKey}, domain: ${active_domain || active_url}`)
   }
 
   appUsageData[formattedDate].apps[appKey].time += timeSpent
-  appUsageData[formattedDate].apps[appKey].category = getCategory(
-    active_url || appKey || description || windowName
-  )
+  appUsageData[formattedDate].apps[appKey].category = chromeCategory
 
   console.log(`Updated time for ${appKey}: ${appUsageData[formattedDate].apps[appKey].time}ms`)
 
@@ -788,17 +876,16 @@ function updateChromeTime(
   if (!appUsageData[formattedDate][formattedHour].hasOwnProperty(appKey)) {
     appUsageData[formattedDate][formattedHour][appKey] = {
       time: 0,
-      category: getCategory(active_url || description || windowName),
+      category: chromeCategory,
       domain: active_domain || active_url,
       description: description,
+      degraded: isDegraded,
       timestamps: []
     }
   }
 
   appUsageData[formattedDate][formattedHour][appKey].time += timeSpent
-  appUsageData[formattedDate][formattedHour][appKey].category = getCategory(
-    active_url || description || windowName
-  )
+  appUsageData[formattedDate][formattedHour][appKey].category = chromeCategory
 
   const timestamps = appUsageData[formattedDate][formattedHour][appKey].timestamps
 
@@ -872,21 +959,32 @@ async function sendPopupMessage(currentWindow) {
     return
   }
 
-  if (currentWindow.windowClass === 'chrome.exe' || currentWindow.windowClass === 'brave.exe') {
+  if (isBrowserExe(currentWindow.windowClass)) {
     const pid = await getChromePid(currentWindow)
-    if (pid) {
-      const chromeTabInfo = await getActiveChromeTab(pid)
-      active_url = String(chromeTabInfo.active_app)
-      active_domain = chromeTabInfo.domain || chromeTabInfo.active_app
+    const resolved = await resolveBrowserUrl(currentWindow)
+
+    if (resolved.source === 'extension') {
+      active_url = resolved.url || ''
+      active_domain = resolved.domain || null
+    } else {
+      // 'private' or 'degraded': no trustworthy URL to identify the tab.
+      active_url = null
+      active_domain = null
     }
-    
+
     // Validate active_url before sending
     if (!active_url || active_url === 'undefined' || active_url === 'null' || active_url.trim() === '') {
       console.log('Popup blocked: Invalid or undefined browser tab information')
       return
     }
-    
-    ipcRenderer.send('show-popup-message', active_url, pid)
+
+    // Pass the browser exe + OS window title so the main process can ask the
+    // extension bridge to close this exact tab (no Python).
+    ipcRenderer.send('show-popup-message', active_url, pid, {
+      isBrowser: true,
+      exe: currentWindow.windowClass,
+      title: currentWindow.windowName
+    })
   } else {
     // Validate windowClass before sending
     const appName = currentWindow.windowClass
@@ -894,8 +992,10 @@ async function sendPopupMessage(currentWindow) {
       console.log('Popup blocked: Invalid or undefined application name:', appName)
       return
     }
-    
-    ipcRenderer.send('show-popup-message', appName, currentWindow.windowPid)
+
+    ipcRenderer.send('show-popup-message', appName, currentWindow.windowPid, {
+      isBrowser: false
+    })
   }
 }
 
@@ -913,29 +1013,48 @@ loadCustomCategoryMappings().then((mappings) => {
   console.log('Loaded custom category mappings:', mappings)
 })
 
+loadCategoryRules().then((rules) => {
+  categoryRules = rules
+  console.log(`Loaded ${rules.length} category rules from DB`)
+})
+
 loadExclusionList().then((list) => {
   exclusionList = list
   console.log('Loaded exclusion list:', list)
 })
 
+// Classify an app/title/url into a category name.
+// Order: user per-app override -> DB rules (app matches before keyword, higher
+// priority first) -> hardcoded APP_CATEGORIES fallback -> 'Miscellaneous'.
+// The DB rules (category_rules table) are the data-driven replacement for the
+// hardcoded catalog; the fallback only runs if the table is empty/unreachable.
 function getCategory(app) {
-  const title = app.toLowerCase()
+  const title = String(app || '').toLowerCase()
 
-  // First check if we have a custom mapping for this app
+  // 1. User per-app override always wins.
   if (customCategoryMappings[app]) {
-    console.log('Category ', customCategoryMappings[app])
     return customCategoryMappings[app]
   }
 
-  // Then follow your existing logic
+  // 2. DB-driven rules. categoryRules is pre-sorted (app-type first, then by
+  //    descending priority) when loaded, so the first substring match wins.
+  if (categoryRules.length > 0) {
+    for (const rule of categoryRules) {
+      if (rule.pattern && title.includes(String(rule.pattern).toLowerCase())) {
+        return rule.category
+      }
+    }
+    return 'Miscellaneous'
+  }
+
+  // 3. Fallback to the legacy hardcoded catalog if rules aren't loaded yet.
   for (const [category, details] of Object.entries(APP_CATEGORIES)) {
-    for (const app of details.apps) {
-      if (title.includes(app.toLowerCase())) {
+    for (const appPattern of details.apps) {
+      if (title.includes(appPattern.toLowerCase())) {
         return category
       }
     }
   }
-
   for (const [category, details] of Object.entries(APP_CATEGORIES)) {
     for (const keyword of details.keywords) {
       if (title.includes(keyword.toLowerCase())) {
@@ -1139,7 +1258,7 @@ setInterval(async () => {
       
       const hasAppSwitched =
         (lastActiveApp && currentAppClass !== lastActiveApp.windowClass) ||
-        ((currentAppClass === 'chrome.exe' || currentAppClass === 'brave.exe') &&
+        (isBrowserExe(currentAppClass) &&
           lastActiveApp &&
           lastActiveApp.windowClass === currentAppClass &&
           currentAppName !== lastActiveApp.windowName)
@@ -1182,6 +1301,43 @@ async function loadCategories() {
   const data = await ipcRenderer.invoke('load-categories')
   console.log('ipcRenderer ', data)
   return data
+}
+
+// Full category metadata for the renderer: [{ name, type, color, icon }, ...].
+// This is the single DB-driven source the renderer uses for palette, icons, the
+// category list, and the productivity-level (type) mapping.
+async function loadAllCategories() {
+  try {
+    const data = await ipcRenderer.invoke('get-all-categories')
+    return Array.isArray(data) ? data : []
+  } catch (error) {
+    console.error('Error loading all categories:', error)
+    return []
+  }
+}
+
+// --- Category + rule CRUD wrappers (used by Settings) ---
+async function addCategory(name, type, color, icon) {
+  return ipcRenderer.invoke('category-add', { name, type, color, icon })
+}
+async function updateCategory(name, updates) {
+  return ipcRenderer.invoke('category-update', { name, updates })
+}
+async function deleteCategory(name) {
+  return ipcRenderer.invoke('category-delete', { name })
+}
+async function getCategoryRules() {
+  const rules = await ipcRenderer.invoke('load-category-rules')
+  return Array.isArray(rules) ? rules : []
+}
+async function addCategoryRule(pattern, category, matchType, priority) {
+  return ipcRenderer.invoke('rule-add', { pattern, category, matchType, priority })
+}
+async function updateCategoryRule(id, updates) {
+  return ipcRenderer.invoke('rule-update', { id, updates })
+}
+async function deleteCategoryRule(id) {
+  return ipcRenderer.invoke('rule-delete', { id })
 }
 
 async function loadData() {
@@ -1269,6 +1425,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
   getFormattedUsageData: (startDate, endDate) => ipcRenderer.invoke('get-formatted-usage-data', startDate, endDate),
   getProductivitySummary: (date) => ipcRenderer.invoke('get-productivity-summary', date),
   cleanupDatabase: () => ipcRenderer.invoke('cleanup-database'),
+  exportData: (payload) => ipcRenderer.invoke('export-data', payload),
   // AI Service API
   aiChat: (message) => ipcRenderer.invoke('ai-chat', message),
   getAiServiceStatus: () => ipcRenderer.invoke('ai-service-status'),
@@ -1276,9 +1433,15 @@ contextBridge.exposeInMainWorld('electronAPI', {
   resetAiMemory: () => ipcRenderer.invoke('ai-service-reset-memory'),
   getAiConfig: () => ipcRenderer.invoke('get-ai-config'),
   saveAiConfig: (config) => ipcRenderer.invoke('save-ai-config', config),
-  // Python Error Recovery API
-  getPythonStatus: () => ipcRenderer.invoke('get-python-status'),
-  resetPythonRecovery: () => ipcRenderer.invoke('reset-python-recovery'),
+  // Generic UI-state store (onboarding flags, dismissed cards). setUiState
+  // merges the patch into ui-state.json rather than overwriting.
+  getUiState: () => ipcRenderer.invoke('get-ui-state'),
+  setUiState: (patch) => ipcRenderer.invoke('set-ui-state', patch),
+  // Opens the bundled browser-extension folder in the OS file manager so the
+  // user can "Load unpacked" it. Returns { success, path }.
+  openExtensionFolder: () => ipcRenderer.invoke('open-extension-folder'),
+  // Browser Extension Bridge API
+  getBrowserBridgeStatus: () => ipcRenderer.invoke('get-browser-bridge-status'),
   // Auto-startup API
   getAutoLaunchStatus: () => ipcRenderer.invoke('get-auto-launch-status'),
   setAutoLaunch: (enabled) => ipcRenderer.invoke('set-auto-launch', enabled),
@@ -1330,9 +1493,21 @@ contextBridge.exposeInMainWorld('activeWindow', {
     }
   },
   loadCategories: () => loadCategories(),
+  loadAllCategories: () => loadAllCategories(),
+  addCategory: (name, type, color, icon) => addCategory(name, type, color, icon),
+  updateCategory: (name, updates) => updateCategory(name, updates),
+  deleteCategory: (name) => deleteCategory(name),
+  getCategoryRules: () => getCategoryRules(),
+  addCategoryRule: (pattern, category, matchType, priority) =>
+    addCategoryRule(pattern, category, matchType, priority),
+  updateCategoryRule: (id, updates) => updateCategoryRule(id, updates),
+  deleteCategoryRule: (id) => deleteCategoryRule(id),
   refreshData: () => loadData(),
   updateAppCategory: (appIdentifier, category, selectedDate, appToUpdate) =>
-    updateAppCategory(appIdentifier, category, selectedDate, appToUpdate)
+    updateAppCategory(appIdentifier, category, selectedDate, appToUpdate),
+  // Rule-based recategorization: creates/updates a classification rule and
+  // retags history so the change persists and applies to past + future data.
+  retagAppCategory: (app, category) => retagAppCategory(app, category)
 })
 
 function getFormattedStats(date) {
@@ -1371,6 +1546,64 @@ ipcRenderer.on('dismiss', (event, appName) => {
     }
   }
 })
+
+// Reduce a raw domain/URL to a stable, matchable host like "facebook.com":
+// strip protocol, "www.", path and query; keep the last two labels so
+// "www.facebook.com/reel/123" -> "facebook.com". A rule on this host then
+// matches every URL live tracking sees for that site (getCategory(active_url)).
+function toRuleDomain(rawDomain) {
+  if (!rawDomain) return ''
+  let host = String(rawDomain)
+    .replace(/^https?:\/\//, '')
+    .replace(/^www\./, '')
+    .split('/')[0]
+    .split('?')[0]
+    .toLowerCase()
+    .trim()
+  const parts = host.split('.').filter(Boolean)
+  // Keep the registrable domain (last two labels) for common TLDs; leave
+  // multi-part hosts (e.g. localhost, IPs) as-is.
+  if (parts.length > 2) host = parts.slice(-2).join('.')
+  return host
+}
+
+// Turn a UI category change into a persistent classification rule + a history
+// retag, via the main process. `app` is the row object from the Activity/
+// Dashboard table ({ name, domain, description, ... }). Browser rows (with a
+// domain) create a keyword rule on the host so ALL that site's URLs are
+// retagged; native apps create an app rule on the app name.
+async function retagAppCategory(app, category) {
+  try {
+    if (!app || !category) return { success: false, error: 'Missing app or category' }
+    const domain = app.domain ? toRuleDomain(app.domain) : ''
+    const matchType = domain ? 'domain' : 'app'
+    const pattern = domain || app.name || app.description
+    if (!pattern) return { success: false, error: 'Could not derive a rule pattern' }
+
+    // Flush any in-memory tracking (up to ~60s worth, between saveData ticks) to
+    // the DB FIRST, so the retag covers today's not-yet-persisted rows and the
+    // reload below doesn't discard them.
+    await saveData()
+
+    const result = await ipcRenderer.invoke('retag-app-category', { matchType, pattern, category })
+
+    // Refresh local caches so this preload's live tracking uses the new rule
+    // immediately (the categories-updated broadcast also does this, but do it
+    // here too so there's no window where the next tick re-derives the old one).
+    categoryRules = await loadCategoryRules()
+
+    // The retag updated the DB, but getAppUsageStats() serves the in-memory
+    // appUsageData snapshot. Without reloading it, the UI's post-change refresh
+    // would re-read the STALE in-memory copy and the category would flicker back
+    // to its old value. Reload the snapshot from the (now-retagged) DB so the
+    // view shows the change.
+    await loadData()
+    return { ...result, pattern, matchType }
+  } catch (error) {
+    console.error('Error in retagAppCategory:', error)
+    return { success: false, error: error.message }
+  }
+}
 
 async function updateAppCategory(appIdentifier, category, selectedDate, appKey) {
   try {
@@ -1420,6 +1653,25 @@ async function loadCustomCategoryMappings() {
   }
 }
 
+// Load classification rules from the DB and sort them so getCategory can match
+// in priority order without re-sorting per lookup: 'app' rules before 'keyword'
+// (the exe is the reliable signal), then higher priority first.
+async function loadCategoryRules() {
+  try {
+    const rules = await ipcRenderer.invoke('load-category-rules')
+    if (!Array.isArray(rules)) return []
+    return rules.slice().sort((a, b) => {
+      const at = a.match_type === 'app' ? 0 : 1
+      const bt = b.match_type === 'app' ? 0 : 1
+      if (at !== bt) return at - bt
+      return (b.priority || 0) - (a.priority || 0)
+    })
+  } catch (error) {
+    console.error('Error loading category rules:', error)
+    return []
+  }
+}
+
 async function saveCustomCategoryMappings(mappings) {
   try {
     await ipcRenderer.invoke('save-custom-categories', mappings)
@@ -1451,6 +1703,12 @@ ipcRenderer.on('categories-updated', (event, categories) => {
     Distracted_List = categories[1] // Update distracted categories
     console.log('Distracted categories updated:', Distracted_List)
   }
+  // Reload the classification rules cache so getCategory reflects any rule/category
+  // edits made in Settings without needing an app restart.
+  loadCategoryRules().then((rules) => {
+    categoryRules = rules
+    console.log(`Reloaded ${rules.length} category rules after update`)
+  })
 })
 
 // Listen for exclusion list updates from main process
