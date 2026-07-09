@@ -1,0 +1,973 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>FocusBook — Know where your time actually goes</title>
+  <meta name="description" content="FocusBook is a desktop app that tracks how you spend time across every app and browser tab, sorts it into Productive, Neutral and Distracting, and steps in the moment you drift. Free download for Windows." />
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Crect x='10' y='40' width='34' height='34' rx='8' fill='%231d4ed8'/%3E%3Crect x='32' y='8' width='58' height='30' rx='8' transform='rotate(45 61 23)' fill='%233b82f6'/%3E%3C/svg%3E" />
+  <style>
+    /* ============================================================
+       FocusBook — marketing page
+       Palette grounded in the app's own dark UI + semantic trio.
+       ============================================================ */
+
+    :root {
+      color-scheme: light dark;
+
+      /* brand */
+      --brand-cyan: #22d3ee;
+      --brand-blue: #3b82f6;
+      --brand-deep: #1d4ed8;
+
+      /* semantic (matches the app's Productive/Neutral/Distracting) */
+      --good: #34d399;
+      --neutral: #fbbf24;
+      --bad: #f87171;
+
+      /* ---- default = LIGHT theme tokens ---- */
+      --bg: #f5f7fb;
+      --bg-grid: rgba(59, 130, 246, 0.06);
+      --panel: #ffffff;
+      --panel-2: #f0f3f9;
+      --panel-line: rgba(15, 23, 42, 0.09);
+      --ink: #0c1424;
+      --ink-soft: #43506b;
+      --ink-faint: #7b879c;
+      --accent: #2563eb;
+      --accent-ink: #ffffff;
+      --ring-track: rgba(15, 23, 42, 0.08);
+      --shadow: 0 24px 60px -28px rgba(15, 30, 70, 0.35);
+      --shadow-soft: 0 8px 24px -14px rgba(15, 30, 70, 0.28);
+      --hero-glow: radial-gradient(60% 55% at 70% 20%, rgba(34, 211, 238, 0.14), transparent 70%),
+                   radial-gradient(50% 60% at 15% 80%, rgba(59, 130, 246, 0.12), transparent 70%);
+    }
+
+    @media (prefers-color-scheme: dark) {
+      :root {
+        --bg: #070b16;
+        --bg-grid: rgba(90, 150, 255, 0.05);
+        --panel: #101728;
+        --panel-2: #0b1120;
+        --panel-line: rgba(148, 178, 255, 0.1);
+        --ink: #eef3ff;
+        --ink-soft: #a7b4d0;
+        --ink-faint: #6b7793;
+        --accent: #38bdf8;
+        --accent-ink: #04121f;
+        --ring-track: rgba(148, 178, 255, 0.12);
+        --shadow: 0 30px 80px -30px rgba(0, 0, 0, 0.8);
+        --shadow-soft: 0 12px 34px -18px rgba(0, 0, 0, 0.75);
+        --hero-glow: radial-gradient(60% 55% at 72% 12%, rgba(34, 211, 238, 0.18), transparent 68%),
+                     radial-gradient(52% 60% at 12% 85%, rgba(59, 130, 246, 0.16), transparent 70%);
+      }
+    }
+
+    /* explicit toggle overrides (must win in both directions) */
+    :root[data-theme="light"] {
+      --bg: #f5f7fb; --bg-grid: rgba(59, 130, 246, 0.06);
+      --panel: #ffffff; --panel-2: #f0f3f9; --panel-line: rgba(15, 23, 42, 0.09);
+      --ink: #0c1424; --ink-soft: #43506b; --ink-faint: #7b879c;
+      --accent: #2563eb; --accent-ink: #ffffff; --ring-track: rgba(15, 23, 42, 0.08);
+      --shadow: 0 24px 60px -28px rgba(15, 30, 70, 0.35);
+      --shadow-soft: 0 8px 24px -14px rgba(15, 30, 70, 0.28);
+      --hero-glow: radial-gradient(60% 55% at 70% 20%, rgba(34, 211, 238, 0.14), transparent 70%),
+                   radial-gradient(50% 60% at 15% 80%, rgba(59, 130, 246, 0.12), transparent 70%);
+    }
+    :root[data-theme="dark"] {
+      --bg: #070b16; --bg-grid: rgba(90, 150, 255, 0.05);
+      --panel: #101728; --panel-2: #0b1120; --panel-line: rgba(148, 178, 255, 0.1);
+      --ink: #eef3ff; --ink-soft: #a7b4d0; --ink-faint: #6b7793;
+      --accent: #38bdf8; --accent-ink: #04121f; --ring-track: rgba(148, 178, 255, 0.12);
+      --shadow: 0 30px 80px -30px rgba(0, 0, 0, 0.8);
+      --shadow-soft: 0 12px 34px -18px rgba(0, 0, 0, 0.75);
+      --hero-glow: radial-gradient(60% 55% at 72% 12%, rgba(34, 211, 238, 0.18), transparent 68%),
+                   radial-gradient(52% 60% at 12% 85%, rgba(59, 130, 246, 0.16), transparent 70%);
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    html { scroll-behavior: smooth; -webkit-text-size-adjust: 100%; }
+    @media (prefers-reduced-motion: reduce) { html { scroll-behavior: auto; } }
+
+    body {
+      font-family: "Inter Tight", "Segoe UI", system-ui, -apple-system, sans-serif;
+      background: var(--bg);
+      color: var(--ink);
+      line-height: 1.55;
+      overflow-x: hidden;
+      -webkit-font-smoothing: antialiased;
+      transition: background 0.35s ease, color 0.35s ease;
+    }
+
+    body::before {
+      content: "";
+      position: fixed;
+      inset: 0;
+      z-index: -2;
+      background-image:
+        linear-gradient(var(--bg-grid) 1px, transparent 1px),
+        linear-gradient(90deg, var(--bg-grid) 1px, transparent 1px);
+      background-size: 46px 46px;
+      mask-image: radial-gradient(80% 70% at 50% 0%, #000 40%, transparent 100%);
+      pointer-events: none;
+    }
+    body::after {
+      content: "";
+      position: fixed;
+      inset: 0;
+      z-index: -1;
+      background: var(--hero-glow);
+      pointer-events: none;
+    }
+
+    .wrap { width: min(1160px, 92vw); margin-inline: auto; }
+
+    .display {
+      font-family: "Space Grotesk", "Inter Tight", system-ui, sans-serif;
+      letter-spacing: -0.02em;
+      text-wrap: balance;
+    }
+    .mono {
+      font-family: "JetBrains Mono", ui-monospace, "SFMono-Regular", Menlo, monospace;
+      font-variant-numeric: tabular-nums;
+    }
+
+    .eyebrow {
+      font-family: "JetBrains Mono", ui-monospace, monospace;
+      font-size: 0.72rem;
+      letter-spacing: 0.22em;
+      text-transform: uppercase;
+      color: var(--ink-faint);
+    }
+
+    /* ---------------- nav ---------------- */
+    header.nav {
+      position: sticky;
+      top: 0;
+      z-index: 50;
+      backdrop-filter: blur(14px);
+      background: color-mix(in srgb, var(--bg) 78%, transparent);
+      border-bottom: 1px solid transparent;
+      transition: border-color 0.3s ease, background 0.3s ease;
+    }
+    header.nav.scrolled { border-bottom-color: var(--panel-line); }
+    .nav-inner {
+      display: flex; align-items: center; justify-content: space-between;
+      height: 66px; gap: 1rem;
+    }
+    .brand { display: flex; align-items: center; gap: 0.6rem; font-weight: 700; }
+    .brand .logo { width: 30px; height: 30px; flex: none; }
+    .brand .name { font-family: "Space Grotesk", sans-serif; font-size: 1.12rem; letter-spacing: -0.01em; }
+    .nav-links { display: flex; align-items: center; gap: 1.75rem; }
+    .nav-links a {
+      color: var(--ink-soft); text-decoration: none; font-size: 0.92rem; font-weight: 500;
+      transition: color 0.2s ease;
+    }
+    .nav-links a:hover { color: var(--ink); }
+    .nav-right { display: flex; align-items: center; gap: 0.6rem; }
+    @media (max-width: 820px) { .nav-links { display: none; } }
+
+    .theme-btn {
+      width: 38px; height: 38px; border-radius: 10px; flex: none;
+      border: 1px solid var(--panel-line); background: var(--panel);
+      color: var(--ink-soft); cursor: pointer; display: grid; place-items: center;
+      transition: color 0.2s, border-color 0.2s, transform 0.15s;
+    }
+    .theme-btn:hover { color: var(--ink); border-color: var(--accent); }
+    .theme-btn:active { transform: scale(0.94); }
+    .theme-btn svg { width: 18px; height: 18px; }
+    .theme-btn .moon { display: none; }
+    :root[data-theme="dark"] .theme-btn .sun,
+    :root:not([data-theme="light"]) .theme-btn .sun { display: block; }
+
+    /* buttons */
+    .btn {
+      display: inline-flex; align-items: center; justify-content: center; gap: 0.5rem;
+      font-family: "Space Grotesk", sans-serif; font-weight: 600; font-size: 0.95rem;
+      padding: 0.72rem 1.3rem; border-radius: 12px; border: 1px solid transparent;
+      text-decoration: none; cursor: pointer; white-space: nowrap;
+      transition: transform 0.15s ease, box-shadow 0.25s ease, background 0.2s, border-color 0.2s, color 0.2s;
+    }
+    .btn svg { width: 17px; height: 17px; }
+    .btn-primary {
+      color: #06121f;
+      background: linear-gradient(120deg, var(--brand-cyan), var(--brand-blue));
+      box-shadow: 0 12px 30px -12px rgba(34, 150, 240, 0.6);
+    }
+    .btn-primary:hover { transform: translateY(-2px); box-shadow: 0 18px 40px -14px rgba(34, 150, 240, 0.75); }
+    .btn-ghost { color: var(--ink); background: var(--panel); border-color: var(--panel-line); }
+    .btn-ghost:hover { border-color: var(--accent); transform: translateY(-2px); }
+    .btn-sm { padding: 0.5rem 0.95rem; font-size: 0.86rem; border-radius: 10px; }
+
+    /* ---------------- hero ---------------- */
+    .hero { padding: clamp(3rem, 8vw, 6rem) 0 clamp(2.5rem, 6vw, 4.5rem); }
+    .hero-grid {
+      display: grid; grid-template-columns: 1.02fr 1fr; gap: clamp(2rem, 5vw, 4rem);
+      align-items: center;
+    }
+    @media (max-width: 940px) { .hero-grid { grid-template-columns: 1fr; } }
+
+    .tag-row { display: flex; gap: 0.55rem; flex-wrap: wrap; margin-bottom: 1.4rem; }
+    .tag {
+      font-family: "JetBrains Mono", monospace; font-size: 0.7rem; letter-spacing: 0.12em;
+      text-transform: uppercase; padding: 0.32rem 0.7rem; border-radius: 999px;
+      border: 1px solid var(--panel-line); color: var(--ink-soft);
+      display: inline-flex; align-items: center; gap: 0.4rem;
+    }
+    .tag .dot { width: 7px; height: 7px; border-radius: 50%; }
+
+    h1.hero-title {
+      font-size: clamp(2.5rem, 6vw, 4rem);
+      line-height: 1.02; font-weight: 700; margin-bottom: 1.15rem;
+    }
+    h1.hero-title .grad {
+      background: linear-gradient(105deg, var(--brand-cyan), var(--brand-blue) 60%, var(--brand-deep));
+      -webkit-background-clip: text; background-clip: text; color: transparent;
+    }
+    .hero-sub {
+      font-size: clamp(1.02rem, 1.6vw, 1.2rem); color: var(--ink-soft);
+      max-width: 34ch; margin-bottom: 1.9rem;
+    }
+    .hero-cta { display: flex; gap: 0.75rem; flex-wrap: wrap; align-items: center; }
+    .hero-meta {
+      margin-top: 1.5rem; display: flex; gap: 1.5rem; flex-wrap: wrap;
+      font-size: 0.85rem; color: var(--ink-faint);
+    }
+    .hero-meta span { display: inline-flex; align-items: center; gap: 0.4rem; }
+    .hero-meta svg { width: 15px; height: 15px; color: var(--good); }
+
+    /* ---- live product mock ---- */
+    .mock {
+      position: relative;
+      background: var(--panel);
+      border: 1px solid var(--panel-line);
+      border-radius: 18px;
+      box-shadow: var(--shadow);
+      overflow: hidden;
+      transform: perspective(1600px) rotateY(-7deg) rotateX(3deg);
+      transition: transform 0.6s cubic-bezier(0.2, 0.7, 0.2, 1);
+    }
+    .mock:hover { transform: perspective(1600px) rotateY(-2deg) rotateX(1deg); }
+    @media (max-width: 940px) { .mock { transform: none; } .mock:hover { transform: none; } }
+
+    .mock-bar {
+      display: flex; align-items: center; gap: 0.5rem;
+      padding: 0.7rem 0.95rem; border-bottom: 1px solid var(--panel-line);
+      background: var(--panel-2);
+    }
+    .mock-bar .dots { display: flex; gap: 0.4rem; }
+    .mock-bar .dots i { width: 11px; height: 11px; border-radius: 50%; display: block; }
+    .mock-title {
+      font-family: "JetBrains Mono", monospace; font-size: 0.72rem;
+      color: var(--brand-cyan); margin-left: 0.4rem; font-weight: 600;
+    }
+    .mock-body { padding: 1.1rem; display: grid; grid-template-columns: 168px 1fr; gap: 1.1rem; }
+    @media (max-width: 520px) { .mock-body { grid-template-columns: 1fr; } .mock-ring-col { display: none; } }
+
+    /* timer ring */
+    .mock-ring-col { display: flex; flex-direction: column; align-items: center; gap: 0.7rem; }
+    .ring-wrap { position: relative; width: 150px; height: 150px; }
+    .ring-wrap svg { transform: rotate(-90deg); width: 100%; height: 100%; }
+    .ring-track { fill: none; stroke: var(--ring-track); stroke-width: 9; }
+    .ring-fill {
+      fill: none; stroke: url(#ringgrad); stroke-width: 9; stroke-linecap: round;
+      stroke-dasharray: 408; stroke-dashoffset: 408;
+    }
+    .ring-center {
+      position: absolute; inset: 0; display: flex; flex-direction: column;
+      align-items: center; justify-content: center; gap: 2px;
+    }
+    .ring-time { font-family: "JetBrains Mono", monospace; font-size: 1.7rem; font-weight: 700; letter-spacing: -0.01em; }
+    .ring-state { font-size: 0.68rem; color: var(--good); text-transform: uppercase; letter-spacing: 0.14em; display: flex; align-items: center; gap: 0.35rem; }
+    .ring-state::before { content: ""; width: 6px; height: 6px; border-radius: 50%; background: var(--good); box-shadow: 0 0 0 0 var(--good); animation: pulse 2s infinite; }
+    @keyframes pulse { 0% { box-shadow: 0 0 0 0 rgba(52,211,153,0.5);} 70%{ box-shadow: 0 0 0 7px rgba(52,211,153,0);} 100%{box-shadow:0 0 0 0 rgba(52,211,153,0);} }
+
+    .mini-goals { width: 100%; display: flex; flex-direction: column; gap: 0.55rem; }
+    .mini-goal-label { display: flex; justify-content: space-between; font-size: 0.66rem; color: var(--ink-faint); text-transform: uppercase; letter-spacing: 0.08em; }
+    .mini-track { height: 5px; border-radius: 999px; background: var(--ring-track); overflow: hidden; }
+    .mini-fill { height: 100%; border-radius: 999px; }
+
+    /* ledger */
+    .mock-ledger { display: flex; flex-direction: column; }
+    .ledger-head {
+      display: flex; justify-content: space-between; align-items: center;
+      font-size: 0.7rem; color: var(--ink-faint); text-transform: uppercase; letter-spacing: 0.1em;
+      padding-bottom: 0.6rem; margin-bottom: 0.35rem; border-bottom: 1px solid var(--panel-line);
+    }
+    .ledger-legend { display: flex; gap: 0.7rem; }
+    .ledger-legend span { display: inline-flex; align-items: center; gap: 0.28rem; }
+    .ledger-legend i { width: 7px; height: 7px; border-radius: 50%; display: block; }
+    .ledger-row {
+      display: grid; grid-template-columns: 1fr auto auto; gap: 0.6rem; align-items: center;
+      padding: 0.5rem 0.15rem; border-bottom: 1px solid var(--panel-line);
+      font-size: 0.82rem;
+    }
+    .ledger-row:last-child { border-bottom: none; }
+    .lr-app { display: flex; align-items: center; gap: 0.5rem; min-width: 0; }
+    .lr-app .ico { width: 22px; height: 22px; border-radius: 6px; flex: none; display: grid; place-items: center; font-size: 0.62rem; font-weight: 700; color: #fff; }
+    .lr-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .lr-time { font-family: "JetBrains Mono", monospace; color: var(--ink-soft); font-size: 0.78rem; }
+    .pill {
+      font-size: 0.66rem; font-weight: 700; padding: 0.2rem 0.55rem; border-radius: 999px;
+      white-space: nowrap; letter-spacing: 0.01em;
+      transition: background 0.4s ease, color 0.4s ease;
+    }
+    .pill.good { background: color-mix(in srgb, var(--good) 18%, transparent); color: var(--good); }
+    .pill.neutral { background: color-mix(in srgb, var(--neutral) 20%, transparent); color: var(--neutral); }
+    .pill.bad { background: color-mix(in srgb, var(--bad) 20%, transparent); color: var(--bad); }
+
+    /* ---------------- logos / trust strip ---------------- */
+    .strip { padding: 1.5rem 0 0.5rem; }
+    .strip-inner {
+      display: flex; align-items: center; justify-content: center; gap: clamp(1.5rem, 4vw, 3.5rem);
+      flex-wrap: wrap; opacity: 0.85;
+    }
+    .strip-item { display: flex; align-items: center; gap: 0.5rem; color: var(--ink-faint); font-size: 0.85rem; font-weight: 500; }
+    .strip-item svg { width: 19px; height: 19px; }
+
+    /* ---------------- sections ---------------- */
+    section { padding: clamp(3.5rem, 8vw, 6rem) 0; }
+    .sec-head { max-width: 42rem; margin-bottom: clamp(2rem, 4vw, 3rem); }
+    .sec-head.center { margin-inline: auto; text-align: center; }
+    .sec-head h2 { font-size: clamp(1.9rem, 4vw, 2.7rem); line-height: 1.08; font-weight: 700; margin: 0.7rem 0 0.9rem; }
+    .sec-head p { color: var(--ink-soft); font-size: clamp(1rem, 1.5vw, 1.12rem); }
+
+    /* how it works — the interruption moment */
+    .flow-grid { display: grid; grid-template-columns: 1.05fr 0.95fr; gap: clamp(2rem, 5vw, 4rem); align-items: center; }
+    @media (max-width: 900px) { .flow-grid { grid-template-columns: 1fr; } }
+    .steps { display: flex; flex-direction: column; gap: 1.1rem; }
+    .step {
+      display: grid; grid-template-columns: auto 1fr; gap: 1rem; align-items: start;
+      padding: 1.1rem 1.2rem; border-radius: 14px; border: 1px solid var(--panel-line);
+      background: var(--panel); box-shadow: var(--shadow-soft);
+      transition: border-color 0.25s, transform 0.25s;
+    }
+    .step:hover { border-color: var(--accent); transform: translateX(4px); }
+    .step-num {
+      font-family: "Space Grotesk", sans-serif; font-weight: 700; font-size: 0.95rem;
+      width: 34px; height: 34px; border-radius: 9px; display: grid; place-items: center;
+      background: linear-gradient(140deg, var(--brand-cyan), var(--brand-blue)); color: #06121f;
+    }
+    .step h3 { font-size: 1.05rem; margin-bottom: 0.25rem; font-weight: 650; }
+    .step p { font-size: 0.92rem; color: var(--ink-soft); }
+
+    /* the blocking popup recreation */
+    .block-demo {
+      position: relative; border-radius: 18px; overflow: hidden;
+      border: 1px solid var(--panel-line); box-shadow: var(--shadow);
+      background:
+        radial-gradient(120% 120% at 50% 0%, color-mix(in srgb, var(--bad) 14%, var(--panel)), var(--panel) 60%);
+      padding: clamp(1.6rem, 4vw, 2.4rem); min-height: 340px;
+      display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center; gap: 1rem;
+    }
+    .block-demo .warn-ico {
+      width: 58px; height: 58px; border-radius: 16px; display: grid; place-items: center;
+      background: color-mix(in srgb, var(--bad) 22%, transparent); color: var(--bad);
+    }
+    .block-demo .warn-ico svg { width: 30px; height: 30px; }
+    .block-demo h3 { font-family: "Space Grotesk", sans-serif; font-size: 1.4rem; font-weight: 700; }
+    .block-demo p { color: var(--ink-soft); max-width: 32ch; font-size: 0.95rem; }
+    .block-demo .caught {
+      font-family: "JetBrains Mono", monospace; font-size: 0.8rem; color: var(--bad);
+      background: color-mix(in srgb, var(--bad) 12%, transparent); padding: 0.4rem 0.8rem; border-radius: 8px;
+    }
+    .block-actions { display: flex; gap: 0.6rem; flex-wrap: wrap; justify-content: center; margin-top: 0.5rem; }
+    .block-actions .b {
+      font-family: "Space Grotesk", sans-serif; font-weight: 600; font-size: 0.85rem;
+      padding: 0.55rem 1.1rem; border-radius: 10px; border: 1px solid var(--panel-line);
+      background: var(--panel-2); color: var(--ink);
+    }
+    .block-actions .b.stay { background: linear-gradient(120deg, var(--brand-cyan), var(--brand-blue)); color: #06121f; border-color: transparent; }
+
+    /* feature grid */
+    .feat-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 1.2rem; }
+    @media (max-width: 900px) { .feat-grid { grid-template-columns: repeat(2, 1fr); } }
+    @media (max-width: 600px) { .feat-grid { grid-template-columns: 1fr; } }
+    .feat {
+      padding: 1.5rem 1.4rem; border-radius: 16px; border: 1px solid var(--panel-line);
+      background: var(--panel); box-shadow: var(--shadow-soft);
+      transition: transform 0.25s ease, border-color 0.25s ease;
+    }
+    .feat:hover { transform: translateY(-5px); border-color: var(--accent); }
+    .feat .ico {
+      width: 44px; height: 44px; border-radius: 12px; display: grid; place-items: center;
+      margin-bottom: 1rem; color: var(--brand-cyan);
+      background: color-mix(in srgb, var(--brand-blue) 14%, transparent);
+    }
+    .feat .ico svg { width: 22px; height: 22px; }
+    .feat h3 { font-size: 1.12rem; font-weight: 650; margin-bottom: 0.45rem; }
+    .feat p { font-size: 0.92rem; color: var(--ink-soft); }
+
+    /* download split */
+    .dl-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 1.4rem; }
+    @media (max-width: 820px) { .dl-grid { grid-template-columns: 1fr; } }
+    .dl-card {
+      position: relative; overflow: hidden;
+      padding: clamp(1.8rem, 4vw, 2.6rem); border-radius: 20px;
+      border: 1px solid var(--panel-line); background: var(--panel); box-shadow: var(--shadow-soft);
+      display: flex; flex-direction: column; gap: 1.1rem;
+    }
+    .dl-card.primary {
+      background:
+        radial-gradient(120% 120% at 100% 0%, color-mix(in srgb, var(--brand-blue) 16%, var(--panel)), var(--panel) 55%);
+      border-color: color-mix(in srgb, var(--brand-blue) 35%, var(--panel-line));
+    }
+    .dl-top { display: flex; align-items: center; gap: 0.8rem; }
+    .dl-badge {
+      width: 48px; height: 48px; border-radius: 13px; flex: none; display: grid; place-items: center;
+      background: var(--panel-2); border: 1px solid var(--panel-line);
+    }
+    .dl-badge svg { width: 26px; height: 26px; }
+    .dl-card h3 { font-family: "Space Grotesk", sans-serif; font-size: 1.35rem; font-weight: 700; }
+    .dl-card .kicker { font-size: 0.8rem; color: var(--ink-faint); font-family: "JetBrains Mono", monospace; letter-spacing: 0.05em; }
+    .dl-card p { color: var(--ink-soft); font-size: 0.95rem; flex: 1; }
+    .dl-list { list-style: none; display: flex; flex-direction: column; gap: 0.55rem; font-size: 0.9rem; color: var(--ink-soft); }
+    .dl-list li { display: flex; align-items: flex-start; gap: 0.55rem; }
+    .dl-list svg { width: 16px; height: 16px; color: var(--good); flex: none; margin-top: 3px; }
+    .dl-foot { font-size: 0.78rem; color: var(--ink-faint); }
+
+    /* steps for extension pairing */
+    .pair {
+      margin-top: 1.4rem; border-radius: 14px; border: 1px dashed var(--panel-line);
+      background: var(--panel-2); padding: 1rem 1.2rem;
+    }
+    .pair ol { margin: 0; padding-left: 1.1rem; display: flex; flex-direction: column; gap: 0.5rem; font-size: 0.88rem; color: var(--ink-soft); }
+    .pair code {
+      font-family: "JetBrains Mono", monospace; font-size: 0.82rem; color: var(--brand-cyan);
+      background: color-mix(in srgb, var(--brand-blue) 12%, transparent); padding: 0.1rem 0.4rem; border-radius: 5px;
+    }
+
+    /* FAQ */
+    .faq { display: flex; flex-direction: column; gap: 0.75rem; max-width: 48rem; margin-inline: auto; }
+    details.q {
+      border: 1px solid var(--panel-line); border-radius: 13px; background: var(--panel);
+      padding: 0 1.2rem; overflow: hidden; box-shadow: var(--shadow-soft);
+    }
+    details.q summary {
+      list-style: none; cursor: pointer; padding: 1.1rem 0; font-weight: 600; font-size: 1.02rem;
+      display: flex; align-items: center; justify-content: space-between; gap: 1rem;
+    }
+    details.q summary::-webkit-details-marker { display: none; }
+    details.q summary .chev { flex: none; transition: transform 0.25s; color: var(--ink-faint); }
+    details.q[open] summary .chev { transform: rotate(180deg); }
+    details.q .a { padding: 0 0 1.1rem; color: var(--ink-soft); font-size: 0.95rem; max-width: 60ch; }
+
+    /* final CTA */
+    .final {
+      position: relative; overflow: hidden; border-radius: 24px;
+      border: 1px solid var(--panel-line);
+      background:
+        radial-gradient(90% 140% at 50% -10%, color-mix(in srgb, var(--brand-blue) 22%, var(--panel)), var(--panel) 60%);
+      padding: clamp(2.5rem, 6vw, 4.5rem) clamp(1.5rem, 5vw, 3rem);
+      text-align: center; box-shadow: var(--shadow);
+    }
+    .final h2 { font-size: clamp(2rem, 5vw, 3.2rem); font-weight: 700; margin-bottom: 1rem; line-height: 1.05; }
+    .final p { color: var(--ink-soft); max-width: 40ch; margin: 0 auto 2rem; font-size: 1.05rem; }
+    .final .hero-cta { justify-content: center; }
+
+    /* footer */
+    footer.site {
+      border-top: 1px solid var(--panel-line); margin-top: 4rem;
+      padding: 2.5rem 0; color: var(--ink-faint); font-size: 0.88rem;
+    }
+    .foot-inner { display: flex; align-items: center; justify-content: space-between; gap: 1rem; flex-wrap: wrap; }
+    .foot-links { display: flex; gap: 1.4rem; flex-wrap: wrap; }
+    .foot-links a { color: var(--ink-soft); text-decoration: none; }
+    .foot-links a:hover { color: var(--ink); }
+
+    /* reveal on scroll */
+    .reveal { opacity: 0; transform: translateY(22px); transition: opacity 0.7s ease, transform 0.7s ease; }
+    .reveal.in { opacity: 1; transform: none; }
+    @media (prefers-reduced-motion: reduce) {
+      .reveal { opacity: 1; transform: none; transition: none; }
+      .ring-state::before { animation: none; }
+    }
+
+    a:focus-visible, button:focus-visible, summary:focus-visible, .btn:focus-visible {
+      outline: 2px solid var(--accent); outline-offset: 3px; border-radius: 8px;
+    }
+  </style>
+</head>
+<body>
+
+  <!-- ===================== NAV ===================== -->
+  <header class="nav" id="nav">
+    <div class="wrap nav-inner">
+      <a class="brand" href="#top" aria-label="FocusBook home">
+        <svg class="logo" viewBox="0 0 100 100" aria-hidden="true">
+          <rect x="8" y="42" width="34" height="34" rx="8" fill="#1d4ed8"/>
+          <rect x="30" y="6" width="60" height="30" rx="8" transform="rotate(45 60 21)" fill="#3b82f6"/>
+        </svg>
+        <span class="name">FocusBook</span>
+      </a>
+      <nav class="nav-links" aria-label="Primary">
+        <a href="#how">How it works</a>
+        <a href="#features">Features</a>
+        <a href="#download">Download</a>
+        <a href="#extension">Extension</a>
+        <a href="#faq">FAQ</a>
+      </nav>
+      <div class="nav-right">
+        <button class="theme-btn" id="themeBtn" aria-label="Toggle color theme" title="Toggle theme">
+          <svg class="sun" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/></svg>
+          <svg class="moon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z"/></svg>
+        </button>
+        <a class="btn btn-primary btn-sm" href="#download">Download</a>
+      </div>
+    </div>
+  </header>
+
+  <span id="top"></span>
+
+  <!-- ===================== HERO ===================== -->
+  <section class="hero">
+    <div class="wrap hero-grid">
+      <div class="hero-copy">
+        <div class="tag-row">
+          <span class="tag"><span class="dot" style="background:var(--good)"></span>Productive</span>
+          <span class="tag"><span class="dot" style="background:var(--neutral)"></span>Neutral</span>
+          <span class="tag"><span class="dot" style="background:var(--bad)"></span>Distracting</span>
+        </div>
+        <h1 class="hero-title display">
+          Know where your time <span class="grad">actually goes.</span>
+        </h1>
+        <p class="hero-sub">
+          FocusBook quietly tracks every app and browser tab, sorts each one into
+          productive, neutral, or distracting — and steps in the moment you drift.
+        </p>
+        <div class="hero-cta">
+          <a class="btn btn-primary" href="#download">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M7 10l5 5 5-5M12 15V3"/></svg>
+            Download for Windows
+          </a>
+          <a class="btn btn-ghost" href="#how">See how it works</a>
+        </div>
+        <div class="hero-meta">
+          <span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg> Free &amp; open source</span>
+          <span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg> Runs 100% on your machine</span>
+          <span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg> No account needed</span>
+        </div>
+      </div>
+
+      <!-- LIVE product mock -->
+      <div class="mock" id="mock" aria-hidden="true">
+        <div class="mock-bar">
+          <div class="dots"><i style="background:#ff5f57"></i><i style="background:#febc2e"></i><i style="background:#28c840"></i></div>
+          <span class="mock-title">FocusBook — Dashboard</span>
+        </div>
+        <div class="mock-body">
+          <div class="mock-ring-col">
+            <div class="ring-wrap">
+              <svg viewBox="0 0 150 150" aria-hidden="true">
+                <defs>
+                  <linearGradient id="ringgrad" x1="0" y1="0" x2="1" y2="1">
+                    <stop offset="0" stop-color="#22d3ee"/>
+                    <stop offset="1" stop-color="#3b82f6"/>
+                  </linearGradient>
+                </defs>
+                <circle class="ring-track" cx="75" cy="75" r="65"/>
+                <circle class="ring-fill" id="ringFill" cx="75" cy="75" r="65"/>
+              </svg>
+              <div class="ring-center">
+                <span class="ring-time mono" id="ringTime">24:59</span>
+                <span class="ring-state">Focusing</span>
+              </div>
+            </div>
+            <div class="mini-goals">
+              <div>
+                <div class="mini-goal-label"><span>Today's score</span><span id="scoreVal">88%</span></div>
+                <div class="mini-track"><div class="mini-fill" id="scoreBar" style="width:88%;background:linear-gradient(90deg,var(--brand-cyan),var(--brand-blue))"></div></div>
+              </div>
+              <div>
+                <div class="mini-goal-label"><span>Daily goal</span><span>68%</span></div>
+                <div class="mini-track"><div class="mini-fill" style="width:68%;background:var(--good)"></div></div>
+              </div>
+            </div>
+          </div>
+
+          <div class="mock-ledger">
+            <div class="ledger-head">
+              <span>Application</span>
+              <div class="ledger-legend">
+                <span><i style="background:var(--good)"></i>Prod</span>
+                <span><i style="background:var(--neutral)"></i>Neu</span>
+                <span><i style="background:var(--bad)"></i>Dist</span>
+              </div>
+            </div>
+            <div id="ledger"></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- trust strip -->
+  <div class="strip">
+    <div class="wrap strip-inner">
+      <div class="strip-item">
+        <svg viewBox="0 0 24 24" fill="currentColor"><path d="M3 12V6.75l9-1.35v6.6H3zm0 .75h9v6.6l-9-1.35V12.75zm9.75-8.25L21.75 3v9h-9V4.5zm9 8.25V21l-9-1.35v-6.9h9z"/></svg>
+        Windows 10 &amp; 11
+      </div>
+      <div class="strip-item">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><path d="M8 12h8M12 8v8"/></svg>
+        Chrome · Brave · Edge
+      </div>
+      <div class="strip-item">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+        Your data never leaves your PC
+      </div>
+      <div class="strip-item">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 19c-5 1.5-5-2.5-7-3m14 6v-3.87a3.37 3.37 0 0 0-.94-2.61c3.14-.35 6.44-1.54 6.44-7A5.44 5.44 0 0 0 20 4.77 5.07 5.07 0 0 0 19.91 1S18.73.65 16 2.48a13.38 13.38 0 0 0-7 0C6.27.65 5.09 1 5.09 1A5.07 5.07 0 0 0 5 4.77a5.44 5.44 0 0 0-1.5 3.78c0 5.42 3.3 6.61 6.44 7A3.37 3.37 0 0 0 9 18.13V22"/></svg>
+        Open source
+      </div>
+    </div>
+  </div>
+
+  <!-- ===================== HOW IT WORKS ===================== -->
+  <section id="how">
+    <div class="wrap">
+      <div class="flow-grid">
+        <div>
+          <div class="sec-head reveal">
+            <span class="eyebrow">How it works</span>
+            <h2 class="display">It watches so you don't have to.</h2>
+            <p>No timers to start, no logs to fill in. FocusBook runs in your tray and does the accounting for you — then interrupts the spiral before it costs you an hour.</p>
+          </div>
+          <div class="steps">
+            <div class="step reveal">
+              <div class="step-num">1</div>
+              <div>
+                <h3>It sees the active window</h3>
+                <p>Every few seconds FocusBook notes which app — and which browser tab — is in front of you. The tab reporter extension handles Chrome, Brave and Edge.</p>
+              </div>
+            </div>
+            <div class="step reveal">
+              <div class="step-num">2</div>
+              <div>
+                <h3>It sorts each one automatically</h3>
+                <p>Rules map every app and site to a category and a verdict: Productive, Neutral or Distracting. Disagree? Reclassify once and it remembers.</p>
+              </div>
+            </div>
+            <div class="step reveal">
+              <div class="step-num">3</div>
+              <div>
+                <h3>It steps in when you drift</h3>
+                <p>Slide from focused work into something distracting and a full-screen nudge appears — stay focused, take a short cooldown, or dismiss it for this app.</p>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- the interruption moment, recreated -->
+        <div class="block-demo reveal">
+          <div class="warn-ico">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+          </div>
+          <span class="caught mono">Detected: switched to YouTube · Distracting</span>
+          <h3 class="display">Hey — weren't you focusing?</h3>
+          <p>You just left a focus session for something distracting. Want to get back to it?</p>
+          <div class="block-actions">
+            <span class="b stay">Stay focused</span>
+            <span class="b">Cooldown 5m</span>
+            <span class="b">Dismiss</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ===================== FEATURES ===================== -->
+  <section id="features">
+    <div class="wrap">
+      <div class="sec-head center reveal">
+        <span class="eyebrow">What's inside</span>
+        <h2 class="display">Everything you need to protect your attention.</h2>
+        <p>A focus tracker, a productivity ledger, and a gentle enforcer — in one desktop app that stays out of your way.</p>
+      </div>
+      <div class="feat-grid">
+        <div class="feat reveal">
+          <div class="ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg></div>
+          <h3>Automatic time tracking</h3>
+          <p>Time is logged per app, per tab, per hour — no manual timers. See your day broken into productive, neutral and distracting minutes.</p>
+        </div>
+        <div class="feat reveal">
+          <div class="ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 3v18h18"/><rect x="7" y="10" width="3" height="8"/><rect x="12" y="6" width="3" height="12"/><rect x="17" y="13" width="3" height="5"/></svg></div>
+          <h3>Productivity analytics</h3>
+          <p>A dashboard with daily and weekly trends, a productivity score, and a per-app breakdown so you can see exactly what's eating your time.</p>
+        </div>
+        <div class="feat reveal">
+          <div class="ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg></div>
+          <h3>Distraction blocking</h3>
+          <p>When you slip into a distracting app mid-focus, a full-screen popup catches it — with cooldowns and per-app dismissals so it's firm, not annoying.</p>
+        </div>
+        <div class="feat reveal">
+          <div class="ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4z"/></svg></div>
+          <h3>Custom categories</h3>
+          <p>Your idea of "productive" is yours. Reassign any app or site to a category and productivity level, and FocusBook honors it from then on.</p>
+        </div>
+        <div class="feat reveal">
+          <div class="ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9.5 2A2.5 2.5 0 0 1 12 4.5v15a2.5 2.5 0 0 1-4.96.44 2.5 2.5 0 0 1-2.96-3.08 3 3 0 0 1-.34-5.58 2.5 2.5 0 0 1 1.32-4.24 2.5 2.5 0 0 1 1.98-3A2.5 2.5 0 0 1 9.5 2z"/><path d="M14.5 2A2.5 2.5 0 0 0 12 4.5v15a2.5 2.5 0 0 0 4.96.44 2.5 2.5 0 0 0 2.96-3.08 3 3 0 0 0 .34-5.58 2.5 2.5 0 0 0-1.32-4.24 2.5 2.5 0 0 0-1.98-3A2.5 2.5 0 0 0 14.5 2z"/></svg></div>
+          <h3>Optional AI insights</h3>
+          <p>Plug in your own API key to get plain-language summaries of your habits and where your focus leaks — entirely optional, entirely under your control.</p>
+        </div>
+        <div class="feat reveal">
+          <div class="ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/><path d="m9 12 2 2 4-4"/></svg></div>
+          <h3>Private by design</h3>
+          <p>All tracking runs and stays on your own machine. The browser extension reports only which tab is active — never durations, never your history.</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ===================== DOWNLOAD ===================== -->
+  <section id="download">
+    <div class="wrap">
+      <div class="sec-head center reveal">
+        <span class="eyebrow">Get started</span>
+        <h2 class="display">Two pieces. Five minutes.</h2>
+        <p>Install the desktop app, then add the browser extension so your tabs are tracked too. Both are free.</p>
+      </div>
+      <div class="dl-grid">
+        <!-- desktop app -->
+        <div class="dl-card primary reveal">
+          <div class="dl-top">
+            <div class="dl-badge">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="color:var(--brand-cyan)"><path d="M3 12V6.75l9-1.35v6.6H3zm0 .75h9v6.6l-9-1.35V12.75zm9.75-8.25L21.75 3v9h-9V4.5zm9 8.25V21l-9-1.35v-6.9h9z" fill="currentColor" stroke="none"/></svg>
+            </div>
+            <div>
+              <span class="kicker">Step 1 · Desktop app</span>
+              <h3>FocusBook for Windows</h3>
+            </div>
+          </div>
+          <p>The core app — tracking, analytics, focus timer and distraction blocking. A standard Windows installer; no Python, no setup.</p>
+          <ul class="dl-list">
+            <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg> Windows 10 &amp; 11 (64-bit)</li>
+            <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg> One-click installer, auto-updates</li>
+            <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg> Lives in your system tray</li>
+          </ul>
+          <a class="btn btn-primary" href="https://github.com/malikHarisawan/focus-book-main/releases/latest" target="_blank" rel="noopener">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M7 10l5 5 5-5M12 15V3"/></svg>
+            Download latest release
+          </a>
+          <span class="dl-foot">Fetches <code style="font-family:inherit">focusbook-setup.exe</code> from GitHub Releases.</span>
+        </div>
+
+        <!-- extension -->
+        <div class="dl-card reveal" id="extension">
+          <div class="dl-top">
+            <div class="dl-badge">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="color:var(--brand-blue)"><path d="M4 7h3a2 2 0 0 0 2-2V4a2 2 0 0 1 4 0v1a2 2 0 0 0 2 2h3a1 1 0 0 1 1 1v3a2 2 0 0 0 2 2h1a2 2 0 0 1 0 4h-1a2 2 0 0 0-2 2v3a1 1 0 0 1-1 1h-3a2 2 0 0 1-2-2v-1a2 2 0 0 0-4 0v1a2 2 0 0 1-2 2H4a1 1 0 0 1-1-1v-3a2 2 0 0 0-2-2H1a2 2 0 0 1 0-4h1a2 2 0 0 0 2-2V8a1 1 0 0 1 1-1z"/></svg>
+            </div>
+            <div>
+              <span class="kicker">Step 2 · Browser extension</span>
+              <h3>Tab Reporter</h3>
+            </div>
+          </div>
+          <p>Lets FocusBook see which browser tab is active so websites get tracked, not just apps. Works in Chrome, Brave and Edge from one codebase.</p>
+          <ul class="dl-list">
+            <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg> Reports the active tab — never durations</li>
+            <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg> Talks to the app over a local, token-secured link</li>
+            <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg> Included with the app — nothing extra to download</li>
+          </ul>
+          <div class="pair">
+            <ol>
+              <li>Open <code>chrome://extensions</code> (or <code>brave://</code> / <code>edge://extensions</code>) and turn on <strong>Developer mode</strong>.</li>
+              <li>Click <strong>Load unpacked</strong> and pick the <code>extension</code> folder inside your FocusBook install.</li>
+              <li>In FocusBook → <strong>Settings</strong>, copy the pairing token and paste it into the extension's Options page.</li>
+            </ol>
+          </div>
+          <a class="btn btn-ghost" href="https://github.com/malikHarisawan/focus-book-main/tree/main/extension" target="_blank" rel="noopener">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 19c-5 1.5-5-2.5-7-3m14 6v-3.87a3.37 3.37 0 0 0-.94-2.61c3.14-.35 6.44-1.54 6.44-7A5.44 5.44 0 0 0 20 4.77 5.07 5.07 0 0 0 19.91 1S18.73.65 16 2.48a13.38 13.38 0 0 0-7 0C6.27.65 5.09 1 5.09 1A5.07 5.07 0 0 0 5 4.77a5.44 5.44 0 0 0-1.5 3.78c0 5.42 3.3 6.61 6.44 7A3.37 3.37 0 0 0 9 18.13V22"/></svg>
+            View extension &amp; setup guide
+          </a>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ===================== FAQ ===================== -->
+  <section id="faq">
+    <div class="wrap">
+      <div class="sec-head center reveal">
+        <span class="eyebrow">Questions</span>
+        <h2 class="display">Good to know</h2>
+      </div>
+      <div class="faq">
+        <details class="q reveal">
+          <summary>Is FocusBook really free?<svg class="chev" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"/></svg></summary>
+          <div class="a">Yes. FocusBook is free and open source. There's no account, no subscription, and no paywalled features — download it and it's yours.</div>
+        </details>
+        <details class="q reveal">
+          <summary>Where does my data go?<svg class="chev" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"/></svg></summary>
+          <div class="a">Nowhere but your own PC. All tracking data is stored locally in your user folder with automatic local backups. The browser extension only tells the app which tab is active over a local, token-authenticated connection — it never sends your browsing history or durations anywhere.</div>
+        </details>
+        <details class="q reveal">
+          <summary>Which platforms are supported?<svg class="chev" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"/></svg></summary>
+          <div class="a">The installer ships for Windows 10 and 11. The browser extension works in Chrome, Brave and Microsoft Edge from a single codebase.</div>
+        </details>
+        <details class="q reveal">
+          <summary>Do I need the browser extension?<svg class="chev" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"/></svg></summary>
+          <div class="a">The app tracks desktop applications on its own. Add the extension when you want website-level detail — so time on individual tabs (docs, YouTube, email) is categorized instead of lumped under "browser."</div>
+        </details>
+        <details class="q reveal">
+          <summary>Is the AI feature required?<svg class="chev" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"/></svg></summary>
+          <div class="a">No. AI Insights is entirely optional and only runs if you add your own API key. FocusBook's tracking, analytics and blocking work fully without it.</div>
+        </details>
+        <details class="q reveal">
+          <summary>Will it slow down my computer?<svg class="chev" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"/></svg></summary>
+          <div class="a">It's built to be light. FocusBook checks the active window on a slow interval and saves in the background, sitting quietly in your system tray while you work.</div>
+        </details>
+      </div>
+    </div>
+  </section>
+
+  <!-- ===================== FINAL CTA ===================== -->
+  <section>
+    <div class="wrap">
+      <div class="final reveal">
+        <span class="eyebrow">Start today</span>
+        <h2 class="display">Stop wondering where the day went.</h2>
+        <p>Install FocusBook and get an honest picture of your time — plus a nudge whenever you drift.</p>
+        <div class="hero-cta">
+          <a class="btn btn-primary" href="https://github.com/malikHarisawan/focus-book-main/releases/latest" target="_blank" rel="noopener">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M7 10l5 5 5-5M12 15V3"/></svg>
+            Download for Windows
+          </a>
+          <a class="btn btn-ghost" href="https://github.com/malikHarisawan/focus-book-main" target="_blank" rel="noopener">View on GitHub</a>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ===================== FOOTER ===================== -->
+  <footer class="site">
+    <div class="wrap foot-inner">
+      <a class="brand" href="#top" aria-label="FocusBook home">
+        <svg class="logo" viewBox="0 0 100 100" aria-hidden="true">
+          <rect x="8" y="42" width="34" height="34" rx="8" fill="#1d4ed8"/>
+          <rect x="30" y="6" width="60" height="30" rx="8" transform="rotate(45 60 21)" fill="#3b82f6"/>
+        </svg>
+        <span class="name">FocusBook</span>
+      </a>
+      <div class="foot-links">
+        <a href="#how">How it works</a>
+        <a href="#features">Features</a>
+        <a href="#download">Download</a>
+        <a href="#faq">FAQ</a>
+        <a href="https://github.com/malikHarisawan/focus-book-main" target="_blank" rel="noopener">GitHub</a>
+      </div>
+      <span>© 2026 FocusBook · Built for people who value their attention.</span>
+    </div>
+  </footer>
+
+  <script>
+    /* ---------- theme toggle ---------- */
+    (function () {
+      var root = document.documentElement;
+      var btn = document.getElementById('themeBtn');
+      var sun = btn.querySelector('.sun');
+      var moon = btn.querySelector('.moon');
+      function currentIsDark() {
+        var t = root.getAttribute('data-theme');
+        if (t) return t === 'dark';
+        return window.matchMedia('(prefers-color-scheme: dark)').matches;
+      }
+      function syncIcon() {
+        var dark = currentIsDark();
+        sun.style.display = dark ? 'block' : 'none';
+        moon.style.display = dark ? 'none' : 'block';
+      }
+      btn.addEventListener('click', function () {
+        var dark = currentIsDark();
+        root.setAttribute('data-theme', dark ? 'light' : 'dark');
+        syncIcon();
+      });
+      window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', syncIcon);
+      syncIcon();
+    })();
+
+    /* ---------- sticky nav border ---------- */
+    (function () {
+      var nav = document.getElementById('nav');
+      var onScroll = function () { nav.classList.toggle('scrolled', window.scrollY > 8); };
+      window.addEventListener('scroll', onScroll, { passive: true });
+      onScroll();
+    })();
+
+    /* ---------- reveal on scroll ---------- */
+    (function () {
+      var els = document.querySelectorAll('.reveal');
+      if (!('IntersectionObserver' in window)) { els.forEach(function (e){ e.classList.add('in'); }); return; }
+      var io = new IntersectionObserver(function (entries) {
+        entries.forEach(function (en) {
+          if (en.isIntersecting) { en.target.classList.add('in'); io.unobserve(en.target); }
+        });
+      }, { threshold: 0.12 });
+      els.forEach(function (e){ io.observe(e); });
+    })();
+
+    /* ---------- LIVE product mock ---------- */
+    (function () {
+      var reduce = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+      /* ledger rows: app, initial time (min), verdict */
+      var rows = [
+        { name: 'VS Code',        cat: 'Code',          color: '#2563eb', min: 47, verdict: 'good',    label: 'Productive' },
+        { name: 'Figma',          cat: 'Design',        color: '#8b5cf6', min: 22, verdict: 'good',    label: 'Productive' },
+        { name: 'Gmail',          cat: 'Communication', color: '#ef4444', min: 9,  verdict: 'neutral', label: 'Neutral' },
+        { name: 'YouTube',        cat: 'Entertainment', color: '#dc2626', min: 6,  verdict: 'bad',     label: 'Distracting' },
+        { name: 'Slack',          cat: 'Communication', color: '#7c3aed', min: 4,  verdict: 'neutral', label: 'Neutral' }
+      ];
+
+      var ledger = document.getElementById('ledger');
+      function initials(n){ return n.replace(/[^A-Za-z0-9 ]/g,'').split(' ').map(function(w){return w[0];}).join('').slice(0,2).toUpperCase(); }
+      rows.forEach(function (r, i) {
+        var el = document.createElement('div');
+        el.className = 'ledger-row';
+        el.innerHTML =
+          '<div class="lr-app"><span class="ico" style="background:' + r.color + '">' + initials(r.name) + '</span>' +
+          '<span class="lr-name">' + r.name + '</span></div>' +
+          '<span class="lr-time" id="t' + i + '">' + r.min + 'm</span>' +
+          '<span class="pill ' + r.verdict + '" id="p' + i + '">' + r.label + '</span>';
+        ledger.appendChild(el);
+      });
+
+      if (reduce) return; /* respect reduced motion — leave it static */
+
+      /* animate: timer ring counts up, active row's minutes tick */
+      var ringFill = document.getElementById('ringFill');
+      var ringTime = document.getElementById('ringTime');
+      var C = 408; /* 2πr, r=65 */
+      var total = 25 * 60; /* 25:00 session */
+      var elapsed = 1; /* start near-full */
+
+      function fmt(s){ var m = Math.floor(s/60), ss = s%60; return (m<10?'0':'')+m+':'+(ss<10?'0':'')+ss; }
+
+      var activeRow = 0; /* VS Code accrues time */
+      var tickAcc = 0;
+
+      var timer = setInterval(function () {
+        elapsed += 1;
+        if (elapsed > total) elapsed = 1;
+        var remaining = total - elapsed;
+        ringTime.textContent = fmt(remaining);
+        ringFill.style.strokeDashoffset = C - (elapsed / total) * C;
+
+        /* every ~4s, add a minute to the active productive app */
+        tickAcc += 1;
+        if (tickAcc >= 4) {
+          tickAcc = 0;
+          rows[activeRow].min += 1;
+          var tEl = document.getElementById('t' + activeRow);
+          if (tEl) {
+            tEl.textContent = rows[activeRow].min + 'm';
+            tEl.style.transition = 'color .2s'; tEl.style.color = 'var(--brand-cyan)';
+            setTimeout(function(){ tEl.style.color = ''; }, 350);
+          }
+        }
+      }, 1000);
+    })();
+  </script>
+</body>
+</html>

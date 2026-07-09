@@ -21,7 +21,7 @@ jobs:
   # -----------------------------
   lint:
     name: Lint & Code Quality
-    runs-on: ubuntu-latest
+    runs-on: windows-latest
 
     steps:
       - uses: actions/checkout@v4
@@ -30,12 +30,6 @@ jobs:
         with:
           node-version: 20
           cache: npm
-
-      # Linux dependencies (needed for electron-active-window native compilation)
-      - name: Install X11 development headers
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y libx11-dev libxtst-dev libxkbfile-dev libpng-dev
 
       - name: Install Node deps (skip native compilation for lint)
         run: npm ci --ignore-scripts
@@ -46,16 +40,12 @@ jobs:
 
 
   # -----------------------------
-  # Build Matrix (Windows, macOS, Linux)
+  # Build (Windows)
   # -----------------------------
   build:
-    name: Build (${{ matrix.os }})
+    name: Build (Windows)
     needs: lint
-    runs-on: ${{ matrix.os }}
-
-    strategy:
-      matrix:
-        os: [windows-latest]
+    runs-on: windows-latest
 
     steps:
       - uses: actions/checkout@v4
@@ -64,19 +54,6 @@ jobs:
         with:
           node-version: 20
           cache: npm
-
-      # Linux-only dependencies (needed for electron-active-window)
-      - name: Install X11 libs (Linux only)
-        if: matrix.os == 'ubuntu-latest'
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y \
-            libx11-dev \
-            libxtst-dev \
-            libxkbfile-dev \
-            libxss-dev \
-            libxext-dev
-          sudo snap install snapcraft --classic
 
       - uses: actions/setup-python@v5
         with:
@@ -102,52 +79,18 @@ jobs:
       - name: Build Electron App
         run: npm run build
 
-      # OS-specific packaging
-      - name: Package App
-        run: |
-          if [ "${{ matrix.os }}" = "windows-latest" ]; then
-            npx electron-builder --win
-          elif [ "${{ matrix.os }}" = "macos-latest" ]; then
-            npx electron-builder --mac
-          else
-            npx electron-builder --linux
-          fi
-        shell: bash
+      - name: Package App (Windows)
+        run: npx electron-builder --win
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
-      # Upload Windows artifacts
       - name: Upload Windows artifacts
-        if: matrix.os == 'windows-latest'
         uses: actions/upload-artifact@v4
         with:
-          name: focusbook-${{ matrix.os }}
+          name: focusbook-windows
           path: |
             dist/*.exe
             dist/*.msi
-          retention-days: 30
-
-      # Upload macOS artifacts
-      - name: Upload macOS artifacts
-        if: matrix.os == 'macos-latest'
-        uses: actions/upload-artifact@v4
-        with:
-          name: focusbook-${{ matrix.os }}
-          path: |
-            dist/*.dmg
-            dist/*.zip
-          retention-days: 30
-
-      # Upload Linux artifacts
-      - name: Upload Linux artifacts
-        if: matrix.os == 'ubuntu-latest'
-        uses: actions/upload-artifact@v4
-        with:
-          name: focusbook-${{ matrix.os }}
-          path: |
-            dist/*.AppImage
-            dist/*.deb
-            dist/*.snap
           retention-days: 30
 
 
@@ -157,7 +100,7 @@ jobs:
   release:
     name: Publish Release
     needs: build
-    runs-on: ubuntu-latest
+    runs-on: windows-latest
     if: startsWith(github.ref, 'refs/tags/v')  # ONLY on tags
 
     steps:
@@ -166,31 +109,14 @@ jobs:
       - name: Download Windows artifacts
         uses: actions/download-artifact@v4
         with:
-          name: focusbook-windows-latest
+          name: focusbook-windows
           path: dist/windows
-        continue-on-error: true
-
-      - name: Download macOS artifacts
-        uses: actions/download-artifact@v4
-        with:
-          name: focusbook-macos-latest
-          path: dist/macos
-        continue-on-error: true
-
-      - name: Download Linux artifacts
-        uses: actions/download-artifact@v4
-        with:
-          name: focusbook-ubuntu-latest
-          path: dist/linux
-        continue-on-error: true
 
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v1
         with:
           files: |
             dist/windows/*
-            dist/macos/*
-            dist/linux/*
           draft: false
           prerelease: false
           generate_release_notes: true
