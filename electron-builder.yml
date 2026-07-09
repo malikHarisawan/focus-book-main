@@ -54,7 +54,7 @@ nsis:
   # each time (which is how duplicate/orphaned "Uninstall" entries appear).
   # Derived from appId; keep it stable once shipped or existing installs orphan.
   guid: 5b2f9c14-7e3a-4d68-9b21-0f4c6a8e2d7f
-buildVersion: 1.0.0
+buildVersion: 1.0.6
 compression: normal
 mac:
   entitlementsInherit: build/entitlements.mac.plist
