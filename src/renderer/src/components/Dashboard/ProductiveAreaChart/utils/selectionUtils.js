@@ -12,11 +12,11 @@
  * Calculate aggregated data for a given range or entire dataset
  * @param {Array} data - Chart data array
  * @param {Object|null} selectedRange - Selected range with startIndex and endIndex
- * @returns {Object} Aggregated productive, unproductive, and total time
+ * @returns {Object} Aggregated productive, neutral, distracting, and total time
  */
 export const calculateAggregatedData = (data, selectedRange = null) => {
   if (!data || data.length === 0) {
-    return { productive: 0, unproductive: 0, total: 0 }
+    return { productive: 0, neutral: 0, distracting: 0, total: 0 }
   }
 
   let startIndex = 0
@@ -28,19 +28,22 @@ export const calculateAggregatedData = (data, selectedRange = null) => {
   }
 
   let totalProductive = 0
-  let totalUnproductive = 0
+  let totalNeutral = 0
+  let totalDistracting = 0
 
   for (let i = startIndex; i <= endIndex; i++) {
     if (data[i]) {
       totalProductive += data[i].productive || 0
-      totalUnproductive += data[i].unproductive || 0
+      totalNeutral += data[i].neutral || 0
+      totalDistracting += data[i].distracting || 0
     }
   }
 
   return {
     productive: totalProductive,
-    unproductive: totalUnproductive,
-    total: totalProductive + totalUnproductive
+    neutral: totalNeutral,
+    distracting: totalDistracting,
+    total: totalProductive + totalNeutral + totalDistracting
   }
 }
 

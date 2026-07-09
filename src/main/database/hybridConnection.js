@@ -42,6 +42,24 @@ class HybridConnection {
     this.isOnline = false
     this.lastConnectionAttempt = null
     this.connectionCheckInterval = null
+
+    // Readiness gate: resolves once the database services are constructed.
+    // The main window is created before connect() completes (for fast startup),
+    // so IPC data handlers await this promise instead of touching a null service.
+    this.isReady = false
+    this._readyResolve = null
+    this._readyPromise = new Promise((resolve) => {
+      this._readyResolve = resolve
+    })
+  }
+
+  /**
+   * Await database readiness. Resolves as soon as the connection is established
+   * and the service instances exist. Safe to call any number of times and at
+   * any point in the lifecycle — returns immediately once ready.
+   */
+  whenReady() {
+    return this._readyPromise
   }
 
   async connect() {
@@ -62,6 +80,13 @@ class HybridConnection {
       await this.focusSessionService.loadCurrentSession()
 
       console.log('✅ SQLite (local) storage initialized')
+
+      // Signal that services are available so any waiting IPC handlers proceed.
+      this.isReady = true
+      if (this._readyResolve) {
+        this._readyResolve()
+        this._readyResolve = null
+      }
 
       // TODO: MongoDB integration can be added later if needed
       // await this.attemptMongoConnection()

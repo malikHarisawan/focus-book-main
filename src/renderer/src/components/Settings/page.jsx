@@ -1,10 +1,14 @@
 'use client'
 
 import { useEffect, useState } from 'react'
+import { useSearchParams } from 'react-router-dom'
 import { useTheme, colorSchemes } from '../../context/ThemeContext'
+import BrowserBridgePanel from './BrowserBridgePanel'
+import CategoryRulesPanel from './CategoryRulesPanel'
+import GettingStartedPanel from './GettingStartedPanel'
+import { toCSV, toJSON } from '../../utils/exportUtils'
 import {
   Settings,
-  User,
   Palette,
   Bell,
   Lock,
@@ -19,23 +23,16 @@ import {
   Download,
   Upload,
   Bot,
-  Check
+  Check,
+  Sparkles
 } from 'lucide-react'
-const allCategories = [
-  'Code',
-  'Browsing',
-  'Entertainment',
-  'Communication',
-  'Utility',
-  'Documenting',
-  'Learning',
-  'Personal',
-  'Miscellaneous'
-]
 
 export default function SettingsPage() {
-  const [activeTab, setActiveTab] = useState('profile')
-  const { theme, setThemeMode, primaryColor, secondaryColor, setPrimaryAccent, setSecondaryAccent } = useTheme()
+  // Honor a ?tab= deep link (e.g. from Activity's "Manage all rules" link) so
+  // we can open directly on the Categories Management tab.
+  const [searchParams] = useSearchParams()
+  const [activeTab, setActiveTab] = useState(() => searchParams.get('tab') || 'getting-started')
+  const { theme, resolvedTheme, setThemeMode, primaryColor, secondaryColor, setPrimaryAccent, setSecondaryAccent } = useTheme()
   const [focusMode, setFocusMode] = useState(false)
   const [notifications, setNotifications] = useState(true)
   const [soundEffects, setSoundEffects] = useState(true)
@@ -44,26 +41,75 @@ export default function SettingsPage() {
   const [timeFormat, setTimeFormat] = useState('24h')
   const [weekStart, setWeekStart] = useState('monday')
   const [language, setLanguage] = useState('english')
-  const [productiveCategories, setproductiveCategories] = useState([])
-  const [distractedCategories, setdistractedCategories] = useState([])
-  const [newProCategory, setNewProCategory] = useState('')
-  const [newDisCategory, setNewDisCategory] = useState('')
   const [openaiApiKey, setOpenaiApiKey] = useState('')
   const [geminiApiKey, setGeminiApiKey] = useState('')
   const [aiProvider, setAiProvider] = useState('openai') // 'openai' or 'gemini'
   const [isApiKeyValid, setIsApiKeyValid] = useState(false)
   const [aiServiceStatus, setAiServiceStatus] = useState({ isRunning: false, port: null, error: null })
+  const [isExporting, setIsExporting] = useState(false)
+  const [exportStatus, setExportStatus] = useState(null) // { ok, message }
+  const [exportFrom, setExportFrom] = useState('') // YYYY-MM-DD, blank = no lower bound
+  const [exportTo, setExportTo] = useState('') // YYYY-MM-DD, blank = no upper bound
+
+  // Export the full app-usage history as CSV or JSON. The renderer already has
+  // the data via getAllAggregatedData(); we serialize here and hand the string
+  // to the main process, which shows a native Save dialog and writes the file.
+  const handleExport = async (format) => {
+    const fmt = format.toLowerCase()
+    // Guard against an inverted range before doing any work.
+    if (exportFrom && exportTo && exportFrom > exportTo) {
+      setExportStatus({ ok: false, message: '"From" date must be on or before "To" date.' })
+      return
+    }
+    setIsExporting(true)
+    setExportStatus(null)
+    try {
+      // Blank pickers = whole history; either/both filled = date-range export.
+      // getFormattedUsageData returns the same nested shape as getAllAggregatedData,
+      // so the serializers are unchanged. Use very-wide bounds for an open end.
+      const hasRange = exportFrom || exportTo
+      const data = hasRange
+        ? await window.electronAPI.getFormattedUsageData(
+            exportFrom || '0000-01-01',
+            exportTo || '9999-12-31'
+          )
+        : await window.electronAPI.getAllAggregatedData()
+      if (!data || data.error) {
+        throw new Error(data?.error || 'Could not load usage data')
+      }
+      if (Object.keys(data).length === 0) {
+        setExportStatus({
+          ok: false,
+          message: hasRange
+            ? 'No usage data in that date range.'
+            : 'No usage data to export yet.'
+        })
+        return
+      }
+
+      const exportedAt = new Date().toISOString()
+      const content = fmt === 'json' ? toJSON(data, exportedAt) : toCSV(data)
+      const stamp = exportedAt.slice(0, 10)
+      const rangeSuffix = hasRange ? `-${exportFrom || 'start'}_to_${exportTo || 'end'}` : ''
+      const defaultName = `focusbook-usage${rangeSuffix}-${stamp}.${fmt}`
+
+      const result = await window.electronAPI.exportData({ content, format: fmt, defaultName })
+      if (result?.success) {
+        setExportStatus({ ok: true, message: `Exported to ${result.filePath}` })
+      } else if (result?.canceled) {
+        setExportStatus(null)
+      } else {
+        throw new Error(result?.error || 'Export failed')
+      }
+    } catch (error) {
+      console.error('Export error:', error)
+      setExportStatus({ ok: false, message: `Export failed: ${error.message}` })
+    } finally {
+      setIsExporting(false)
+    }
+  }
 
   useEffect(() => {
-    const fetchCategories = async () => {
-      const [productive, distracted] = await window.activeWindow.loadCategories()
-      if (productive) {
-        setproductiveCategories(productive)
-        setdistractedCategories(distracted)
-      }
-    }
-    fetchCategories()
-
     // Load AI config from config.json
     const loadAiConfig = async () => {
       try {
@@ -98,36 +144,11 @@ export default function SettingsPage() {
 
     return () => clearInterval(statusInterval)
   }, [])
-  function loadproCategories() {
-    if (
-      newProCategory &&
-      !productiveCategories.includes(newProCategory) &&
-      !distractedCategories.includes(newProCategory)
-    ) {
-      setproductiveCategories([...productiveCategories, newProCategory])
-    }
-  }
-
-  function loaddisCategories() {
-    if (
-      newDisCategory &&
-      !distractedCategories.includes(newDisCategory) &&
-      !productiveCategories.includes(newDisCategory)
-    ) {
-      setdistractedCategories([...distractedCategories, newDisCategory])
-    }
-  }
-  function removeCategory(app) {
-    setproductiveCategories(productiveCategories.filter((c) => c != app))
-  }
-  function removedisCategory(app) {
-    setdistractedCategories(distractedCategories.filter((c) => c != app))
-  }
 
   return (
     <div className="grid gap-4">
-      <div className="bg-white dark:bg-[#212329] border border-[#E8EDF1] dark:border-[#282932] backdrop-blur-sm rounded-lg overflow-hidden">
-        <div className="border-b border-[#E8EDF1] dark:border-[#282932] pb-2 p-4">
+      <div className="bg-white dark:bg-[#0B1220] border border-[#E8EDF1] dark:border-[#1E293B] backdrop-blur-sm rounded-lg overflow-hidden">
+        <div className="border-b border-[#E8EDF1] dark:border-[#1E293B] pb-2 p-4">
           <h2 className="text-[#232360] dark:text-white flex items-center text-lg font-semibold">
             <Settings className="mr-2 h-5 w-5 text-[#5051F9]" />
             Settings
@@ -137,11 +158,11 @@ export default function SettingsPage() {
 
         <div className="grid grid-cols-12 min-h-[600px]">
           {/* Settings Navigation */}
-          <div className="col-span-12 md:col-span-3 border-r border-[#E8EDF1] dark:border-[#282932]">
+          <div className="col-span-12 md:col-span-3 border-r border-[#E8EDF1] dark:border-[#1E293B]">
             <nav className="p-3">
               <ul className="space-y-0.5">
                 {[
-                  { id: 'profile', label: 'Profile', icon: User },
+                  { id: 'getting-started', label: 'Getting Started', icon: Sparkles },
                   { id: 'appearance', label: 'Appearance', icon: Palette },
                   { id: 'notifications', label: 'Notifications', icon: Bell },
                   { id: 'Categories Management', label: 'Categories Management', icon: Lock },
@@ -170,116 +191,15 @@ export default function SettingsPage() {
 
           {/* Settings Content */}
           <div className="col-span-12 md:col-span-9 p-6">
-            {/* Profile Settings */}
-            {activeTab === 'profile' && (
-              <div className="space-y-6 animate-fadeIn">
-                <h3 className="text-lg font-medium text-slate-900 dark:text-slate-200 border-b border-slate-200 dark:border-slate-700/30 pb-2">
-                  User Profile
-                </h3>
-
-                <div className="flex items-start space-x-6">
-                  <div className="relative group">
-                    <div className="w-24 h-24 rounded-full bg-gradient-to-br from-cyan-500 to-cyan-600 flex items-center justify-center text-2xl font-bold text-white">
-                      JD
-                    </div>
-                    <button className="absolute bottom-0 right-0 bg-slate-200 dark:bg-[#1a1b23] p-1.5 rounded-full border border-slate-300 dark:border-slate-600 text-cyan-600 dark:text-cyan-400 hover:bg-slate-300 dark:hover:bg-slate-700 transition-colors">
-                      <RefreshCw className="h-4 w-4" />
-                    </button>
-                    <div className="absolute inset-0 rounded-full bg-black/50 opacity-0 group-hover:opacity-100 flex items-center justify-center transition-opacity">
-                      <span className="text-xs text-white font-medium">Change</span>
-                    </div>
-                  </div>
-
-                  <div className="flex-1 space-y-4">
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                      <div>
-                        <label className="block text-sm font-medium text-slate-700 dark:text-slate-400 mb-1">
-                          Full Name
-                        </label>
-                        <input
-                          type="text"
-                          defaultValue="John Doe"
-                          className="w-full bg-slate-50 dark:bg-[#1a1b23] border border-slate-300 dark:border-slate-700/30 rounded-md px-3 py-2 text-slate-900 dark:text-slate-200 focus:outline-none focus:ring-1 focus:ring-cyan-500 focus:border-cyan-500"
-                        />
-                      </div>
-                      <div>
-                        <label className="block text-sm font-medium text-slate-700 dark:text-slate-400 mb-1">
-                          Display Name
-                        </label>
-                        <input
-                          type="text"
-                          defaultValue="JohnD"
-                          className="w-full bg-slate-50 dark:bg-[#1a1b23] border border-slate-300 dark:border-slate-700/30 rounded-md px-3 py-2 text-slate-900 dark:text-slate-200 focus:outline-none focus:ring-1 focus:ring-cyan-500 focus:border-cyan-500"
-                        />
-                      </div>
-                    </div>
-
-                    <div>
-                      <label className="block text-sm font-medium text-slate-700 dark:text-slate-400 mb-1">Email</label>
-                      <input
-                        type="email"
-                        defaultValue="john.doe@example.com"
-                        className="w-full bg-slate-50 dark:bg-[#1a1b23] border border-slate-300 dark:border-slate-700/30 rounded-md px-3 py-2 text-slate-900 dark:text-slate-200 focus:outline-none focus:ring-1 focus:ring-cyan-500 focus:border-cyan-500"
-                      />
-                    </div>
-
-                    <div>
-                      <label className="block text-sm font-medium text-slate-700 dark:text-slate-400 mb-1">Bio</label>
-                      <textarea
-                        defaultValue="Software developer focused on productivity and time management."
-                        rows={3}
-                        className="w-full bg-slate-50 dark:bg-[#1a1b23] border border-slate-300 dark:border-slate-700/30 rounded-md px-3 py-2 text-slate-900 dark:text-slate-200 focus:outline-none focus:ring-1 focus:ring-cyan-500 focus:border-cyan-500"
-                      />
-                    </div>
-                  </div>
-                </div>
-
-                <div className="pt-4 border-t border-slate-700">
-                  <h4 className="text-md font-medium text-slate-800 dark:text-slate-300 mb-3">Account Settings</h4>
-
-                  <div className="space-y-4">
-                    <div>
-                      <label className="block text-sm font-medium text-slate-700 dark:text-slate-400 mb-1">
-                        Current Password
-                      </label>
-                      <input
-                        type="password"
-                        placeholder="••••••••"
-                        className="w-full bg-slate-50 dark:bg-[#1a1b23] border border-slate-300 dark:border-slate-700/30 rounded-md px-3 py-2 text-slate-900 dark:text-slate-200 focus:outline-none focus:ring-1 focus:ring-cyan-500 focus:border-cyan-500"
-                      />
-                    </div>
-
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                      <div>
-                        <label className="block text-sm font-medium text-slate-700 dark:text-slate-400 mb-1">
-                          New Password
-                        </label>
-                        <input
-                          type="password"
-                          placeholder="••••••••"
-                          className="w-full bg-slate-50 dark:bg-[#1a1b23] border border-slate-300 dark:border-slate-700/30 rounded-md px-3 py-2 text-slate-900 dark:text-slate-200 focus:outline-none focus:ring-1 focus:ring-cyan-500 focus:border-cyan-500"
-                        />
-                      </div>
-                      <div>
-                        <label className="block text-sm font-medium text-slate-700 dark:text-slate-400 mb-1">
-                          Confirm New Password
-                        </label>
-                        <input
-                          type="password"
-                          placeholder="••••••••"
-                          className="w-full bg-slate-50 dark:bg-[#1a1b23] border border-slate-300 dark:border-slate-700/30 rounded-md px-3 py-2 text-slate-900 dark:text-slate-200 focus:outline-none focus:ring-1 focus:ring-cyan-500 focus:border-cyan-500"
-                        />
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              </div>
+            {/* Getting Started */}
+            {activeTab === 'getting-started' && (
+              <GettingStartedPanel onNavigateTab={setActiveTab} />
             )}
 
             {/* Appearance Settings */}
             {activeTab === 'appearance' && (
               <div className="space-y-6 animate-fadeIn">
-                <h3 className="text-lg font-medium text-[#232360] dark:text-white border-b border-[#E8EDF1] dark:border-[#282932] pb-2">
+                <h3 className="text-lg font-medium text-[#232360] dark:text-white border-b border-[#E8EDF1] dark:border-[#1E293B] pb-2">
                   Appearance
                 </h3>
 
@@ -292,7 +212,7 @@ export default function SettingsPage() {
                         className={`p-4 rounded-xl border-2 ${
                           theme === 'dark'
                             ? 'border-[#5051F9] bg-[#5051F9]/10 dark:bg-[#5051F9]/20 ring-1 ring-[#5051F9]/50'
-                            : 'border-[#E8EDF1] dark:border-[#282932] bg-white dark:bg-[#212329] hover:bg-[#F4F7FE] dark:hover:bg-[#282932]'
+                            : 'border-[#E8EDF1] dark:border-[#1E293B] bg-white dark:bg-[#0B1220] hover:bg-[#F4F7FE] dark:hover:bg-[#1E293B]'
                         } transition-all`}
                       >
                         <div className="flex justify-center mb-2">
@@ -309,7 +229,7 @@ export default function SettingsPage() {
                         className={`p-4 rounded-xl border-2 ${
                           theme === 'light'
                             ? 'border-[#5051F9] bg-[#5051F9]/10 ring-1 ring-[#5051F9]/50'
-                            : 'border-[#E8EDF1] dark:border-[#282932] bg-white dark:bg-[#212329] hover:bg-[#F4F7FE] dark:hover:bg-[#282932]'
+                            : 'border-[#E8EDF1] dark:border-[#1E293B] bg-white dark:bg-[#0B1220] hover:bg-[#F4F7FE] dark:hover:bg-[#1E293B]'
                         } transition-all`}
                       >
                         <div className="flex justify-center mb-2">
@@ -325,12 +245,12 @@ export default function SettingsPage() {
                         onClick={() => setThemeMode('system')}
                         className={`p-4 rounded-xl border-2 ${
                           theme === 'system'
-                            ? 'border-[#1EA7FF] bg-[#1EA7FF]/10 ring-1 ring-[#1EA7FF]/50'
-                            : 'border-[#E8EDF1] dark:border-[#282932] bg-white dark:bg-[#212329] hover:bg-[#F4F7FE] dark:hover:bg-[#282932]'
+                            ? 'border-[#22D3EE] bg-[#22D3EE]/10 ring-1 ring-[#22D3EE]/50'
+                            : 'border-[#E8EDF1] dark:border-[#1E293B] bg-white dark:bg-[#0B1220] hover:bg-[#F4F7FE] dark:hover:bg-[#1E293B]'
                         } transition-all`}
                       >
                         <div className="flex justify-center mb-2">
-                          <div className="h-8 w-8 rounded-full bg-gradient-to-r from-[#F4F7FE] to-[#1E1F25] flex items-center justify-center">
+                          <div className="h-8 w-8 rounded-full bg-gradient-to-r from-[#F4F7FE] to-[#05070D] flex items-center justify-center">
                             <Settings className="h-5 w-5 text-[#232360] dark:text-white" />
                           </div>
                         </div>
@@ -343,7 +263,7 @@ export default function SettingsPage() {
                   </div>
 
                   {/* Primary Accent Color */}
-                  <div className="pt-4 border-t border-[#E8EDF1] dark:border-[#282932]">
+                  <div className="pt-4 border-t border-[#E8EDF1] dark:border-[#1E293B]">
                     <h4 className="text-md font-medium text-[#232360] dark:text-white mb-2">Primary Accent Color</h4>
                     <p className="text-sm text-[#768396] mb-3">Used for buttons, active states, and primary elements</p>
                     <div className="flex flex-wrap gap-3">
@@ -353,7 +273,7 @@ export default function SettingsPage() {
                           onClick={() => setPrimaryAccent(key)}
                           className={`relative w-12 h-12 rounded-xl transition-all ${
                             primaryColor === key
-                              ? 'ring-2 ring-offset-2 ring-offset-white dark:ring-offset-[#1E1F25] ring-[#2B3674] dark:ring-white scale-110'
+                              ? 'ring-2 ring-offset-2 ring-offset-white dark:ring-offset-[#05070D] ring-[#2B3674] dark:ring-white scale-110'
                               : 'hover:scale-105'
                           }`}
                           style={{ backgroundColor: theme === 'dark' ? value.dark : value.light }}
@@ -369,7 +289,7 @@ export default function SettingsPage() {
                   </div>
 
                   {/* Secondary Accent Color */}
-                  <div className="pt-4 border-t border-[#E2E8F0] dark:border-[#1B254B]">
+                  <div className="pt-4 border-t border-[#E2E8F0] dark:border-[#1E293B]">
                     <h4 className="text-md font-medium text-[#2B3674] dark:text-white mb-2">Secondary Accent Color</h4>
                     <p className="text-sm text-[#A3AED0] mb-3">Used for charts, graphs, and secondary elements</p>
                     <div className="flex flex-wrap gap-3">
@@ -379,7 +299,7 @@ export default function SettingsPage() {
                           onClick={() => setSecondaryAccent(key)}
                           className={`relative w-12 h-12 rounded-xl transition-all ${
                             secondaryColor === key
-                              ? 'ring-2 ring-offset-2 ring-offset-white dark:ring-offset-[#0B1437] ring-[#2B3674] dark:ring-white scale-110'
+                              ? 'ring-2 ring-offset-2 ring-offset-white dark:ring-offset-[#05070D] ring-[#2B3674] dark:ring-white scale-110'
                               : 'hover:scale-105'
                           }`}
                           style={{ backgroundColor: theme === 'dark' ? value.dark : value.light }}
@@ -394,7 +314,7 @@ export default function SettingsPage() {
                     </div>
                   </div>
 
-                  <div className="pt-4 border-t border-[#E2E8F0] dark:border-[#1B254B]">
+                  <div className="pt-4 border-t border-[#E2E8F0] dark:border-[#1E293B]">
                     <h4 className="text-md font-medium text-[#2B3674] dark:text-white mb-3">Interface Density</h4>
                     <div className="flex space-x-4">
                       <label className="flex items-center">
@@ -402,7 +322,7 @@ export default function SettingsPage() {
                           type="radio"
                           name="density"
                           defaultChecked
-                          className="h-4 w-4 text-[#4318FF] dark:text-[#7551FF] focus:ring-[#4318FF] dark:focus:ring-[#7551FF] border-[#E2E8F0] dark:border-[#1B254B] bg-white dark:bg-[#111C44]"
+                          className="h-4 w-4 text-[#4318FF] dark:text-[#7551FF] focus:ring-[#4318FF] dark:focus:ring-[#7551FF] border-[#E2E8F0] dark:border-[#1E293B] bg-white dark:bg-[#0B1220]"
                         />
                         <span className="ml-2 text-[#2B3674] dark:text-white">Comfortable</span>
                       </label>
@@ -410,14 +330,14 @@ export default function SettingsPage() {
                         <input
                           type="radio"
                           name="density"
-                          className="h-4 w-4 text-[#4318FF] dark:text-[#7551FF] focus:ring-[#4318FF] dark:focus:ring-[#7551FF] border-[#E2E8F0] dark:border-[#1B254B] bg-white dark:bg-[#111C44]"
+                          className="h-4 w-4 text-[#4318FF] dark:text-[#7551FF] focus:ring-[#4318FF] dark:focus:ring-[#7551FF] border-[#E2E8F0] dark:border-[#1E293B] bg-white dark:bg-[#0B1220]"
                         />
                         <span className="ml-2 text-[#2B3674] dark:text-white">Compact</span>
                       </label>
                     </div>
                   </div>
 
-                  <div className="pt-4 border-t border-[#E2E8F0] dark:border-[#1B254B]">
+                  <div className="pt-4 border-t border-[#E2E8F0] dark:border-[#1E293B]">
                     <h4 className="text-md font-medium text-[#2B3674] dark:text-white mb-3">Focus Mode</h4>
                     <div className="flex items-center justify-between">
                       <div>
@@ -549,7 +469,7 @@ export default function SettingsPage() {
                           <label className="block text-sm font-medium text-slate-700 dark:text-slate-400 mb-1">
                             From
                           </label>
-                          <select className="w-full bg-slate-50 dark:bg-[#1a1b23] border border-slate-300 dark:border-slate-700/30 rounded-md px-3 py-2 text-slate-900 dark:text-slate-200 focus:outline-none focus:ring-1 focus:ring-cyan-500 focus:border-cyan-500">
+                          <select className="w-full bg-slate-50 dark:bg-[#05070D] border border-slate-300 dark:border-slate-700/30 rounded-md px-3 py-2 text-slate-900 dark:text-slate-200 focus:outline-none focus:ring-1 focus:ring-cyan-500 focus:border-cyan-500">
                             {Array.from({ length: 24 }).map((_, i) => (
                               <option key={i} value={i}>
                                 {i.toString().padStart(2, '0')}:00
@@ -561,7 +481,7 @@ export default function SettingsPage() {
                           <label className="block text-sm font-medium text-slate-700 dark:text-slate-400 mb-1">
                             To
                           </label>
-                          <select className="w-full bg-slate-50 dark:bg-[#1a1b23] border border-slate-300 dark:border-slate-700/30 rounded-md px-3 py-2 text-slate-900 dark:text-slate-200 focus:outline-none focus:ring-1 focus:ring-cyan-500 focus:border-cyan-500">
+                          <select className="w-full bg-slate-50 dark:bg-[#05070D] border border-slate-300 dark:border-slate-700/30 rounded-md px-3 py-2 text-slate-900 dark:text-slate-200 focus:outline-none focus:ring-1 focus:ring-cyan-500 focus:border-cyan-500">
                             {Array.from({ length: 24 }).map((_, i) => (
                               <option key={i} value={i}>
                                 {i.toString().padStart(2, '0')}:00
@@ -582,123 +502,9 @@ export default function SettingsPage() {
                 <h3 className="text-lg font-medium text-slate-900 dark:text-slate-200 border-b border-slate-200 dark:border-slate-700/30 pb-2">
                   Manage Categories
                 </h3>
-                <div className="space-y-4">
-                  <div className="pt-4 border-t border-slate-700">
-                    <div className="space-y-3">
-                      <div>
-                        <div className="pt-4 border-t border-slate-700">
-                          <h4 className="text-md font-medium text-slate-800 dark:text-slate-300 mb-3">
-                            Manage Productive Categories
-                          </h4>
 
-                          <div className="flex flex-wrap gap-2 mb-3 ">
-                            {productiveCategories.map((app) => (
-                              <div
-                                key={app}
-                                className="bg-slate-200 dark:bg-[#1a1b23] text-slate-700 dark:text-slate-300 px-3 py-1 rounded-full text-sm flex items-center"
-                              >
-                                {app}
-                                <button
-                                  onClick={() => removeCategory(app)}
-                                  className="ml-2 text-slate-400 hover:text-slate-200"
-                                >
-                                  <svg
-                                    xmlns="http://www.w3.org/2000/svg"
-                                    className="h-4 w-4"
-                                    viewBox="0 0 20 20"
-                                    fill="currentColor"
-                                  >
-                                    <path
-                                      fillRule="evenodd"
-                                      d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z"
-                                      clipRule="evenodd"
-                                    />
-                                  </svg>
-                                </button>
-                              </div>
-                            ))}
-                          </div>
-
-                          <div className="flex bg-slate-50 dark:bg-[#1a1b23] border border-slate-300 dark:border-slate-700/30 rounded-l-md">
-                            <select
-                              value={newProCategory}
-                              onChange={(e) => setNewProCategory(e.target.value)}
-                              className="flex-1 bg-slate-50 dark:bg-[#1a1b23] border border-slate-300 dark:border-slate-700/30 rounded-l-md px-3 py-2 text-slate-900 dark:text-slate-200 focus:outline-none focus:ring-1 focus:ring-cyan-500 focus:border-cyan-500"
-                            >
-                              <option value="">Select Category</option>
-                              {allCategories.map((cat, idx) => (
-                                <option key={idx} value={cat}>
-                                  {cat}
-                                </option>
-                              ))}
-                            </select>
-                            <button
-                              onClick={loadproCategories}
-                              className="bg-cyan-600 hover:bg-cyan-700 text-white px-4 py-2 rounded-r-md transition-colors"
-                            >
-                              Add
-                            </button>
-                          </div>
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-
-                  <div className="pt-4 border-t border-slate-700">
-                    <h4 className="text-md font-medium text-slate-800 dark:text-slate-300 mb-3">
-                      Manage Distracted Categories
-                    </h4>
-
-                    <div className="flex flex-wrap gap-2 mb-3">
-                      {distractedCategories.map((app) => (
-                        <div
-                          key={app}
-                          className="bg-slate-200 dark:bg-[#1a1b23] text-slate-700 dark:text-slate-300 px-3 py-1 rounded-full text-sm flex items-center"
-                        >
-                          {app}
-                          <button
-                            onClick={() => removedisCategory(app)}
-                            className="ml-2 text-slate-400 hover:text-slate-200"
-                          >
-                            <svg
-                              xmlns="http://www.w3.org/2000/svg"
-                              className="h-4 w-4"
-                              viewBox="0 0 20 20"
-                              fill="currentColor"
-                            >
-                              <path
-                                fillRule="evenodd"
-                                d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z"
-                                clipRule="evenodd"
-                              />
-                            </svg>
-                          </button>
-                        </div>
-                      ))}
-                    </div>
-
-                    <div className="flex">
-                      <select
-                        value={newDisCategory}
-                        onChange={(e) => setNewDisCategory(e.target.value)}
-                        className="flex-1 bg-slate-50 dark:bg-[#1a1b23] border border-slate-300 dark:border-slate-700/30 rounded-l-md px-3 py-2 text-slate-900 dark:text-slate-200 focus:outline-none focus:ring-1 focus:ring-cyan-500 focus:border-cyan-500"
-                      >
-                        <option value="">Select Category</option>
-                        {allCategories.map((cat, idx) => (
-                          <option key={idx} value={cat}>
-                            {cat}
-                          </option>
-                        ))}
-                      </select>
-                      <button
-                        onClick={loaddisCategories}
-                        className="bg-cyan-600 hover:bg-cyan-700 text-white px-4 py-2 rounded-r-md transition-colors"
-                      >
-                        Add
-                      </button>
-                    </div>
-                  </div>
-                </div>
+                {/* Full category + classification-rule management (DB-driven) */}
+                <CategoryRulesPanel />
               </div>
             )}
 
@@ -711,7 +517,7 @@ export default function SettingsPage() {
 
                 <div className="space-y-6">
                   {/* AI Provider and API Key Configuration */}
-                  <div className="bg-slate-50 dark:bg-[#1a1b23] border border-slate-300 dark:border-slate-700/30 rounded-lg p-4">
+                  <div className="bg-slate-50 dark:bg-[#05070D] border border-slate-300 dark:border-slate-700/30 rounded-lg p-4">
                     <h4 className="text-md font-medium text-slate-300 mb-2 flex items-center">
                       <Bot className="h-4 w-4 mr-2 text-cyan-500" />
                       AI Assistant Configuration
@@ -729,7 +535,7 @@ export default function SettingsPage() {
                         <select
                           value={aiProvider}
                           onChange={(e) => setAiProvider(e.target.value)}
-                          className="w-full px-3 py-2 bg-slate-50 dark:bg-[#13141a] border border-slate-300 dark:border-slate-700/30 rounded-md text-slate-900 dark:text-slate-200 focus:outline-none focus:ring-2 focus:ring-cyan-500"
+                          className="w-full px-3 py-2 bg-slate-50 dark:bg-[#03050A] border border-slate-300 dark:border-slate-700/30 rounded-md text-slate-900 dark:text-slate-200 focus:outline-none focus:ring-2 focus:ring-cyan-500"
                         >
                           <option value="openai">OpenAI (GPT-4o)</option>
                           <option value="gemini">Google Gemini (gemini-2.5-flash)</option>
@@ -748,7 +554,7 @@ export default function SettingsPage() {
                               value={openaiApiKey}
                               onChange={(e) => setOpenaiApiKey(e.target.value)}
                               placeholder="Enter your OpenAI API key (sk-...)"
-                              className="flex-1 px-3 py-2 bg-slate-50 dark:bg-[#13141a] border border-slate-300 dark:border-slate-700/30 rounded-md text-slate-900 dark:text-slate-200 placeholder-slate-500 dark:placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-cyan-500"
+                              className="flex-1 px-3 py-2 bg-slate-50 dark:bg-[#03050A] border border-slate-300 dark:border-slate-700/30 rounded-md text-slate-900 dark:text-slate-200 placeholder-slate-500 dark:placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-cyan-500"
                             />
                             <button
                               onClick={async () => {
@@ -780,7 +586,7 @@ export default function SettingsPage() {
                             <p className="text-green-400 text-sm mt-2">✓ API key is valid</p>
                           )}
 
-                          <div className="bg-slate-100 dark:bg-[#13141a] border border-slate-300 dark:border-slate-700/30 rounded-md p-3 mt-3">
+                          <div className="bg-slate-100 dark:bg-[#03050A] border border-slate-300 dark:border-slate-700/30 rounded-md p-3 mt-3">
                             <h5 className="text-sm font-medium text-slate-300 mb-2">How to get an OpenAI API key:</h5>
                             <ol className="text-sm text-slate-400 space-y-1">
                               <li>1. Visit <a href="https://platform.openai.com/api-keys" className="text-cyan-400 hover:underline" target="_blank" rel="noopener noreferrer">OpenAI API Keys</a></li>
@@ -804,7 +610,7 @@ export default function SettingsPage() {
                               value={geminiApiKey}
                               onChange={(e) => setGeminiApiKey(e.target.value)}
                               placeholder="Enter your Gemini API key (AIza...)"
-                              className="flex-1 px-3 py-2 bg-slate-50 dark:bg-[#13141a] border border-slate-300 dark:border-slate-700/30 rounded-md text-slate-900 dark:text-slate-200 placeholder-slate-500 dark:placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-cyan-500"
+                              className="flex-1 px-3 py-2 bg-slate-50 dark:bg-[#03050A] border border-slate-300 dark:border-slate-700/30 rounded-md text-slate-900 dark:text-slate-200 placeholder-slate-500 dark:placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-cyan-500"
                             />
                             <button
                               onClick={async () => {
@@ -836,7 +642,7 @@ export default function SettingsPage() {
                             <p className="text-green-400 text-sm mt-2">✓ API key is valid</p>
                           )}
 
-                          <div className="bg-slate-100 dark:bg-[#13141a] border border-slate-300 dark:border-slate-700/30 rounded-md p-3 mt-3">
+                          <div className="bg-slate-100 dark:bg-[#03050A] border border-slate-300 dark:border-slate-700/30 rounded-md p-3 mt-3">
                             <h5 className="text-sm font-medium text-slate-300 mb-2">How to get a Gemini API key:</h5>
                             <ol className="text-sm text-slate-400 space-y-1">
                               <li>1. Visit <a href="https://aistudio.google.com/apikey" className="text-cyan-400 hover:underline" target="_blank" rel="noopener noreferrer">Google AI Studio</a></li>
@@ -885,7 +691,7 @@ export default function SettingsPage() {
                   </div>
 
                   {/* Service Status */}
-                  <div className="bg-slate-50 dark:bg-[#1a1b23] border border-slate-300 dark:border-slate-700/30 rounded-lg p-4">
+                  <div className="bg-slate-50 dark:bg-[#05070D] border border-slate-300 dark:border-slate-700/30 rounded-lg p-4">
                     <h4 className="text-md font-medium text-slate-300 mb-2 flex items-center">
                       <RefreshCw className="h-4 w-4 mr-2 text-cyan-500" />
                       Service Status
@@ -934,7 +740,7 @@ export default function SettingsPage() {
                 </h3>
 
                 <div className="space-y-6">
-                  <div className="bg-slate-50 dark:bg-[#1a1b23] border border-slate-300 dark:border-slate-700/30 rounded-lg p-4">
+                  <div className="bg-slate-50 dark:bg-[#05070D] border border-slate-300 dark:border-slate-700/30 rounded-lg p-4">
                     <h4 className="text-md font-medium text-slate-300 mb-2 flex items-center">
                       <Download className="h-4 w-4 mr-2 text-cyan-500" />
                       Export Data
@@ -943,25 +749,83 @@ export default function SettingsPage() {
                       Download your productivity data in various formats
                     </p>
 
-                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                    {/* Optional date range. Leave blank to export the full history. */}
+                    <div className="flex flex-wrap items-end gap-3 mb-4">
+                      <div className="flex flex-col">
+                        <label className="text-xs text-slate-500 dark:text-slate-400 mb-1">
+                          From
+                        </label>
+                        <input
+                          type="date"
+                          value={exportFrom}
+                          max={exportTo || undefined}
+                          onChange={(e) => setExportFrom(e.target.value)}
+                          style={{ colorScheme: resolvedTheme === 'dark' ? 'dark' : 'light' }}
+                          className="text-sm bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded px-2 py-1.5 text-slate-800 dark:text-slate-200"
+                        />
+                      </div>
+                      <div className="flex flex-col">
+                        <label className="text-xs text-slate-500 dark:text-slate-400 mb-1">
+                          To
+                        </label>
+                        <input
+                          type="date"
+                          value={exportTo}
+                          min={exportFrom || undefined}
+                          onChange={(e) => setExportTo(e.target.value)}
+                          style={{ colorScheme: resolvedTheme === 'dark' ? 'dark' : 'light' }}
+                          className="text-sm bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded px-2 py-1.5 text-slate-800 dark:text-slate-200"
+                        />
+                      </div>
+                      {(exportFrom || exportTo) && (
+                        <button
+                          onClick={() => {
+                            setExportFrom('')
+                            setExportTo('')
+                          }}
+                          className="text-xs text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200 underline pb-2"
+                        >
+                          Clear
+                        </button>
+                      )}
+                      <span className="text-xs text-slate-400 pb-2">
+                        {exportFrom || exportTo ? 'Exporting selected range' : 'Exporting all history'}
+                      </span>
+                    </div>
+
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                       {[
                         { format: 'CSV', icon: '📊', desc: 'Spreadsheet compatible' },
-                        { format: 'JSON', icon: '{ }', desc: 'Developer friendly' },
-                        { format: 'PDF', icon: '📄', desc: 'Printable report' }
+                        { format: 'JSON', icon: '{ }', desc: 'Developer friendly' }
                       ].map((item) => (
                         <button
                           key={item.format}
-                          className="flex flex-col items-center justify-center p-4 bg-slate-100 dark:bg-[#1a1b23] hover:bg-slate-200 dark:hover:bg-slate-700 border border-slate-300 dark:border-slate-700/30 rounded-lg transition-colors"
+                          onClick={() => handleExport(item.format)}
+                          disabled={isExporting}
+                          className="flex flex-col items-center justify-center p-4 bg-slate-100 dark:bg-[#05070D] hover:bg-slate-200 dark:hover:bg-slate-700 border border-slate-300 dark:border-slate-700/30 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                         >
                           <div className="text-2xl mb-2">{item.icon}</div>
-                          <div className="font-medium text-slate-200">{item.format}</div>
+                          <div className="font-medium text-slate-800 dark:text-slate-200">
+                            {item.format}
+                          </div>
                           <div className="text-xs text-slate-400">{item.desc}</div>
                         </button>
                       ))}
                     </div>
+                    {exportStatus && (
+                      <p
+                        className={`text-sm mt-3 ${
+                          exportStatus.ok
+                            ? 'text-emerald-600 dark:text-emerald-400'
+                            : 'text-rose-500 dark:text-rose-400'
+                        }`}
+                      >
+                        {exportStatus.message}
+                      </p>
+                    )}
                   </div>
 
-                  <div className="bg-slate-50 dark:bg-[#1a1b23] border border-slate-300 dark:border-slate-700/30 rounded-lg p-4">
+                  <div className="bg-slate-50 dark:bg-[#05070D] border border-slate-300 dark:border-slate-700/30 rounded-lg p-4">
                     <h4 className="text-md font-medium text-slate-300 mb-2 flex items-center">
                       <Upload className="h-4 w-4 mr-2 text-cyan-500" />
                       Import Data
@@ -985,7 +849,7 @@ export default function SettingsPage() {
                     </div>
                   </div>
 
-                  <div className="bg-slate-50 dark:bg-[#1a1b23] border border-slate-300 dark:border-slate-700/30 rounded-lg p-4">
+                  <div className="bg-slate-50 dark:bg-[#05070D] border border-slate-300 dark:border-slate-700/30 rounded-lg p-4">
                     <h4 className="text-md font-medium text-slate-300 mb-2 flex items-center">
                       <Trash2 className="h-4 w-4 mr-2 text-rose-500" />
                       Delete Data
@@ -995,14 +859,14 @@ export default function SettingsPage() {
                     </p>
 
                     <div className="space-y-3">
-                      <button className="w-full flex justify-between items-center p-3 bg-slate-100 dark:bg-[#1a1b23] hover:bg-slate-200 dark:hover:bg-slate-700 border border-slate-300 dark:border-slate-700/30 rounded-lg transition-colors">
+                      <button className="w-full flex justify-between items-center p-3 bg-slate-100 dark:bg-[#05070D] hover:bg-slate-200 dark:hover:bg-slate-700 border border-slate-300 dark:border-slate-700/30 rounded-lg transition-colors">
                         <span className="text-slate-300">Clear activity history</span>
                         <span className="text-xs bg-slate-200 dark:bg-slate-700 text-slate-700 dark:text-slate-300 px-2 py-1 rounded">
                           Last 30 days
                         </span>
                       </button>
 
-                      <button className="w-full flex justify-between items-center p-3 bg-slate-100 dark:bg-[#1a1b23] hover:bg-slate-200 dark:hover:bg-slate-700 border border-slate-300 dark:border-slate-700/30 rounded-lg transition-colors">
+                      <button className="w-full flex justify-between items-center p-3 bg-slate-100 dark:bg-[#05070D] hover:bg-slate-200 dark:hover:bg-slate-700 border border-slate-300 dark:border-slate-700/30 rounded-lg transition-colors">
                         <span className="text-slate-300">Reset all statistics</span>
                         <span className="text-xs bg-slate-200 dark:bg-slate-700 text-slate-700 dark:text-slate-300 px-2 py-1 rounded">
                           All time
@@ -1018,7 +882,7 @@ export default function SettingsPage() {
                     </div>
                   </div>
 
-                  <div className="bg-slate-50 dark:bg-[#1a1b23] border border-slate-300 dark:border-slate-700/30 rounded-lg p-4">
+                  <div className="bg-slate-50 dark:bg-[#05070D] border border-slate-300 dark:border-slate-700/30 rounded-lg p-4">
                     <h4 className="text-md font-medium text-slate-300 mb-2 flex items-center">
                       <Database className="h-4 w-4 mr-2 text-cyan-500" />
                       Backup & Sync
@@ -1056,7 +920,7 @@ export default function SettingsPage() {
                         <label className="block text-sm font-medium text-slate-700 dark:text-slate-400 mb-1">
                           Backup Frequency
                         </label>
-                        <select className="w-full bg-slate-50 dark:bg-[#1a1b23] border border-slate-300 dark:border-slate-700/30 rounded-md px-3 py-2 text-slate-900 dark:text-slate-200 focus:outline-none focus:ring-1 focus:ring-cyan-500 focus:border-cyan-500">
+                        <select className="w-full bg-slate-50 dark:bg-[#05070D] border border-slate-300 dark:border-slate-700/30 rounded-md px-3 py-2 text-slate-900 dark:text-slate-200 focus:outline-none focus:ring-1 focus:ring-cyan-500 focus:border-cyan-500">
                           <option value="daily">Daily</option>
                           <option value="weekly">Weekly</option>
                           <option value="monthly">Monthly</option>
@@ -1076,6 +940,8 @@ export default function SettingsPage() {
                 </h3>
 
                 <div className="space-y-6">
+                  <BrowserBridgePanel />
+
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     {[
                       { name: 'Google Calendar', icon: '📅', connected: true },
@@ -1113,7 +979,7 @@ export default function SettingsPage() {
                     ))}
                   </div>
 
-                  <div className="bg-slate-50 dark:bg-[#1a1b23] border border-slate-300 dark:border-slate-700/30 rounded-lg p-4">
+                  <div className="bg-slate-50 dark:bg-[#05070D] border border-slate-300 dark:border-slate-700/30 rounded-lg p-4">
                     <h4 className="text-md font-medium text-slate-800 dark:text-slate-300 mb-3">API Access</h4>
                     <p className="text-sm text-slate-400 mb-4">
                       Generate API keys to integrate with other services
@@ -1129,7 +995,7 @@ export default function SettingsPage() {
                             type="text"
                             value="••••••••••••••••••••••••••••••"
                             readOnly
-                            className="flex-1 bg-slate-50 dark:bg-[#1a1b23] border border-slate-300 dark:border-slate-700/30 rounded-l-md px-3 py-2 text-slate-900 dark:text-slate-200 focus:outline-none"
+                            className="flex-1 bg-slate-50 dark:bg-[#05070D] border border-slate-300 dark:border-slate-700/30 rounded-l-md px-3 py-2 text-slate-900 dark:text-slate-200 focus:outline-none"
                           />
                           <button className="bg-slate-300 hover:bg-slate-400 dark:bg-slate-700 dark:hover:bg-slate-600 text-slate-800 dark:text-slate-300 px-4 py-2 rounded-r-md transition-colors">
                             Show
@@ -1148,7 +1014,7 @@ export default function SettingsPage() {
                     </div>
                   </div>
 
-                  <div className="bg-slate-50 dark:bg-[#1a1b23] border border-slate-300 dark:border-slate-700/30 rounded-lg p-4">
+                  <div className="bg-slate-50 dark:bg-[#05070D] border border-slate-300 dark:border-slate-700/30 rounded-lg p-4">
                     <h4 className="text-md font-medium text-slate-800 dark:text-slate-300 mb-3">Webhooks</h4>
                     <p className="text-sm text-slate-400 mb-4">
                       Configure webhooks to notify external services
@@ -1162,7 +1028,7 @@ export default function SettingsPage() {
                         <input
                           type="text"
                           placeholder="https://"
-                          className="w-full bg-slate-50 dark:bg-[#1a1b23] border border-slate-300 dark:border-slate-700/30 rounded-md px-3 py-2 text-slate-900 dark:text-slate-200 focus:outline-none focus:ring-1 focus:ring-cyan-500 focus:border-cyan-500"
+                          className="w-full bg-slate-50 dark:bg-[#05070D] border border-slate-300 dark:border-slate-700/30 rounded-md px-3 py-2 text-slate-900 dark:text-slate-200 focus:outline-none focus:ring-1 focus:ring-cyan-500 focus:border-cyan-500"
                         />
                       </div>
 
@@ -1181,7 +1047,7 @@ export default function SettingsPage() {
                             <label key={event} className="flex items-center">
                               <input
                                 type="checkbox"
-                                className="h-4 w-4 text-cyan-500 focus:ring-cyan-500 border-slate-300 dark:border-slate-600 bg-slate-50 dark:bg-[#1a1b23] rounded"
+                                className="h-4 w-4 text-cyan-500 focus:ring-cyan-500 border-slate-300 dark:border-slate-600 bg-slate-50 dark:bg-[#05070D] rounded"
                               />
                               <span className="ml-2 text-slate-300 text-sm">{event}</span>
                             </label>
@@ -1206,7 +1072,7 @@ export default function SettingsPage() {
                 </h3>
 
                 <div className="space-y-6">
-                  <div className="bg-slate-50 dark:bg-[#1a1b23] border border-slate-300 dark:border-slate-700/30 rounded-lg p-4">
+                  <div className="bg-slate-50 dark:bg-[#05070D] border border-slate-300 dark:border-slate-700/30 rounded-lg p-4">
                     <h4 className="text-md font-medium text-slate-800 dark:text-slate-300 mb-3">Focus Timer</h4>
 
                     <div className="space-y-4">
@@ -1220,7 +1086,7 @@ export default function SettingsPage() {
                             defaultValue={25}
                             min={1}
                             max={120}
-                            className="w-full bg-slate-50 dark:bg-[#1a1b23] border border-slate-300 dark:border-slate-700/30 rounded-md px-3 py-2 text-slate-900 dark:text-slate-200 focus:outline-none focus:ring-1 focus:ring-cyan-500 focus:border-cyan-500"
+                            className="w-full bg-slate-50 dark:bg-[#05070D] border border-slate-300 dark:border-slate-700/30 rounded-md px-3 py-2 text-slate-900 dark:text-slate-200 focus:outline-none focus:ring-1 focus:ring-cyan-500 focus:border-cyan-500"
                           />
                         </div>
 
@@ -1233,7 +1099,7 @@ export default function SettingsPage() {
                             defaultValue={5}
                             min={1}
                             max={60}
-                            className="w-full bg-slate-50 dark:bg-[#1a1b23] border border-slate-300 dark:border-slate-700/30 rounded-md px-3 py-2 text-slate-900 dark:text-slate-200 focus:outline-none focus:ring-1 focus:ring-cyan-500 focus:border-cyan-500"
+                            className="w-full bg-slate-50 dark:bg-[#05070D] border border-slate-300 dark:border-slate-700/30 rounded-md px-3 py-2 text-slate-900 dark:text-slate-200 focus:outline-none focus:ring-1 focus:ring-cyan-500 focus:border-cyan-500"
                           />
                         </div>
                       </div>
@@ -1248,7 +1114,7 @@ export default function SettingsPage() {
                             defaultValue={15}
                             min={1}
                             max={120}
-                            className="w-full bg-slate-50 dark:bg-[#1a1b23] border border-slate-300 dark:border-slate-700/30 rounded-md px-3 py-2 text-slate-900 dark:text-slate-200 focus:outline-none focus:ring-1 focus:ring-cyan-500 focus:border-cyan-500"
+                            className="w-full bg-slate-50 dark:bg-[#05070D] border border-slate-300 dark:border-slate-700/30 rounded-md px-3 py-2 text-slate-900 dark:text-slate-200 focus:outline-none focus:ring-1 focus:ring-cyan-500 focus:border-cyan-500"
                           />
                         </div>
 
@@ -1261,7 +1127,7 @@ export default function SettingsPage() {
                             defaultValue={4}
                             min={1}
                             max={10}
-                            className="w-full bg-slate-50 dark:bg-[#1a1b23] border border-slate-300 dark:border-slate-700/30 rounded-md px-3 py-2 text-slate-900 dark:text-slate-200 focus:outline-none focus:ring-1 focus:ring-cyan-500 focus:border-cyan-500"
+                            className="w-full bg-slate-50 dark:bg-[#05070D] border border-slate-300 dark:border-slate-700/30 rounded-md px-3 py-2 text-slate-900 dark:text-slate-200 focus:outline-none focus:ring-1 focus:ring-cyan-500 focus:border-cyan-500"
                           />
                         </div>
                       </div>
@@ -1289,7 +1155,7 @@ export default function SettingsPage() {
                     </div>
                   </div>
 
-                  <div className="bg-slate-50 dark:bg-[#1a1b23] border border-slate-300 dark:border-slate-700/30 rounded-lg p-4">
+                  <div className="bg-slate-50 dark:bg-[#05070D] border border-slate-300 dark:border-slate-700/30 rounded-lg p-4">
                     <h4 className="text-md font-medium text-slate-800 dark:text-slate-300 mb-3">Date & Time</h4>
 
                     <div className="space-y-4">
@@ -1304,7 +1170,7 @@ export default function SettingsPage() {
                               name="timeFormat"
                               checked={timeFormat === '12h'}
                               onChange={() => setTimeFormat('12h')}
-                              className="h-4 w-4 text-cyan-500 focus:ring-cyan-500 border-slate-300 dark:border-slate-600 bg-slate-50 dark:bg-[#1a1b23]"
+                              className="h-4 w-4 text-cyan-500 focus:ring-cyan-500 border-slate-300 dark:border-slate-600 bg-slate-50 dark:bg-[#05070D]"
                             />
                             <span className="ml-2 text-slate-300">12-hour (1:30 PM)</span>
                           </label>
@@ -1314,7 +1180,7 @@ export default function SettingsPage() {
                               name="timeFormat"
                               checked={timeFormat === '24h'}
                               onChange={() => setTimeFormat('24h')}
-                              className="h-4 w-4 text-cyan-500 focus:ring-cyan-500 border-slate-300 dark:border-slate-600 bg-slate-50 dark:bg-[#1a1b23]"
+                              className="h-4 w-4 text-cyan-500 focus:ring-cyan-500 border-slate-300 dark:border-slate-600 bg-slate-50 dark:bg-[#05070D]"
                             />
                             <span className="ml-2 text-slate-300">24-hour (13:30)</span>
                           </label>
@@ -1328,7 +1194,7 @@ export default function SettingsPage() {
                         <select
                           value={weekStart}
                           onChange={(e) => setWeekStart(e.target.value)}
-                          className="w-full bg-slate-50 dark:bg-[#1a1b23] border border-slate-300 dark:border-slate-700/30 rounded-md px-3 py-2 text-slate-900 dark:text-slate-200 focus:outline-none focus:ring-1 focus:ring-cyan-500 focus:border-cyan-500"
+                          className="w-full bg-slate-50 dark:bg-[#05070D] border border-slate-300 dark:border-slate-700/30 rounded-md px-3 py-2 text-slate-900 dark:text-slate-200 focus:outline-none focus:ring-1 focus:ring-cyan-500 focus:border-cyan-500"
                         >
                           <option value="monday">Monday</option>
                           <option value="sunday">Sunday</option>
@@ -1340,7 +1206,7 @@ export default function SettingsPage() {
                         <label className="block text-sm font-medium text-slate-700 dark:text-slate-400 mb-1">
                           Date Format
                         </label>
-                        <select className="w-full bg-slate-50 dark:bg-[#1a1b23] border border-slate-300 dark:border-slate-700/30 rounded-md px-3 py-2 text-slate-900 dark:text-slate-200 focus:outline-none focus:ring-1 focus:ring-cyan-500 focus:border-cyan-500">
+                        <select className="w-full bg-slate-50 dark:bg-[#05070D] border border-slate-300 dark:border-slate-700/30 rounded-md px-3 py-2 text-slate-900 dark:text-slate-200 focus:outline-none focus:ring-1 focus:ring-cyan-500 focus:border-cyan-500">
                           <option value="MM/DD/YYYY">MM/DD/YYYY</option>
                           <option value="DD/MM/YYYY">DD/MM/YYYY</option>
                           <option value="YYYY-MM-DD">YYYY-MM-DD</option>
@@ -1349,7 +1215,7 @@ export default function SettingsPage() {
                     </div>
                   </div>
 
-                  <div className="bg-slate-50 dark:bg-[#1a1b23] border border-slate-300 dark:border-slate-700/30 rounded-lg p-4">
+                  <div className="bg-slate-50 dark:bg-[#05070D] border border-slate-300 dark:border-slate-700/30 rounded-lg p-4">
                     <h4 className="text-md font-medium text-slate-800 dark:text-slate-300 mb-3">Language & Region</h4>
 
                     <div className="space-y-4">
@@ -1360,7 +1226,7 @@ export default function SettingsPage() {
                         <select
                           value={language}
                           onChange={(e) => setLanguage(e.target.value)}
-                          className="w-full bg-slate-50 dark:bg-[#1a1b23] border border-slate-300 dark:border-slate-700/30 rounded-md px-3 py-2 text-slate-900 dark:text-slate-200 focus:outline-none focus:ring-1 focus:ring-cyan-500 focus:border-cyan-500"
+                          className="w-full bg-slate-50 dark:bg-[#05070D] border border-slate-300 dark:border-slate-700/30 rounded-md px-3 py-2 text-slate-900 dark:text-slate-200 focus:outline-none focus:ring-1 focus:ring-cyan-500 focus:border-cyan-500"
                         >
                           <option value="english">English</option>
                           <option value="spanish">Spanish</option>
@@ -1375,7 +1241,7 @@ export default function SettingsPage() {
                         <label className="block text-sm font-medium text-slate-700 dark:text-slate-400 mb-1">
                           Timezone
                         </label>
-                        <select className="w-full bg-slate-50 dark:bg-[#1a1b23] border border-slate-300 dark:border-slate-700/30 rounded-md px-3 py-2 text-slate-900 dark:text-slate-200 focus:outline-none focus:ring-1 focus:ring-cyan-500 focus:border-cyan-500">
+                        <select className="w-full bg-slate-50 dark:bg-[#05070D] border border-slate-300 dark:border-slate-700/30 rounded-md px-3 py-2 text-slate-900 dark:text-slate-200 focus:outline-none focus:ring-1 focus:ring-cyan-500 focus:border-cyan-500">
                           <option value="auto">Auto-detect (System)</option>
                           <option value="utc">UTC</option>
                           <option value="est">Eastern Time (EST/EDT)</option>
@@ -1386,7 +1252,7 @@ export default function SettingsPage() {
                     </div>
                   </div>
 
-                  <div className="bg-slate-50 dark:bg-[#1a1b23] border border-slate-300 dark:border-slate-700/30 rounded-lg p-4">
+                  <div className="bg-slate-50 dark:bg-[#05070D] border border-slate-300 dark:border-slate-700/30 rounded-lg p-4">
                     <h4 className="text-md font-medium text-slate-800 dark:text-slate-300 mb-3">Accessibility</h4>
 
                     <div className="space-y-3">
@@ -1429,26 +1295,6 @@ export default function SettingsPage() {
                 </div>
               </div>
             )}
-
-            {/* Save Button */}
-            <div className="mt-6 flex justify-end">
-              <button
-                onClick={() => {
-                  try {
-                    window.activeWindow.send('save-categories', {
-                      productive: productiveCategories,
-                      distracted: distractedCategories
-                    })
-                  } catch (error) {
-                    console.error('Error saving settings:', error)
-                  }
-                }}
-                className="bg-cyan-600 hover:bg-cyan-700 text-white px-4 py-2 rounded-md transition-colors flex items-center"
-              >
-                <Save className="h-4 w-4 mr-2" />
-                Save Settings
-              </button>
-            </div>
           </div>
         </div>
       </div>

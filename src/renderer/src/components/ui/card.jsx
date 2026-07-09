@@ -4,7 +4,7 @@ import { cn } from '../../lib/utils' // Utility for merging classnames
 const Card = React.forwardRef(({ className, ...props }, ref) => (
   <div
     ref={ref}
-    className={cn('rounded-2xl border border-[#E8EDF1] dark:border-[#282932] bg-white dark:bg-[#212329] text-[#232360] dark:text-white shadow-sm', className)}
+    className={cn('rounded-2xl border border-[#E8EDF1] dark:border-[#1E293B]/70 bg-white dark:bg-[#0B1220]/60 dark:backdrop-blur-md text-[#232360] dark:text-white shadow-sm dark:shadow-[0_4px_24px_rgba(0,0,0,0.35)]', className)}
     {...props}
   />
 ))

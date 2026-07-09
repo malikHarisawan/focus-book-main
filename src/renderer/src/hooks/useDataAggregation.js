@@ -179,18 +179,7 @@ export const formatTimeSpent = (seconds) => {
   }
 }
 
-export const getCategoryProductivity = (category) => {
-  switch (category) {
-    case 'Code':
-    case 'Productivity':
-    case 'Learning':
-    case 'Documenting':
-      return 'Productive'
-    case 'Entertainment':
-    case 'Browsing':
-    case 'Personal':
-      return 'Un-Productive'
-    default:
-      return 'Neutral'
-  }
-}
+// Productivity level is DB-driven — delegate to the single source of truth in
+// dataProcessor rather than hardcoding a category->level map here. Returns
+// 'Productive' | 'Neutral' | 'Distracting'.
+export { getProductivity as getCategoryProductivity } from '../utils/dataProcessor'

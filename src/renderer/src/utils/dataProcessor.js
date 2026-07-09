@@ -1,28 +1,63 @@
-// Note: This will be replaced by database-driven productivity mapping
-// Kept as fallback for when database categories aren't loaded yet
-const DEFAULT_FOCUS_CATEGORIES = ['Code', 'Documenting', 'Learning']
-const DEFAULT_NEUTRAL_CATEGORIES = ['Utility', 'Miscellaneous', 'Personal', 'Utilities']
-const DEFAULT_UNPRODUCTIVE = ['Entertainment', 'Messaging', 'Communication', 'Browsing']
+// Category metadata is DB-driven — the `categories` table is the single source of
+// truth for productivity type, color, and icon. This module is the renderer-side
+// cache: it loads the full metadata once (get-all-categories) and exposes lookups
+// so no component needs its own hardcoded color/icon/productivity map.
+//
+// Fallbacks below apply when the DB is unreachable or a category has no color/icon
+// set, so the UI degrades gracefully (Neutral / gray / Package) rather than
+// crashing.
+let categoryProductivityMap = {}
+let categoryColorMap = {}
+let categoryIconMap = {}
+let categoryList = [] // [{ name, type, color, icon }, ...]
 
-// Global variable to store database category mappings
-let categoryProductivityMap = null
+// Sensible defaults when the DB has no color/icon for a category, or is offline.
+const DEFAULT_CATEGORY_COLOR = '#7a7a7a'
+const DEFAULT_CATEGORY_ICON = 'Package'
 
-// Function to load category productivity mapping from main process
+// Function to load category metadata from main process
 async function loadCategoryProductivityMapping() {
   try {
-    // Request categories from the main process via activeWindow API
-    const categories = await window.activeWindow.loadCategories()
-    if (categories && Array.isArray(categories)) {
-      categoryProductivityMap = {}
-      categories.forEach(category => {
-        if (category.name && category.productivity_type) {
-          categoryProductivityMap[category.name] = category.productivity_type
-        }
+    // Prefer the rich metadata source (name, type, color, icon).
+    let cats = []
+    if (window.activeWindow?.loadAllCategories) {
+      cats = await window.activeWindow.loadAllCategories()
+    }
+
+    if (Array.isArray(cats) && cats.length > 0) {
+      const pMap = {}
+      const cMap = {}
+      const iMap = {}
+      cats.forEach((c) => {
+        if (!c || !c.name) return
+        // Store productive/distracted; neutral is the default so we can omit it.
+        if (c.type === 'productive' || c.type === 'distracted') pMap[c.name] = c.type
+        if (c.color) cMap[c.name] = c.color
+        if (c.icon) iMap[c.name] = c.icon
       })
-      console.log('Dashboard: Category productivity mapping loaded:', categoryProductivityMap)
+      categoryProductivityMap = pMap
+      categoryColorMap = cMap
+      categoryIconMap = iMap
+      categoryList = cats
+      console.log('Category metadata loaded:', categoryList.length, 'categories')
+      return
+    }
+
+    // Fallback: the older [productive[], distracted[]] shape (no color/icon).
+    const categories = await window.activeWindow.loadCategories()
+    if (Array.isArray(categories)) {
+      const [productive = [], distracted = []] = categories
+      const map = {}
+      productive.forEach((name) => {
+        map[name] = 'productive'
+      })
+      distracted.forEach((name) => {
+        map[name] = 'distracted'
+      })
+      categoryProductivityMap = map
     }
   } catch (error) {
-    console.error('Dashboard: Error loading category productivity mapping:', error)
+    console.error('Error loading category metadata:', error)
   }
 }
 
@@ -33,6 +68,20 @@ loadCategoryProductivityMapping()
 export const refreshCategoryMapping = () => {
   return loadCategoryProductivityMapping()
 }
+
+// DB-driven category color. Falls back to a neutral gray when unknown.
+export const getCategoryColorFromDB = (category) => {
+  return categoryColorMap[category] || DEFAULT_CATEGORY_COLOR
+}
+
+// DB-driven category icon name (a lucide-react icon name string). Falls back to
+// 'Package'. Consumers resolve the string to a component/emoji themselves.
+export const getCategoryIconFromDB = (category) => {
+  return categoryIconMap[category] || DEFAULT_CATEGORY_ICON
+}
+
+// The full list of categories [{ name, type, color, icon }] for dropdowns/menus.
+export const getCategoryList = () => categoryList
 export const formatTime = (milliseconds) => {
   const hours = Math.floor(milliseconds / (1000 * 60 * 60))
   const minutes = Math.floor((milliseconds % (1000 * 60 * 60)) / (1000 * 60))
@@ -40,47 +89,24 @@ export const formatTime = (milliseconds) => {
   return `${hours * 60 + minutes}`
 }
 
-const getProductivity = (category) => {
-  // First try to use database mapping if available
-  if (categoryProductivityMap && categoryProductivityMap[category]) {
-    const productivityType = categoryProductivityMap[category]
-    switch (productivityType) {
-      case 'productive':
-        return 'Productive'
-      case 'distracted':
-        return 'Un-Productive'
-      case 'neutral':
-        return 'Neutral'
-      default:
-        return 'Neutral'
-    }
-  }
-
-  // Fallback to static arrays if database mapping not loaded
-  if (DEFAULT_FOCUS_CATEGORIES.includes(category)) {
-    return 'Productive'
-  } else if (DEFAULT_UNPRODUCTIVE.includes(category)) {
-    return 'Un-Productive'
-  } else {
-    return 'Neutral'
+// Map a category to its display productivity level.
+// Canonical labels: 'Productive' | 'Neutral' | 'Distracting'. Exported so all
+// components share this one mapping instead of hardcoding their own.
+export const getProductivity = (category) => {
+  switch (categoryProductivityMap[category]) {
+    case 'productive':
+      return 'Productive'
+    case 'distracted':
+      return 'Distracting'
+    default:
+      return 'Neutral'
   }
 }
 
-// Export getProductivityType for external use
+// Export getProductivityType for external use — returns the raw DB type
+// ('productive' | 'distracted' | 'neutral').
 export const getProductivityType = (category) => {
-  // First try to use database mapping if available
-  if (categoryProductivityMap && categoryProductivityMap[category]) {
-    return categoryProductivityMap[category]
-  }
-
-  // Fallback to static arrays if database mapping not loaded
-  if (DEFAULT_FOCUS_CATEGORIES.includes(category)) {
-    return 'productive'
-  } else if (DEFAULT_UNPRODUCTIVE.includes(category)) {
-    return 'distracted'
-  } else {
-    return 'neutral'
-  }
+  return categoryProductivityMap[category] || 'neutral'
 }
 
 // Extract domain name from URL or app identifier
@@ -125,6 +151,8 @@ export function formatAppsData(rawData, date) {
       key: key,
       name: displayName, // Use original case for display
       category: value.category,
+      domain: value.domain || appMap.get(name)?.domain || '',
+      description: value.description || appMap.get(name)?.description || '',
       timeSpentSeconds: prevTime + value.time
     })
   }
@@ -143,6 +171,8 @@ export function formatAppsData(rawData, date) {
       key: app.key,
       name: app.name,
       category: app.category,
+      domain: app.domain || '',
+      description: app.description || '',
       timeSpent: formatAppsTime(Math.floor(app.timeSpentSeconds / 1000)),
       timeSpentSeconds: Math.floor(app.timeSpentSeconds / 1000),
       productivity: getProductivity(app.category),
@@ -239,6 +269,93 @@ export const processUsageChartData = (jsonData, date, viewType = 'day') => {
   }
 }
 
+// Add an app's time to the correct productivity bucket of a chart data point.
+// Buckets mirror the three DB-driven labels so the chart, summary cards, and
+// tooltip all agree: productive / neutral / distracting.
+const accumulateProductivity = (bucket, app) => {
+  if (!app.category || !app.time) return
+
+  const seconds = app.time / 1000
+  switch (getProductivity(app.category)) {
+    case 'Productive':
+      bucket.productive += seconds
+      break
+    case 'Distracting':
+      bucket.distracting += seconds
+      break
+    default:
+      bucket.neutral += seconds
+  }
+}
+
+const emptyPoint = (day) => ({ day, productive: 0, neutral: 0, distracting: 0 })
+
+// Format a Date as a LOCAL YYYY-MM-DD (not UTC). Using toISOString() here would
+// shift the day for non-UTC timezones (e.g. a local midnight rolls back a day),
+// which is exactly why the month view used to span 06-30..07-30 instead of the
+// intended 07-01..07-31.
+const toLocalDateStr = (d) => {
+  const y = d.getFullYear()
+  const m = String(d.getMonth() + 1).padStart(2, '0')
+  const day = String(d.getDate()).padStart(2, '0')
+  return `${y}-${m}-${day}`
+}
+
+// The list of YYYY-MM-DD dates covered by a given zoom/view level, anchored on
+// `date`. Mirrors the ranges the area chart uses so the summary cards and the
+// chart always describe the same window:
+//   hour/day -> just `date`; week -> the Sun..Sat week containing `date`;
+//   month    -> every day of `date`'s calendar month.
+export const getDatesForView = (date, viewType = 'day') => {
+  const dateObj = new Date(date)
+  if (viewType === 'week') {
+    const dates = []
+    for (let i = 0; i < 7; i++) {
+      const d = new Date(dateObj)
+      d.setDate(dateObj.getDate() - dateObj.getDay() + i)
+      dates.push(toLocalDateStr(d))
+    }
+    return dates
+  }
+  if (viewType === 'month') {
+    const year = dateObj.getFullYear()
+    const month = dateObj.getMonth()
+    const daysInMonth = new Date(year, month + 1, 0).getDate()
+    const dates = []
+    for (let day = 1; day <= daysInMonth; day++) {
+      dates.push(toLocalDateStr(new Date(year, month, day)))
+    }
+    return dates
+  }
+  // 'hour' and 'day' both describe a single day.
+  return [typeof date === 'string' ? date : toLocalDateStr(dateObj)]
+}
+
+// Aggregate productive / neutral / distracting / total SECONDS across the date
+// window for a view level. Used by the dashboard summary cards so they reflect
+// the current day/week/month view instead of always showing the selected day.
+export const getProductivityTotals = (jsonData, date, viewType = 'day') => {
+  const totals = { productive: 0, neutral: 0, distracting: 0 }
+  if (jsonData) {
+    for (const d of getDatesForView(date, viewType)) {
+      const apps = jsonData[d]?.apps
+      if (!apps) continue
+      for (const app of Object.values(apps)) {
+        accumulateProductivity(totals, app)
+      }
+    }
+  }
+  const productiveSeconds = Math.floor(totals.productive)
+  const neutralSeconds = Math.floor(totals.neutral)
+  const distractingSeconds = Math.floor(totals.distracting)
+  return {
+    productiveSeconds,
+    neutralSeconds,
+    distractingSeconds,
+    totalSeconds: productiveSeconds + neutralSeconds + distractingSeconds
+  }
+}
+
 export const processProductiveChartData = (jsonData, date, viewType = 'day') => {
   if (viewType === 'hour') {
     if (!jsonData || !jsonData[date]) {
@@ -247,11 +364,7 @@ export const processProductiveChartData = (jsonData, date, viewType = 'day') => 
     const hourlyData = []
 
     for (let i = 9; i <= 21; i++) {
-      hourlyData.push({
-        day: i === 12 ? '12PM' : i < 12 ? `${i}AM` : `${i - 12}PM`,
-        productive: 0,
-        unproductive: 0
-      })
+      hourlyData.push(emptyPoint(i === 12 ? '12PM' : i < 12 ? `${i}AM` : `${i - 12}PM`))
     }
 
     for (const [hourKey, hourData] of Object.entries(jsonData[date])) {
@@ -264,16 +377,7 @@ export const processProductiveChartData = (jsonData, date, viewType = 'day') => 
       if (index < 0 || index >= hourlyData.length) continue
 
       for (const app of Object.values(hourData)) {
-        if (!app.category || !app.time) continue
-
-        const seconds = app.time / 1000
-        const isProductive = getProductivity(app.category)
-
-        if (isProductive == 'Productive') {
-          hourlyData[index].productive += seconds
-        } else {
-          hourlyData[index].unproductive += seconds
-        }
+        accumulateProductivity(hourlyData[index], app)
       }
     }
 
@@ -285,11 +389,9 @@ export const processProductiveChartData = (jsonData, date, viewType = 'day') => 
     const fullDayData = []
 
     for (let i = 0; i < 24; i++) {
-      fullDayData.push({
-        day: i === 0 ? '12AM' : i === 12 ? '12PM' : i < 12 ? `${i}AM` : `${i - 12}PM`,
-        productive: 0,
-        unproductive: 0
-      })
+      fullDayData.push(
+        emptyPoint(i === 0 ? '12AM' : i === 12 ? '12PM' : i < 12 ? `${i}AM` : `${i - 12}PM`)
+      )
     }
 
     for (const [hourKey, hourData] of Object.entries(jsonData[date])) {
@@ -299,89 +401,49 @@ export const processProductiveChartData = (jsonData, date, viewType = 'day') => 
       if (isNaN(hour) || hour < 0 || hour > 23) continue
 
       for (const app of Object.values(hourData)) {
-        if (!app.category || !app.time) continue
-
-        const seconds = app.time / 1000
-        const isProductive = getProductivity(app.category)
-
-        if (isProductive == 'Productive') {
-          fullDayData[hour].productive += seconds
-        } else {
-          fullDayData[hour].unproductive += seconds
-        }
+        accumulateProductivity(fullDayData[hour], app)
       }
     }
 
     return fullDayData
   } else if (viewType === 'week') {
     const weekData = []
-    const dateObj = new Date(date)
     const dayNames = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']
+    // Reuse the shared (local-date) window so the chart and the summary cards
+    // agree on exactly which days the week covers.
+    const weekDates = getDatesForView(date, 'week')
 
-    for (let i = 0; i < 7; i++) {
-      const currentDate = new Date(dateObj)
-      currentDate.setDate(dateObj.getDate() - dateObj.getDay() + i)
-      const formattedDate = currentDate.toISOString().split('T')[0]
-
-      const dayData = {
-        day: dayNames[i],
-        productive: 0,
-        unproductive: 0
-      }
+    weekDates.forEach((formattedDate, i) => {
+      const dayData = emptyPoint(dayNames[i])
 
       if (jsonData[formattedDate] && jsonData[formattedDate].apps) {
         for (const app of Object.values(jsonData[formattedDate].apps)) {
-          if (!app.category || !app.time) continue
-
-          const seconds = app.time / 1000
-          const isProductive = getProductivity(app.category)
-
-          if (isProductive == 'Productive') {
-            dayData.productive += seconds
-          } else {
-            dayData.unproductive += seconds
-          }
+          accumulateProductivity(dayData, app)
         }
       }
 
       weekData.push(dayData)
-    }
+    })
 
     return weekData
   } else if (viewType === 'month') {
     const monthData = []
-    const dateObj = new Date(date)
-    const year = dateObj.getFullYear()
-    const month = dateObj.getMonth()
-    const daysInMonth = new Date(year, month + 1, 0).getDate()
+    // Shared local-date window (fixes the old toISOString() off-by-one that
+    // made the month span the previous day..30th in non-UTC timezones).
+    const monthDates = getDatesForView(date, 'month')
 
-    for (let day = 1; day <= daysInMonth; day++) {
-      const currentDate = new Date(year, month, day)
-      const formattedDate = currentDate.toISOString().split('T')[0]
-
-      const dayData = {
-        day: day.toString(),
-        productive: 0,
-        unproductive: 0
-      }
+    monthDates.forEach((formattedDate, idx) => {
+      const day = idx + 1
+      const dayData = emptyPoint(day.toString())
 
       if (jsonData[formattedDate] && jsonData[formattedDate].apps) {
         for (const app of Object.values(jsonData[formattedDate].apps)) {
-          if (!app.category || !app.time) continue
-
-          const seconds = app.time / 1000
-          const isProductive = getProductivity(app.category)
-
-          if (isProductive == 'Productive') {
-            dayData.productive += seconds
-          } else {
-            dayData.unproductive += seconds
-          }
+          accumulateProductivity(dayData, app)
         }
       }
 
       monthData.push(dayData)
-    }
+    })
 
     return monthData
   }
@@ -473,11 +535,7 @@ export const processMostUsedApps = (jsonData, date) => {
 }
 
 const isProductiveCategory = (category) => {
-  if (categoryProductivityMap && categoryProductivityMap[category]) {
-    return categoryProductivityMap[category] === 'productive'
-  }
-  // Fallback to static categories
-  return DEFAULT_FOCUS_CATEGORIES.includes(category)
+  return categoryProductivityMap[category] === 'productive'
 }
 
 export const getTotalFocusTime = (jsonData, date, processedChartData, view) => {

@@ -1,6 +1,6 @@
 'use client'
 
-import { use, useEffect, useState, useMemo } from 'react'
+import { use, useEffect, useRef, useState, useMemo } from 'react'
 import { Badge } from '../ui/badge'
 import { Button } from '../ui/button'
 import {
@@ -19,7 +19,9 @@ import {
   Terminal,
   CodeIcon,
   Tag,
-  Check
+  Check,
+  Sparkles,
+  Sliders
 } from 'lucide-react'
 import {
   DropdownMenu,
@@ -36,11 +38,21 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '.
 import { Card, CardContent, CardHeader, CardTitle } from '../ui/card'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '../ui/tabs'
 
+import { useNavigate } from 'react-router-dom'
 import { useToast } from '../../hooks/use-toast'
-import useCategoryChangeToast from './category-change-toast'
 import CategoryBadge from './category-badge'
 import BulkCategoryDialog from './bulk-categories-dialog'
-import { formatAppsData, getProductivityType, refreshCategoryMapping } from '../../utils/dataProcessor'
+import SummaryTab from './SummaryTab'
+import SummarySkeleton from './SummarySkeleton'
+import {
+  formatAppsData,
+  getProductivityType,
+  refreshCategoryMapping,
+  getCategoryList,
+  getCategoryColorFromDB
+} from '../../utils/dataProcessor'
+import { getCategoryIconComponent } from '../../utils/categoryVisuals'
+import { generateSummary, clearSummaryCache } from '../../utils/aiSummaryService'
 import { useDate } from '../../context/DateContext'
 import { useTheme } from '../../context/ThemeContext'
 
@@ -57,21 +69,49 @@ export default function AppUsageTable() {
   const [sortBy, setSortBy] = useState('timeSpent')
   const [sortOrder, setSortOrder] = useState('desc')
   const [apps, setApps] = useState([])
+  // Category names for the "Change Category" menu — DB-driven via getCategoryList,
+  // seeded from the cache and refreshed alongside the data loads below.
+  const [categoryNames, setCategoryNames] = useState(() =>
+    getCategoryList().map((c) => c.name)
+  )
+  const [summary, setSummary] = useState(null)
+  const [isLoadingSummary, setIsLoadingSummary] = useState(false)
+  const [summaryError, setSummaryError] = useState(null)
+  // Table is the default tab; the AI summary is generated lazily only when the
+  // user actually opens the Summary tab (see the tab-change handler below).
+  const [activeTab, setActiveTab] = useState('table')
+  // Ref mirror of activeTab so the category-update listener (registered once per
+  // date) always reads the current tab instead of a stale closure value.
+  const activeTabRef = useRef('table')
+  // Guards against re-generating the summary every time the user re-visits the
+  // Summary tab within the same date. Reset when the date changes.
+  const [summaryLoadedForDate, setSummaryLoadedForDate] = useState(null)
   const { selectedDate, handleDateChange } = useDate()
   const { toast } = useToast()
-  const { showCategoryChangeToast } = useCategoryChangeToast()
+  const navigate = useNavigate()
 
   useEffect(() => {
     loadApps()
+    // Summary is generated lazily when the Summary tab is opened, not on mount.
+    // Reset the per-date guard so a date change re-generates on the next open.
+    setSummaryLoadedForDate(null)
     handleVisibilityChange()
     document.addEventListener('visibilitychange', handleVisibilityChange)
-    
+
     // Listen for category updates (in case of multiple windows or external updates)
     const removeCategoryListener = window.activeWindow.onCategoryUpdated((data) => {
       console.log('Activity page received category update:', data)
       loadApps()
+      // Invalidate the cached summary; only regenerate now if the Summary tab is
+      // actually open, otherwise it'll regenerate the next time it's opened.
+      clearSummaryCache(selectedDate)
+      setSummaryLoadedForDate(null)
+      if (activeTabRef.current === 'summary') {
+        loadSummary(true)
+        setSummaryLoadedForDate(selectedDate)
+      }
     })
-    
+
     return () => {
       document.removeEventListener('visibilitychange', handleVisibilityChange)
       if (removeCategoryListener) {
@@ -85,12 +125,84 @@ export default function AppUsageTable() {
       loadApps()
     }
   }
-  // Add the bulk categorize handler function inside the AppUsageTable component
+
+  // Lazily generate the AI summary the first time the Summary tab is opened for
+  // a given date. Switching to Table never triggers generation.
+  const handleTabChange = (value) => {
+    setActiveTab(value)
+    activeTabRef.current = value
+    if (value === 'summary' && summaryLoadedForDate !== selectedDate) {
+      setSummaryLoadedForDate(selectedDate)
+      loadSummary()
+    }
+  }
+  
+  // Load application usage data
   async function loadApps() {
+    // Ensure the DB-driven category productivity map is populated before
+    // formatAppsData reads it, otherwise productivity labels default to Neutral.
+    await refreshCategoryMapping()
+    // Refresh the category name list (now that metadata is loaded) so the
+    // "Change Category" menu reflects any user-added categories.
+    const names = getCategoryList().map((c) => c.name)
+    if (names.length > 0) setCategoryNames(names)
     const jsonData = await window.activeWindow.getAppUsageStats()
     const appsData = formatAppsData(jsonData, selectedDate)
     setApps(appsData)
   }
+
+  // Load AI-powered summary
+  async function loadSummary(forceRefresh = false) {
+    setIsLoadingSummary(true)
+    setSummaryError(null)
+    
+    try {
+      // Wait for apps to be loaded if not already
+      let appsData = apps
+      if (apps.length === 0) {
+        const jsonData = await window.activeWindow.getAppUsageStats()
+        appsData = formatAppsData(jsonData, selectedDate)
+      }
+
+      const result = await generateSummary(selectedDate, appsData, forceRefresh)
+      
+      if (result.success) {
+        setSummary(result.data)
+        
+        // Show toast for cache hits or AI generation
+        if (result.fromCache && !forceRefresh) {
+          console.log('✅ Using cached summary')
+        } else if (!result.isFallback) {
+          toast({
+            title: 'Summary Generated',
+            description: 'AI analysis completed successfully',
+          })
+        }
+      } else {
+        setSummaryError(result.error)
+        setSummary(result.data) // Fallback data
+      }
+    } catch (error) {
+      console.error('Error loading summary:', error)
+      setSummaryError(error.message)
+      toast({
+        title: 'Summary Error',
+        description: 'Failed to generate summary. Showing basic statistics.',
+        variant: 'destructive'
+      })
+    } finally {
+      setIsLoadingSummary(false)
+    }
+  }
+
+  // Manual refresh handler
+  const handleRefreshSummary = () => {
+    clearSummaryCache(selectedDate)
+    setSummaryLoadedForDate(selectedDate)
+    loadSummary(true)
+  }
+
+  // Handle bulk category changes
   const handleBulkCategorize = async (appIds, category) => {
     // Calculate the new productivity status based on the category
     const productivityType = getProductivityType(category)
@@ -117,6 +229,10 @@ export default function AppUsageTable() {
 
       // Refresh the category mapping to ensure consistency across the app
       await refreshCategoryMapping()
+      
+      // Clear summary cache and reload since categories changed
+      clearSummaryCache(selectedDate)
+      loadSummary(true)
     } catch (error) {
       console.error('Failed to save bulk category changes:', error)
       toast({
@@ -141,7 +257,9 @@ export default function AppUsageTable() {
     }
   }
 
-  // Update the handleCategoryChange function to show a toast notification
+  // Change a category from the Activity table. This creates/updates a
+  // classification RULE (not a per-app override the tracker would overwrite)
+  // and retags matching history, so the change persists across past + future.
   const handleCategoryChange = async (appId, newCategory) => {
     const appToUpdate = apps.find((app) => app.id === appId)
     if (appToUpdate) {
@@ -149,22 +267,44 @@ export default function AppUsageTable() {
       const productivityType = getProductivityType(newCategory)
       const newProductivity = getProductivityDisplay(productivityType)
 
-      // Update local state with both category and productivity
+      // Optimistically update local state with both category and productivity
       setApps(apps.map((app) => (app.id === appId ? { ...app, category: newCategory, productivity: newProductivity } : app)))
-      showCategoryChangeToast(appToUpdate.name, newCategory)
 
       try {
-        const appIdentifier = appToUpdate.domain || appToUpdate.name
-        const key = appToUpdate.key
-        await window.activeWindow.updateAppCategory(appIdentifier, newCategory, selectedDate, key)
+        const result = await window.activeWindow.retagAppCategory(appToUpdate, newCategory)
+        if (!result?.success) {
+          throw new Error(result?.error || 'Retag failed')
+        }
 
-        // Refresh the category mapping to ensure consistency across the app
+        // Convey the rule-based scope so the user understands it applies broadly.
+        const scope =
+          result.matchType === 'domain'
+            ? `All “${result.pattern}” activity`
+            : `“${appToUpdate.name}”`
+        toast({
+          title: result.ruleCreated ? 'Rule created' : 'Rule updated',
+          description: `${scope} is now categorized as “${newCategory}”.`,
+          duration: 3500
+        })
+
+        // Refresh the category mapping and reload so retagged rows show.
         await refreshCategoryMapping()
+        await loadApps()
+
+        // Clear summary cache; only regenerate if the Summary tab is open.
+        clearSummaryCache(selectedDate)
+        setSummaryLoadedForDate(null)
+        if (activeTabRef.current === 'summary') {
+          setSummaryLoadedForDate(selectedDate)
+          loadSummary(true)
+        }
       } catch (error) {
         console.error('Failed to save category change permanently:', error)
+        // Roll back the optimistic update on failure.
+        await loadApps()
         toast({
           title: 'Error',
-          description: 'Failed to save category change permanently',
+          description: 'Failed to save category change.',
           variant: 'destructive'
         })
       }
@@ -221,32 +361,11 @@ export default function AppUsageTable() {
     }
   }
 
+  // DB-driven category icon (icon component + color both from the categories
+  // table). Replaces the old hardcoded per-category switch.
   const getCategoryIcon = (category) => {
-    switch (category) {
-      case 'Browsing':
-        return <Globe className="h-4 w-4 text-blue-500 dark:text-blue-400" />
-      case 'Code':
-        return <CodeIcon className="h-4 w-4 text-cyan-600 dark:text-cyan-400" />
-      case 'Documenting':
-        return <FileText className="h-4 w-4 text-green-600 dark:text-green-400" />
-      case 'Entertainment':
-        return <Video className="h-4 w-4 text-red-600 dark:text-red-400" />
-      case 'Learning':
-        return <BookOpen className="h-4 w-4 text-purple-600 dark:text-purple-400" />
-      case 'Messaging':
-      case 'Communication':
-        return <MessageSquare className="h-4 w-4 text-indigo-600 dark:text-indigo-400" />
-      case 'Miscellaneous':
-        return <Package className="h-4 w-4 text-slate-600 dark:text-slate-400" />
-      case 'Personal':
-        return <User className="h-4 w-4 text-pink-600 dark:text-pink-400" />
-      case 'Productivity':
-        return <Briefcase className="h-4 w-4 text-amber-600 dark:text-amber-400" />
-      case 'Utility':
-        return <Terminal className="h-4 w-4 text-emerald-600 dark:text-emerald-400" />
-      default:
-        return <Package className="h-4 w-4 text-slate-600 dark:text-slate-400" />
-    }
+    const Icon = getCategoryIconComponent(category)
+    return <Icon className="h-4 w-4" style={{ color: getCategoryColorFromDB(category) }} />
   }
   const handleDate = (e) => {
     handleDateChange(e.target.value)
@@ -263,6 +382,7 @@ export default function AppUsageTable() {
                 value={selectedDate}
                 onChange={handleDate}
                 className="bg-transparent text-primary outline-none text-xs"
+                style={{ colorScheme: resolvedTheme === 'dark' ? 'dark' : 'light' }}
               />
 
               <Calendar className="absolute right-2 w-4 h-4 text-primary pointer-events-none" />
@@ -308,7 +428,7 @@ export default function AppUsageTable() {
         </div>
       </CardHeader>
       <CardContent className="p-0">
-        <Tabs defaultValue="table" className="w-full">
+        <Tabs value={activeTab} onValueChange={handleTabChange} className="w-full">
           <div className="px-4 pt-4 pb-2 flex items-center justify-between">
             <TabsList className="bg-muted/50 p-0.5">
               <TabsTrigger
@@ -317,14 +437,42 @@ export default function AppUsageTable() {
               >
                 Table
               </TabsTrigger>
+              <TabsTrigger
+                value="summary"
+                className="data-[state=active]:bg-muted data-[state=active]:text-primary"
+              >
+                <Sparkles className="h-4 w-4 mr-1.5" />
+                Summary
+              </TabsTrigger>
             </TabsList>
 
             <div className="flex items-center space-x-4">
               <div className="text-sm text-muted-foreground">
                 Total time: <span className="text-primary font-mono">{totalTimeFormatted}</span>
               </div>
+              {/* Refresh only makes sense on the Summary tab, where the AI runs. */}
+              {activeTab === 'summary' && (
+              <Button
+                onClick={handleRefreshSummary}
+                variant="ghost"
+                size="sm"
+                className="h-8 text-muted-foreground"
+                disabled={isLoadingSummary}
+              >
+                <RefreshCw className={`h-4 w-4 mr-1.5 ${isLoadingSummary ? 'animate-spin' : ''}`} />
+                Refresh Summary
+              </Button>
+              )}
             </div>
           </div>
+
+          <TabsContent value="summary" className="mt-0">
+            {isLoadingSummary ? (
+              <SummarySkeleton />
+            ) : (
+              <SummaryTab summary={summary} date={selectedDate} />
+            )}
+          </TabsContent>
 
           <TabsContent value="table" className="mt-0">
             <div className="rounded-md border border-border/50 overflow-hidden mx-6 mb-6">
@@ -409,19 +557,7 @@ export default function AppUsageTable() {
                                   <span>Change Category</span>
                                 </DropdownMenuSubTrigger>
                                 <DropdownMenuSubContent className="bg-white dark:bg-slate-900 border-gray-300 dark:border-slate-700 text-gray-900 dark:text-slate-50 shadow-xl">
-                                  {[
-                                    'Browsing',
-                                    'Code',
-                                    'Communication',
-                                    'Documenting',
-                                    'Entertainment',
-                                    'Learning',
-                                    'Messaging',
-                                    'Miscellaneous',
-                                    'Personal',
-                                    'Productivity',
-                                    'Utility'
-                                  ].map((category) => (
+                                  {categoryNames.map((category) => (
                                     <DropdownMenuItem
                                       key={category}
                                       className="flex items-center hover:bg-gray-100 dark:hover:bg-slate-800 cursor-pointer"
@@ -434,6 +570,16 @@ export default function AppUsageTable() {
                                       )}
                                     </DropdownMenuItem>
                                   ))}
+                                  <DropdownMenuSeparator className="bg-gray-300 dark:bg-slate-700" />
+                                  <DropdownMenuItem
+                                    className="flex items-center text-primary hover:bg-gray-100 dark:hover:bg-slate-800 cursor-pointer text-xs"
+                                    onClick={() =>
+                                      navigate('/settings?tab=Categories Management')
+                                    }
+                                  >
+                                    <Sliders className="h-3.5 w-3.5 mr-2" />
+                                    Manage all rules →
+                                  </DropdownMenuItem>
                                 </DropdownMenuSubContent>
                               </DropdownMenuSub>
 

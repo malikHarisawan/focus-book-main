@@ -21,21 +21,23 @@ jobs:
   # -----------------------------
   lint:
     name: Lint & Code Quality
+    # ESLint is pure JS — run it on the free (1x-cost) Ubuntu runner, not a
+    # Windows runner (2x cost). Only the electron-builder --win packaging below
+    # actually needs Windows. Keeping lint on Ubuntu also avoids the Windows
+    # runner-queue starvation that cancelled this job after 15m.
     runs-on: ubuntu-latest
+    timeout-minutes: 10
 
     steps:
       - uses: actions/checkout@v4
 
       - uses: actions/setup-node@v4
         with:
-          node-version: 20
+          # Node 22 to match the build job — some devDependencies (@electron/rebuild
+          # and its node-gyp 12.x) declare engines >= 22.12, so a uniform version
+          # avoids EBADENGINE warnings during npm ci.
+          node-version: 22
           cache: npm
-
-      # Linux dependencies (needed for electron-active-window native compilation)
-      - name: Install X11 development headers
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y libx11-dev libxtst-dev libxkbfile-dev libpng-dev
 
       - name: Install Node deps (skip native compilation for lint)
         run: npm ci --ignore-scripts
@@ -46,37 +48,25 @@ jobs:
 
 
   # -----------------------------
-  # Build Matrix (Windows, macOS, Linux)
+  # Build (Windows)
   # -----------------------------
   build:
-    name: Build (${{ matrix.os }})
+    name: Build (Windows)
     needs: lint
-    runs-on: ${{ matrix.os }}
-
-    strategy:
-      matrix:
-        os: [windows-latest]
+    # windows-latest now ships Visual Studio 2026 (v18). We build on it via
+    # @electron/rebuild@4.x, whose bundled node-gyp 12.x recognizes VS 18
+    # (find-visualstudio.js maps versionMajor 18 -> 2026). @electron/rebuild@4
+    # requires Node >= 22.12, so this job pins Node 22. See nodejs/node-gyp#3282.
+    runs-on: windows-latest
+    timeout-minutes: 30
 
     steps:
       - uses: actions/checkout@v4
 
       - uses: actions/setup-node@v4
         with:
-          node-version: 20
+          node-version: 22
           cache: npm
-
-      # Linux-only dependencies (needed for electron-active-window)
-      - name: Install X11 libs (Linux only)
-        if: matrix.os == 'ubuntu-latest'
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y \
-            libx11-dev \
-            libxtst-dev \
-            libxkbfile-dev \
-            libxss-dev \
-            libxext-dev
-          sudo snap install snapcraft --classic
 
       - uses: actions/setup-python@v5
         with:
@@ -102,52 +92,18 @@ jobs:
       - name: Build Electron App
         run: npm run build
 
-      # OS-specific packaging
-      - name: Package App
-        run: |
-          if [ "${{ matrix.os }}" = "windows-latest" ]; then
-            npx electron-builder --win
-          elif [ "${{ matrix.os }}" = "macos-latest" ]; then
-            npx electron-builder --mac
-          else
-            npx electron-builder --linux
-          fi
-        shell: bash
+      - name: Package App (Windows)
+        run: npx electron-builder --win
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
-      # Upload Windows artifacts
       - name: Upload Windows artifacts
-        if: matrix.os == 'windows-latest'
         uses: actions/upload-artifact@v4
         with:
-          name: focusbook-${{ matrix.os }}
+          name: focusbook-windows
           path: |
             dist/*.exe
             dist/*.msi
-          retention-days: 30
-
-      # Upload macOS artifacts
-      - name: Upload macOS artifacts
-        if: matrix.os == 'macos-latest'
-        uses: actions/upload-artifact@v4
-        with:
-          name: focusbook-${{ matrix.os }}
-          path: |
-            dist/*.dmg
-            dist/*.zip
-          retention-days: 30
-
-      # Upload Linux artifacts
-      - name: Upload Linux artifacts
-        if: matrix.os == 'ubuntu-latest'
-        uses: actions/upload-artifact@v4
-        with:
-          name: focusbook-${{ matrix.os }}
-          path: |
-            dist/*.AppImage
-            dist/*.deb
-            dist/*.snap
           retention-days: 30
 
 
@@ -157,6 +113,8 @@ jobs:
   release:
     name: Publish Release
     needs: build
+    # Just downloads the built artifacts and creates a GitHub release — no
+    # compilation or Windows tooling — so it runs on the free Ubuntu runner.
     runs-on: ubuntu-latest
     if: startsWith(github.ref, 'refs/tags/v')  # ONLY on tags
 
@@ -166,31 +124,14 @@ jobs:
       - name: Download Windows artifacts
         uses: actions/download-artifact@v4
         with:
-          name: focusbook-windows-latest
+          name: focusbook-windows
           path: dist/windows
-        continue-on-error: true
-
-      - name: Download macOS artifacts
-        uses: actions/download-artifact@v4
-        with:
-          name: focusbook-macos-latest
-          path: dist/macos
-        continue-on-error: true
-
-      - name: Download Linux artifacts
-        uses: actions/download-artifact@v4
-        with:
-          name: focusbook-ubuntu-latest
-          path: dist/linux
-        continue-on-error: true
 
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v1
         with:
           files: |
             dist/windows/*
-            dist/macos/*
-            dist/linux/*
           draft: false
           prerelease: false
           generate_release_notes: true

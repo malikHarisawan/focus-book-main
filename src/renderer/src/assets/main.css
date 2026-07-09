@@ -9,7 +9,7 @@
 :root {
   /* Default accent colors - Purple/Blue theme */
   --accent-primary: #5051F9;
-  --accent-secondary: #1EA7FF;
+  --accent-secondary: #22D3EE;
   
   /* Light Mode Background Colors - From Figma */
   --bg-main: #F4F7FE;
@@ -19,38 +19,38 @@
   /* Light Mode Text Colors - From Figma */
   --text-primary: #232360;
   --text-secondary: #768396;
-  --text-tertiary: #5F6388;
+  --text-tertiary: #94A3B8;
   
   /* Light Mode Border Colors */
   --border-primary: #E8EDF1;
   --border-secondary: #E7EBEC;
   
   /* Chart Colors */
-  --chart-blue: #1EA7FF;
+  --chart-blue: #22D3EE;
   --chart-orange: #FF6B6B;
 }
 
 .dark {
   /* Dark Mode accent colors - Exact Figma values */
   --accent-primary: #5051F9;
-  --accent-secondary: #1EA7FF;
+  --accent-secondary: #22D3EE;
   
-  /* Dark Mode Background Colors - Exact Figma values */
-  --bg-main: #1E1F25;
-  --bg-card: #212329;
-  --bg-input: #282932;
+  /* Dark Mode Background Colors - Cyber near-black (cyan pops) */
+  --bg-main: #05070D;
+  --bg-card: #0B1220;
+  --bg-input: #16202E;
   
   /* Dark Mode Text Colors - Exact Figma values */
   --text-primary: #FFFFFF;
-  --text-secondary: #898999;
+  --text-secondary: #94A3B8;
   --text-tertiary: #768396;
   
   /* Dark Mode Border Colors */
-  --border-primary: #282932;
-  --border-secondary: #5F6388;
+  --border-primary: #1E293B;
+  --border-secondary: #94A3B8;
   
   /* Chart Colors */
-  --chart-blue: #1EA7FF;
+  --chart-blue: #22D3EE;
   --chart-orange: #FF6B6B;
 }
 
@@ -122,8 +122,8 @@
 
 .dark .subtle-grid {
   background-image:
-    linear-gradient(rgba(117, 81, 255, 0.02) 1px, transparent 1px),
-    linear-gradient(90deg, rgba(117, 81, 255, 0.02) 1px, transparent 1px);
+    linear-gradient(rgba(34, 211, 238, 0.035) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(34, 211, 238, 0.035) 1px, transparent 1px);
 }
 
 /* Smooth Gradient Overlay */
@@ -137,12 +137,15 @@
 }
 
 .dark .gradient-overlay {
-  background: linear-gradient(
-    135deg,
-    rgba(117, 81, 255, 0.03) 0%,
-    transparent 50%,
-    rgba(51, 195, 255, 0.02) 100%
-  );
+  background:
+    radial-gradient(ellipse 80% 50% at 50% -10%, rgba(80, 81, 249, 0.10) 0%, transparent 60%),
+    radial-gradient(ellipse 60% 50% at 100% 0%, rgba(34, 211, 238, 0.06) 0%, transparent 55%),
+    linear-gradient(
+      135deg,
+      rgba(80, 81, 249, 0.04) 0%,
+      transparent 50%,
+      rgba(34, 211, 238, 0.03) 100%
+    );
 }
 
 /* Softer Shadow Effects */
@@ -235,16 +238,42 @@
 
 .hover-glow:hover {
   box-shadow:
-    0 4px 12px rgba(45, 212, 191, 0.12),
-    0 8px 24px rgba(45, 212, 191, 0.08);
+    0 4px 12px rgba(34, 211, 238, 0.12),
+    0 8px 24px rgba(34, 211, 238, 0.08);
 }
 
-/* Gradient Text - Teal accent */
+.dark .hover-glow:hover {
+  box-shadow:
+    0 0 0 1px rgba(34, 211, 238, 0.25),
+    0 4px 16px rgba(34, 211, 238, 0.18),
+    0 8px 32px rgba(80, 81, 249, 0.12);
+}
+
+/* Gradient Text - Cyber cyan/blue accent */
 .gradient-text {
-  background: linear-gradient(135deg, #2dd4bf 0%, #14b8a6 100%);
+  background: linear-gradient(135deg, #22d3ee 0%, #3b82f6 100%);
   -webkit-background-clip: text;
   background-clip: text;
   -webkit-text-fill-color: transparent;
+}
+
+/* Glassmorphism surface - reference cyber cards (translucent slate + blur) */
+.glass-card {
+  background-color: rgba(11, 18, 32, 0.6);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border: 1px solid rgba(148, 163, 184, 0.12);
+}
+
+.dark .glass-panel {
+  background-color: rgba(11, 18, 32, 0.45);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+}
+
+/* Cyan glow border for active/accent elements */
+.cyber-glow {
+  box-shadow: 0 0 0 1px rgba(34, 211, 238, 0.4), 0 0 12px rgba(34, 211, 238, 0.15);
 }
 
 /* Subtle Vignette Effect */

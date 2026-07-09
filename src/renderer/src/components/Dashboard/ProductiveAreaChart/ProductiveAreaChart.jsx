@@ -67,17 +67,19 @@ const ProductiveAreaChart = ({
   // Get current theme
   const { resolvedTheme } = useTheme()
 
-  // Theme-aware colors - Exact Figma color palette
+  // Theme-aware colors - cyan accent in dark mode, purple in light
+  const isDark = resolvedTheme === 'dark'
+  const accent = isDark ? '#22D3EE' : '#5051F9' // Cyan (dark) / Purple (light)
   const chartColors = {
-    productive: '#5051F9', // Primary purple - for productive time
-    unproductive: '#FF6B6B', // Red/Salmon - for unproductive/distracting time
-    neutral: '#1EA7FF', // Cyan blue - for neutral
-    selection: '#5051F9', // Selection same as productive
-    grid: resolvedTheme === 'dark' ? '#282932' : '#E8EDF1',
-    text: resolvedTheme === 'dark' ? '#898999' : '#768396',
-    bg: resolvedTheme === 'dark' ? '#212329' : '#ffffff',
-    bgSecondary: resolvedTheme === 'dark' ? '#282932' : '#F4F7FE',
-    border: resolvedTheme === 'dark' ? '#282932' : '#E8EDF1',
+    productive: accent, // Cyan (dark) / Purple (light) - for productive time
+    neutral: isDark ? '#64748B' : '#22D3EE', // Slate (dark) / Cyan (light) - matches legend
+    distracting: '#FF6B6B', // Red/Salmon - for distracting time
+    selection: accent, // Selection same as productive
+    grid: isDark ? '#1E293B' : '#E8EDF1',
+    text: isDark ? '#94A3B8' : '#768396',
+    bg: isDark ? '#0B1220' : '#ffffff',
+    bgSecondary: isDark ? '#1E293B' : '#F4F7FE',
+    border: isDark ? '#1E293B' : '#E8EDF1',
   }
 
   // State management using custom hooks
@@ -107,7 +109,7 @@ const ProductiveAreaChart = ({
 
   // Local state
   const [currentData, setCurrentData] = useState([])
-  const [aggregatedData, setAggregatedData] = useState({ productive: 0, unproductive: 0, total: 0 })
+  const [aggregatedData, setAggregatedData] = useState({ productive: 0, neutral: 0, distracting: 0, total: 0 })
   const [isLoading, setIsLoading] = useState(false)
   const [showHelp, setShowHelp] = useState(false)
 
@@ -275,7 +277,7 @@ const ProductiveAreaChart = ({
   // Loading state
   if (!currentData || currentData.length === 0) {
     return (
-      <div className="bg-white dark:bg-[#1a1b23] p-4 rounded-xl h-[250px] flex items-center justify-center border border-slate-200 dark:border-slate-700/30">
+      <div className="bg-white dark:bg-[#05070D] p-4 rounded-xl h-[250px] flex items-center justify-center border border-slate-200 dark:border-slate-700/30">
         {isLoading ? (
           <div className="flex items-center gap-2 text-teal-500">
             <div className="animate-spin w-4 h-4 border-2 border-teal-500 border-t-transparent rounded-full"></div>
@@ -289,39 +291,43 @@ const ProductiveAreaChart = ({
   }
 
   return (
-    <div ref={containerRef} className="bg-white dark:bg-[#1a1b23] p-4 rounded-xl border border-slate-200 dark:border-slate-700/30" tabIndex={0}>
-      {/* Clean Header with Tabs */}
-      <div className="flex items-center justify-between mb-6">
-        <h3 className="text-slate-700 dark:text-white text-base font-medium">Productivity Over Time</h3>
-        
+    <div
+      ref={containerRef}
+      className="bg-white dark:bg-[#05070D] p-3 rounded-xl border border-slate-200 dark:border-slate-700/30 h-full flex flex-col"
+      tabIndex={0}
+    >
+      {/* Compact Header with Tabs */}
+      <div className="flex items-center justify-between mb-3">
+        <h3 className="text-slate-700 dark:text-white text-sm font-medium leading-tight">Productivity Over Time</h3>
+
         {/* Tab Navigation - Daily/Weekly/Monthly */}
         <div className="flex items-center gap-1">
           <button
             onClick={() => handleBreadcrumbClick('hour')}
-            className={`px-4 py-1.5 text-sm font-medium transition-all ${
+            className={`px-3 py-1 text-xs font-medium transition-all ${
               zoomLevel === 'hour' || zoomLevel === 'day'
-                ? 'text-[#5051F9] border-b-2 border-[#5051F9]'
-                : 'text-[#768396] dark:text-[#898999] hover:text-[#232360] dark:hover:text-white border-b-2 border-transparent'
+                ? 'text-[#5051F9] border-b-2 border-[#5051F9] dark:text-[#22D3EE] dark:border-[#22D3EE]'
+                : 'text-[#768396] dark:text-[#94A3B8] hover:text-[#232360] dark:hover:text-white border-b-2 border-transparent'
             }`}
           >
             Daily
           </button>
           <button
             onClick={() => handleBreadcrumbClick('week')}
-            className={`px-4 py-1.5 text-sm font-medium transition-all ${
+            className={`px-3 py-1 text-xs font-medium transition-all ${
               zoomLevel === 'week'
-                ? 'text-[#5051F9] border-b-2 border-[#5051F9]'
-                : 'text-[#768396] dark:text-[#898999] hover:text-[#232360] dark:hover:text-white border-b-2 border-transparent'
+                ? 'text-[#5051F9] border-b-2 border-[#5051F9] dark:text-[#22D3EE] dark:border-[#22D3EE]'
+                : 'text-[#768396] dark:text-[#94A3B8] hover:text-[#232360] dark:hover:text-white border-b-2 border-transparent'
             }`}
           >
             Weekly
           </button>
           <button
             onClick={() => handleBreadcrumbClick('month')}
-            className={`px-4 py-1.5 text-sm font-medium transition-all ${
+            className={`px-3 py-1 text-xs font-medium transition-all ${
               zoomLevel === 'month'
-                ? 'text-[#5051F9] border-b-2 border-[#5051F9]'
-                : 'text-[#768396] dark:text-[#898999] hover:text-[#232360] dark:hover:text-white border-b-2 border-transparent'
+                ? 'text-[#5051F9] border-b-2 border-[#5051F9] dark:text-[#22D3EE] dark:border-[#22D3EE]'
+                : 'text-[#768396] dark:text-[#94A3B8] hover:text-[#232360] dark:hover:text-white border-b-2 border-transparent'
             }`}
           >
             Monthly
@@ -329,25 +335,32 @@ const ProductiveAreaChart = ({
         </div>
       </div>
 
-      <ResponsiveContainer width="100%" height={280}>
-        <AreaChart
-          ref={chartRef}
-          data={currentData}
-          margin={{ top: 20, right: 30, left: 10, bottom: 10 }}
-          onMouseDown={onMouseDown}
-          onMouseMove={onMouseMove}
-          onMouseUp={onMouseUp}
-          style={{ backgroundColor: 'transparent' }}
-        >
+      <div className="flex-1 min-h-[180px]">
+        <ResponsiveContainer width="100%" height="100%">
+          <AreaChart
+            ref={chartRef}
+            data={currentData}
+            margin={{ top: 8, right: 16, left: 8, bottom: 20 }}
+            onMouseDown={onMouseDown}
+            onMouseMove={onMouseMove}
+            onMouseUp={onMouseUp}
+            style={{ backgroundColor: 'transparent' }}
+          >
           <defs>
-            {/* Productive gradient - Primary Purple #5051F9 */}
+            {/* Productive gradient - Cyan (dark) / Purple (light) */}
             <linearGradient id="colorProductive" x1="0" y1="0" x2="0" y2="1">
-              <stop offset="0%" stopColor="#5051F9" stopOpacity={0.6} />
-              <stop offset="40%" stopColor="#5051F9" stopOpacity={0.35} />
-              <stop offset="100%" stopColor="#5051F9" stopOpacity={0.05} />
+              <stop offset="0%" stopColor={chartColors.productive} stopOpacity={0.6} />
+              <stop offset="40%" stopColor={chartColors.productive} stopOpacity={0.35} />
+              <stop offset="100%" stopColor={chartColors.productive} stopOpacity={0.05} />
             </linearGradient>
-            {/* Unproductive gradient - Red/Salmon #FF6B6B */}
-            <linearGradient id="colorUnproductive" x1="0" y1="0" x2="0" y2="1">
+            {/* Neutral gradient - Slate (dark) / Cyan (light) */}
+            <linearGradient id="colorNeutral" x1="0" y1="0" x2="0" y2="1">
+              <stop offset="0%" stopColor={chartColors.neutral} stopOpacity={0.5} />
+              <stop offset="40%" stopColor={chartColors.neutral} stopOpacity={0.3} />
+              <stop offset="100%" stopColor={chartColors.neutral} stopOpacity={0.05} />
+            </linearGradient>
+            {/* Distracting gradient - Red/Salmon #FF6B6B */}
+            <linearGradient id="colorDistracting" x1="0" y1="0" x2="0" y2="1">
               <stop offset="0%" stopColor="#FF6B6B" stopOpacity={0.5} />
               <stop offset="40%" stopColor="#FF6B6B" stopOpacity={0.3} />
               <stop offset="100%" stopColor="#FF6B6B" stopOpacity={0.05} />
@@ -356,43 +369,59 @@ const ProductiveAreaChart = ({
           <XAxis
             dataKey="day"
             stroke="transparent"
-            tick={{ fill: '#94a3b8', fontSize: 11, fontWeight: 400 }}
+            tick={{ fill: '#FFFFFF', fontSize: 11, fontWeight: 500 }}
             tickLine={false}
             axisLine={false}
-            dy={10}
+            dy={2}
+            interval={Math.max(0, Math.floor((currentData?.length || 24) / 8))}
             style={{ userSelect: 'none', WebkitUserSelect: 'none', MozUserSelect: 'none' }}
           />
-          <YAxis 
+          <YAxis
             stroke="transparent"
-            tick={false}
+            tick={{ fill: chartColors.text, fontSize: 10 }}
             tickLine={false}
             axisLine={false}
-            width={0}
+            width={38}
+            tickFormatter={(seconds) => {
+              const minutes = Math.round(seconds / 60)
+              return minutes >= 60 ? `${Math.floor(minutes / 60)}h${minutes % 60 ? ` ${minutes % 60}m` : ''}` : `${minutes}m`
+            }}
+            allowDecimals={false}
+            style={{ userSelect: 'none' }}
           />
-          <CartesianGrid strokeDasharray="0" stroke="rgba(100, 116, 139, 0.06)" vertical={false} />
+          <CartesianGrid strokeDasharray="3 3" stroke={isDark ? 'rgba(148, 163, 184, 0.12)' : 'rgba(100, 116, 139, 0.12)'} vertical={false} />
           <Tooltip
             content={<CustomTooltip />}
-            cursor={{ stroke: 'rgba(80, 81, 249, 0.3)', strokeWidth: 1 }}
+            cursor={{ stroke: isDark ? 'rgba(34, 211, 238, 0.35)' : 'rgba(80, 81, 249, 0.3)', strokeWidth: 1 }}
+            position={{ y: -30 }}
+            wrapperStyle={{ outline: 'none' }}
+          />
+          {/* Only Productive (cyan) and Distracting (red) are charted; neutral
+              time is intentionally omitted here (still shown in the stat cards).
+              Draw order matters for stacked areas: distracting is drawn first so
+              it sits at the BOTTOM, and productive is drawn last so it renders on
+              TOP — the dominant type visually dominates the chart. */}
+          <Area
+            type="monotoneX"
+            dataKey="distracting"
+            name="Distracting"
+            stackId="1"
+            stroke="#FF6B6B"
+            strokeWidth={2}
+            fill="url(#colorDistracting)"
+            dot={false}
+            activeDot={false}
           />
           <Area
             type="monotoneX"
             dataKey="productive"
             name="Productive"
-            stroke="#5051F9"
-            strokeWidth={2.5}
+            stackId="1"
+            stroke={chartColors.productive}
+            strokeWidth={2}
             fill="url(#colorProductive)"
-            dot={{ fill: '#5051F9', stroke: '#fff', strokeWidth: 2, r: 4 }}
-            activeDot={{ fill: '#6B6CFA', stroke: '#fff', strokeWidth: 2, r: 6 }}
-          />
-          <Area
-            type="monotoneX"
-            dataKey="unproductive"
-            name="Unproductive"
-            stroke="#FF6B6B"
-            strokeWidth={2.5}
-            fill="url(#colorUnproductive)"
-            dot={{ fill: '#FF6B6B', stroke: '#fff', strokeWidth: 2, r: 4 }}
-            activeDot={{ fill: '#FF8A8A', stroke: '#fff', strokeWidth: 2, r: 6 }}
+            dot={false}
+            activeDot={false}
           />
           {isDragging && dragStart && dragEnd && (
             <ReferenceArea
@@ -416,7 +445,8 @@ const ProductiveAreaChart = ({
             />
           )}
         </AreaChart>
-      </ResponsiveContainer>
+        </ResponsiveContainer>
+      </div>
     </div>
   )
 }

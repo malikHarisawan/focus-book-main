@@ -19,15 +19,15 @@ export const colorSchemes = {
       name: 'Purple Blue'
     },
     blue: {
-      light: '#1EA7FF', // Cyan Blue
-      dark: '#1EA7FF',  // Same for dark mode
+      light: '#22D3EE', // Cyan Blue
+      dark: '#22D3EE',  // Same for dark mode
       name: 'Cyan Blue'
     }
   },
   secondary: {
     cyan: {
-      light: '#1EA7FF', // Cyan Blue
-      dark: '#1EA7FF',  // Same for dark mode
+      light: '#22D3EE', // Cyan Blue
+      dark: '#22D3EE',  // Same for dark mode
       name: 'Cyan'
     },
     orange: {

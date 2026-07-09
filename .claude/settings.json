@@ -1,0 +1,13 @@
+{
+  "permissions": {
+    "allow": [
+      "mcp__playwright__browser_snapshot",
+      "mcp__playwright__browser_take_screenshot",
+      "mcp__playwright__browser_console_messages",
+      "mcp__playwright__browser_tabs",
+      "mcp__playwright__browser_network_requests",
+      "mcp__supabase__list_migrations",
+      "mcp__supabase__list_tables"
+    ]
+  }
+}

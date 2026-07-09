@@ -69,38 +69,50 @@ const FocusTimer = () => {
     loadTodayStats()
   }, [])
 
-  // Enhanced timer countdown effect with better precision
+  // Keep the latest completion handler in a ref so the countdown interval (which
+  // is created once per run/pause transition) always calls the current closure
+  // instead of a stale one captured at interval-creation time.
+  const handleSessionCompleteRef = useRef(null)
+
+  // Countdown effect. Depends ONLY on run/pause state — NOT on timeLeft — so the
+  // interval is created once when the timer starts and torn down when it stops,
+  // rather than being recreated every second (which reset the tick cadence and
+  // captured stale state). The interval reads/writes timeLeft functionally.
   useEffect(() => {
-    if (isRunning && !isPaused && timeLeft > 0) {
+    if (isRunning && !isPaused) {
+      lastUpdateRef.current = Date.now()
       intervalRef.current = setInterval(() => {
         const now = Date.now()
-        const elapsed = Math.floor((now - lastUpdateRef.current) / 1000)
-        
+        const deltaMs = now - lastUpdateRef.current
+        const elapsed = Math.floor(deltaMs / 1000)
+
         if (elapsed >= 1) {
+          // Advance the reference by the WHOLE seconds we just consumed, not to
+          // `now` — this preserves the sub-second remainder so it carries into
+          // the next tick. (Resetting to `now` discarded up to ~1s per tick,
+          // making the timer slowly run long.)
+          lastUpdateRef.current += elapsed * 1000
           setTimeLeft((prevTime) => {
             const newTime = Math.max(0, prevTime - elapsed)
-            if (newTime === 0) {
-              handleSessionComplete()
+            if (newTime === 0 && prevTime > 0) {
+              handleSessionCompleteRef.current?.()
             }
             return newTime
           })
-          lastUpdateRef.current = now
         }
-      }, 100) // More frequent updates for smoother UI
-    } else {
-      if (intervalRef.current) {
-        clearInterval(intervalRef.current)
-        intervalRef.current = null
-      }
+      }, 250)
+    } else if (intervalRef.current) {
+      clearInterval(intervalRef.current)
+      intervalRef.current = null
     }
-    
+
     return () => {
       if (intervalRef.current) {
         clearInterval(intervalRef.current)
         intervalRef.current = null
       }
     }
-  }, [isRunning, isPaused, timeLeft])
+  }, [isRunning, isPaused])
 
   const loadCurrentSession = async () => {
     try {
@@ -207,6 +219,12 @@ const FocusTimer = () => {
       setLastBreakTime(Date.now())
     }
   }
+
+  // Always point the ref at the freshest handler so the countdown interval fires
+  // completion with current state (currentSession, sessionStartTime, etc.).
+  useEffect(() => {
+    handleSessionCompleteRef.current = handleSessionComplete
+  })
 
   const startSession = async () => {
     setLoading(true)
@@ -480,7 +498,7 @@ const FocusTimer = () => {
             <div className="text-4xl sm:text-6xl md:text-7xl lg:text-8xl font-mono font-bold tracking-wider">
               {formatTime(timeLeft)}
             </div>
-            <div className="text-lg text-gray-400 mt-4">
+            <div className="text-lg text-muted-foreground mt-4">
               {isRunning ? (isPaused ? 'Paused' : 'Running') : 'Ready'}
             </div>
           </div>
@@ -489,7 +507,7 @@ const FocusTimer = () => {
         return (
           <div className="text-center py-4">
             <div className="text-3xl sm:text-4xl md:text-5xl lg:text-6xl font-bold mb-2">{formatTime(timeLeft)}</div>
-            <div className="w-full bg-gray-700 rounded-full h-1">
+            <div className="w-full bg-muted rounded-full h-1">
               <div
                 className={`h-1 rounded-full transition-all duration-1000 ${
                   sessionType === 'focus' || sessionType === 'pomodoro'
@@ -516,7 +534,7 @@ const FocusTimer = () => {
                   stroke="currentColor"
                   strokeWidth="8"
                   fill="none"
-                  className="text-gray-600 opacity-20"
+                  className="text-muted-foreground opacity-20"
                 />
                 {/* Progress circle */}
                 <circle
@@ -536,7 +554,7 @@ const FocusTimer = () => {
               <div className="absolute inset-0 flex items-center justify-center">
                 <div className="text-center">
                   <div className="text-4xl font-bold font-mono">{formatTime(timeLeft)}</div>
-                  <div className="text-sm text-gray-400 mt-2">
+                  <div className="text-sm text-muted-foreground mt-2">
                     {isRunning ? (isPaused ? 'Paused' : 'Running') : 'Ready'}
                   </div>
                 </div>
@@ -548,7 +566,7 @@ const FocusTimer = () => {
   }
 
   return (
-    <div className="w-full p-2 sm:p-4 lg:p-6 space-y-3 sm:space-y-4 lg:space-y-6 text-white">
+    <div className="w-full p-2 sm:p-4 lg:p-6 space-y-3 sm:space-y-4 lg:space-y-6 text-foreground">
       <Tabs defaultValue="timer" className="w-full">
         <TabsList className="grid w-full grid-cols-2 sm:grid-cols-4">
           <TabsTrigger value="timer" className="flex items-center gap-1 sm:gap-2 text-xs sm:text-sm px-2 sm:px-4">
@@ -578,10 +596,10 @@ const FocusTimer = () => {
             <CardHeader className="text-center">
               <div className="flex flex-col sm:flex-row items-center justify-between gap-3">
                 <div className="flex flex-wrap items-center gap-2">
-                  <Badge variant="outline" className="text-gray-700 border-gray-300">
+                  <Badge variant="outline" className="text-foreground border-border">
                     Session #{sessionCount + 1}
                   </Badge>
-                  <Badge variant="secondary" className="text-gray-700 bg-gray-100">
+                  <Badge variant="secondary" className="text-foreground bg-muted">
                     {sessionTypes[sessionType]?.label || 'Focus Session'}
                   </Badge>
                 </div>
@@ -698,11 +716,11 @@ const FocusTimer = () => {
               {/* Progress bar */}
               {timerMode !== 'minimal' && (
                 <div className="space-y-2">
-                  <div className="flex justify-between text-sm text-gray-600">
+                  <div className="flex justify-between text-sm text-muted-foreground">
                     <span>Progress</span>
                     <span>{Math.round(getProgress())}%</span>
                   </div>
-                  <div className="w-full bg-gray-200 rounded-full h-2">
+                  <div className="w-full bg-muted rounded-full h-2">
                     <div
                       className={`h-2 rounded-full transition-all duration-1000 ${
                         sessionType === 'focus' || sessionType === 'pomodoro'
@@ -721,7 +739,7 @@ const FocusTimer = () => {
               <div className="grid grid-cols-3 gap-4 pt-4 border-t">
                 <div className="text-center">
                   <div className="text-2xl font-bold">{sessionCount}</div>
-                  <div className="text-sm text-gray-500">Sessions Today</div>
+                  <div className="text-sm text-muted-foreground">Sessions Today</div>
                 </div>
                 <div className="text-center">
                   <div className="text-2xl font-bold">
@@ -738,11 +756,11 @@ const FocusTimer = () => {
                         })()
                       : '0h 0m'}
                   </div>
-                  <div className="text-sm text-gray-500">Total Focus Time</div>
+                  <div className="text-sm text-muted-foreground">Total Focus Time</div>
                 </div>
                 <div className="text-center">
                   <div className="text-2xl font-bold">{sessionGoal}</div>
-                  <div className="text-sm text-gray-500">Daily Goal</div>
+                  <div className="text-sm text-muted-foreground">Daily Goal</div>
                 </div>
               </div>
             </CardContent>
@@ -837,8 +855,8 @@ const FocusTimer = () => {
                     key={template.id}
                     className={`p-4 rounded-lg border-2 cursor-pointer transition-all ${
                       selectedTemplate === template.id
-                        ? 'border-cyan-500 bg-cyan-50'
-                        : 'border-gray-200 hover:border-cyan-300'
+                        ? 'border-cyan-500 bg-primary/10'
+                        : 'border-border hover:border-cyan-300'
                     }`}
                     onClick={() => applyTemplate(template)}
                   >
@@ -858,7 +876,7 @@ const FocusTimer = () => {
                         </Button>
                       )}
                     </div>
-                    <p className="text-sm text-gray-600 mb-3">{template.description}</p>
+                    <p className="text-sm text-muted-foreground mb-3">{template.description}</p>
                     <div className="flex gap-2 text-xs">
                       <Badge variant="outline">Focus: {template.focus}m</Badge>
                       <Badge variant="outline">Short: {template.shortBreak}m</Badge>
@@ -915,10 +933,10 @@ const FocusTimer = () => {
                 </div>
               </div>
               <div className="pt-4">
-                <div className="text-sm text-gray-600 mb-2">
+                <div className="text-sm text-muted-foreground mb-2">
                   Progress: {sessionCount} / {sessionGoal} sessions
                 </div>
-                <div className="w-full bg-gray-200 rounded-full h-2">
+                <div className="w-full bg-muted rounded-full h-2">
                   <div
                     className="h-2 bg-cyan-500 rounded-full transition-all duration-300"
                     style={{ width: `${Math.min((sessionCount / sessionGoal) * 100, 100)}%` }}
@@ -937,17 +955,17 @@ const FocusTimer = () => {
             <CardContent>
               <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
                 {todayStats?.map((stat, index) => (
-                  <div key={stat._id} className="text-center p-4 bg-gray-100 rounded-lg">
-                    <div className="text-2xl font-bold text-gray-900">{stat.totalSessions}</div>
-                    <div className="text-sm text-gray-600 capitalize">
+                  <div key={stat._id} className="text-center p-4 bg-muted rounded-lg">
+                    <div className="text-2xl font-bold text-foreground">{stat.totalSessions}</div>
+                    <div className="text-sm text-muted-foreground capitalize">
                       {stat._id.replace(/([A-Z])/g, ' $1').trim()}
                     </div>
-                    <div className="text-xs text-gray-500 mt-1">
+                    <div className="text-xs text-muted-foreground mt-1">
                       {Math.floor((stat.totalDuration || 0) / 60000)}m total
                     </div>
                   </div>
                 )) || (
-                  <div className="col-span-full text-center text-gray-500 py-8">
+                  <div className="col-span-full text-center text-muted-foreground py-8">
                     No sessions completed today
                   </div>
                 )}
@@ -970,11 +988,11 @@ const FocusTimer = () => {
               </CardTitle>
             </CardHeader>
             <CardContent className="space-y-4">
-              <p className="text-gray-600">{breakSuggestion.reason}</p>
+              <p className="text-muted-foreground">{breakSuggestion.reason}</p>
               
               <div className="space-y-2">
                 <h4 className="font-medium">Benefits of taking this break:</h4>
-                <ul className="text-sm text-gray-600 space-y-1">
+                <ul className="text-sm text-muted-foreground space-y-1">
                   {breakSuggestion.benefits.map((benefit, index) => (
                     <li key={index} className="flex items-center gap-2">
                       <span className="w-1 h-1 bg-current rounded-full" />
@@ -1022,7 +1040,7 @@ const FocusTimer = () => {
                     </Button>
                   ))}
                 </div>
-                <div className="text-xs text-gray-500 text-center">
+                <div className="text-xs text-muted-foreground text-center">
                   1 = Poor • 2 = Below Average • 3 = Average • 4 = Good • 5 = Excellent
                 </div>
               </div>
@@ -1034,7 +1052,7 @@ const FocusTimer = () => {
                   placeholder="What went well? What could be improved? Any insights..."
                   value={sessionNotes}
                   onChange={(e) => setSessionNotes(e.target.value)}
-                  className="w-full p-3 text-sm border border-gray-300 bg-white text-gray-900 placeholder:text-gray-400 rounded-md resize-none h-24 focus:outline-none focus:ring-2 focus:ring-cyan-500"
+                  className="w-full p-3 text-sm border border-border bg-background text-foreground placeholder:text-muted-foreground rounded-md resize-none h-24 focus:outline-none focus:ring-2 focus:ring-cyan-500"
                 />
               </div>
               

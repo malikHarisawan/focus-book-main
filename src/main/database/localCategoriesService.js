@@ -108,38 +108,40 @@ class LocalCategoriesService {
     })
   }
 
-  async addCategory(name, type) {
+  // Add or update a category. `type` is required; color/icon optional. Upserts by
+  // name so this doubles as create-or-edit for the settings UI.
+  async addCategory(name, type, color, icon) {
     return this.db.executeWithRetry(async () => {
       const existing = await this.db.findOne('categories', { name: name })
+      const fields = { type }
+      if (color !== undefined) fields.color = color
+      if (icon !== undefined) fields.icon = icon
 
       if (existing) {
-        // Update existing category
-        await this.db.update(
-          'categories',
-          { name: name },
-          {
-            $set: { type: type }
-          }
-        )
+        await this.db.update('categories', { name: name }, { $set: fields })
         return true
       } else {
-        // Add new category
-        await this.db.insert('categories', { name, type })
+        await this.db.insert('categories', { name, ...fields })
         return true
       }
     })
   }
 
-  async updateCategory(name, newType) {
+  // Update an existing category's type/color/icon by name.
+  async updateCategory(name, updates) {
     return this.db.executeWithRetry(async () => {
-      const result = await this.db.update(
-        'categories',
-        { name: name },
-        {
-          $set: { type: newType }
-        }
-      )
-      return result.numReplaced > 0
+      // Back-compat: callers used to pass a bare type string.
+      const set =
+        typeof updates === 'string'
+          ? { type: updates }
+          : {
+              ...(updates.type !== undefined ? { type: updates.type } : {}),
+              ...(updates.color !== undefined ? { color: updates.color } : {}),
+              ...(updates.icon !== undefined ? { icon: updates.icon } : {})
+            }
+      if (Object.keys(set).length === 0) return false
+      const result = await this.db.update('categories', { name: name }, { $set: set })
+      return (result.numReplaced || result) > 0
     })
   }
 
@@ -160,6 +162,93 @@ class LocalCategoriesService {
       })
 
       return result
+    })
+  }
+
+  // Return all classification rules. The preload sorts them for matching; here we
+  // just surface the rows with a stable shape { id, pattern, category, match_type,
+  // priority }. id is included so the settings UI can edit/delete specific rules.
+  async getCategoryRules() {
+    return this.db.executeWithRetry(async () => {
+      const rules = await this.db.find('categoryRules', {})
+      return rules.map((r) => ({
+        id: r._id,
+        pattern: r.pattern,
+        category: r.category,
+        match_type: r.match_type || r.matchType,
+        priority: typeof r.priority === 'number' ? r.priority : 0
+      }))
+    })
+  }
+
+  // Add a classification rule. Returns true on insert, false if an identical
+  // (pattern, match_type) already exists (the table's UNIQUE constraint).
+  async addCategoryRule(pattern, category, matchType = 'keyword', priority = 0) {
+    return this.db.executeWithRetry(async () => {
+      const existing = await this.db.findOne('categoryRules', {
+        pattern: pattern,
+        match_type: matchType
+      })
+      if (existing) return false
+      await this.db.insert('categoryRules', {
+        pattern: pattern,
+        category: category,
+        match_type: matchType,
+        priority: priority
+      })
+      return true
+    })
+  }
+
+  // Insert a rule, or if one with the same (pattern, match_type) already exists,
+  // update its category. Used by the "change category from Activity/Dashboard"
+  // flow, which turns a per-app tweak into a persistent classification rule.
+  // Returns { id, created } — created=true if a new rule was inserted.
+  async upsertCategoryRule(pattern, category, matchType = 'keyword', priority = 0) {
+    return this.db.executeWithRetry(async () => {
+      const existing = await this.db.findOne('categoryRules', {
+        pattern: pattern,
+        match_type: matchType
+      })
+      if (existing) {
+        if (existing.category !== category) {
+          await this.db.update(
+            'categoryRules',
+            { _id: existing._id },
+            { $set: { category: category } }
+          )
+        }
+        return { id: existing._id, created: false }
+      }
+      const inserted = await this.db.insert('categoryRules', {
+        pattern: pattern,
+        category: category,
+        match_type: matchType,
+        priority: priority
+      })
+      return { id: inserted && (inserted._id || inserted.id), created: true }
+    })
+  }
+
+  // Update a rule's category/priority by its id.
+  async updateCategoryRule(id, updates) {
+    return this.db.executeWithRetry(async () => {
+      const set = {}
+      if (updates.category !== undefined) set.category = updates.category
+      if (updates.priority !== undefined) set.priority = updates.priority
+      if (updates.pattern !== undefined) set.pattern = updates.pattern
+      if (updates.match_type !== undefined) set.match_type = updates.match_type
+      if (Object.keys(set).length === 0) return false
+      const result = await this.db.update('categoryRules', { _id: id }, { $set: set })
+      return (result.numReplaced || 0) > 0
+    })
+  }
+
+  // Delete a rule by its id.
+  async deleteCategoryRule(id) {
+    return this.db.executeWithRetry(async () => {
+      const result = await this.db.remove('categoryRules', { _id: id })
+      return result > 0
     })
   }
 
