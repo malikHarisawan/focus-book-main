@@ -5,7 +5,18 @@ import eslintPluginReactHooks from 'eslint-plugin-react-hooks'
 import eslintPluginReactRefresh from 'eslint-plugin-react-refresh'
 
 export default [
-  { ignores: ['**/node_modules', '**/dist', '**/out'] },
+  {
+    ignores: [
+      '**/node_modules',
+      '**/dist',
+      '**/out',
+      'AI_agent/**', // Python service + its venv — not JS we lint
+      'extension/**', // browser-extension code runs in a webextension env, not linted here
+      'website/**', // static marketing site, self-contained
+      'build/**',
+      'scripts/**'
+    ]
+  },
   eslint,
   eslintPluginReact.configs.flat.recommended,
   eslintPluginReact.configs.flat['jsx-runtime'],

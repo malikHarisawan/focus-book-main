@@ -10,20 +10,28 @@ The extension reports **state only** — which tab is active in which window, an
 which window is focused. It never measures or reports durations or "time spent";
 the FocusBook focus tracker remains the sole authority on when time is spent.
 
-## Install (unpacked)
+## Install (unpacked, auto-paired)
 
-1. Open your browser's extensions page:
+FocusBook stamps the pairing token into this folder (`focusbook-token.js`) when
+you open it from **Settings → Getting Started → Open extension folder**, so the
+loaded extension connects on its own — no token to copy.
+
+1. In FocusBook, click **Open extension folder** (this pre-pairs it).
+2. Open your browser's extensions page:
    - Chrome: `chrome://extensions`
    - Brave: `brave://extensions`
    - Edge: `edge://extensions`
-2. Turn on **Developer mode**.
-3. Click **Load unpacked** and select this `extension/` folder.
-4. Open the extension's **Options** page (Details → Extension options).
-5. In FocusBook, open **Settings** and copy the pairing token, then paste it
-   into the Options page and click **Save token**.
+3. Turn on **Developer mode**.
+4. Click **Load unpacked** and select that folder.
 
-The extension connects automatically once the token is saved, and reconnects on
-its own if the desktop app restarts.
+It connects within a few seconds; "Connected" appears in FocusBook.
+
+### Manual pairing (fallback)
+
+If the folder was read-only (rare) or you're pairing a checkout the app never
+stamped, open the extension's **Options** page (Details → Extension options),
+paste the token from FocusBook's Settings, and click **Save token**. A token
+entered here always overrides the bundled one.
 
 ## How it stays alive
 

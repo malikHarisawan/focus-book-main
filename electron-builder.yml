@@ -35,7 +35,6 @@ asarUnpack:
   - resources/**
 win:
   executableName: FocusBook
-  signAndEditExecutable: false
   target:
     - target: nsis
       arch:
@@ -50,14 +49,11 @@ nsis:
   runAfterFinish: true
   installerIcon: icon.ico
   uninstallerIcon: icon.ico
-  artifactName: focusbook-setup.${ext}
-squirrelWindows:
-  iconUrl: https://raw.githubusercontent.com/electron/electron-quick-start/master/build/icon.ico
-  loadingGif: false
-  msi: false
-  remoteReleases: false
-  useAppIdAsId: true
-  name: FocusBook
+  # A fixed GUID pins the Add/Remove-Programs (uninstall) registry key across
+  # versions, so upgrades reuse a single entry instead of registering a new one
+  # each time (which is how duplicate/orphaned "Uninstall" entries appear).
+  # Derived from appId; keep it stable once shipped or existing installs orphan.
+  guid: 5b2f9c14-7e3a-4d68-9b21-0f4c6a8e2d7f
 buildVersion: 1.0.0
 compression: normal
 mac:

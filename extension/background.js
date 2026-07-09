@@ -42,10 +42,39 @@ function detectBrowser() {
 }
 const browserName = detectBrowser()
 
+// Read a token that the desktop app stamped into the extension folder before the
+// user loaded it (focusbook-token.js sets globalThis.FOCUSBOOK_BUNDLED_TOKEN).
+// This is what makes "Load unpacked" produce an already-paired extension — no
+// copy/paste. A token the user types on the options page always wins over it.
+function getBundledToken() {
+  try {
+    importScripts('focusbook-token.js')
+  } catch (e) {
+    // File missing or unreadable (dev checkout without a stamp): no bundled token.
+    return null
+  }
+  const t = globalThis.FOCUSBOOK_BUNDLED_TOKEN
+  return typeof t === 'string' && t.length >= 32 ? t : null
+}
+
 async function getAuthToken() {
   if (authToken) return authToken
   const stored = await chrome.storage.local.get('focusbookToken')
-  authToken = stored.focusbookToken || null
+  if (stored.focusbookToken) {
+    authToken = stored.focusbookToken
+    return authToken
+  }
+  // No user-entered token: fall back to the one the app stamped into the folder,
+  // and persist it so the options page shows it as connected.
+  const bundled = getBundledToken()
+  if (bundled) {
+    authToken = bundled
+    try {
+      await chrome.storage.local.set({ focusbookToken: bundled })
+    } catch (e) {
+      // storage write failed; we still hold the token in memory for this session
+    }
+  }
   return authToken
 }
 

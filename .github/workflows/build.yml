@@ -21,7 +21,12 @@ jobs:
   # -----------------------------
   lint:
     name: Lint & Code Quality
-    runs-on: windows-latest
+    # ESLint is pure JS — run it on the free (1x-cost) Ubuntu runner, not a
+    # Windows runner (2x cost). Only the electron-builder --win packaging below
+    # actually needs Windows. Keeping lint on Ubuntu also avoids the Windows
+    # runner-queue starvation that cancelled this job after 15m.
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
 
     steps:
       - uses: actions/checkout@v4
@@ -46,6 +51,7 @@ jobs:
     name: Build (Windows)
     needs: lint
     runs-on: windows-latest
+    timeout-minutes: 30
 
     steps:
       - uses: actions/checkout@v4
