@@ -53,7 +53,20 @@
       "Skill(fewer-permission-prompts:*)",
       "Bash(ls -dt ~/.claude/projects/*/ 2>/dev/null | head -20; echo \"===\"; echo \"Total JSONL files:\"; find ~/.claude/projects/ -name \"*.jsonl\" 2>/dev/null | wc -l)",
       "Read(//c/Users/malik/.claude/projects/**)",
-      "Bash(grep -m1 '\"Bash\"' /c/Users/malik/.claude/projects/d--CODE-tasklytics-backend-redesign/e64bd76c-d8cf-4964-923f-cd6a5a3accc2.jsonl)"
+      "Bash(grep -m1 '\"Bash\"' /c/Users/malik/.claude/projects/d--CODE-tasklytics-backend-redesign/e64bd76c-d8cf-4964-923f-cd6a5a3accc2.jsonl)",
+      "Bash(npx eslint *)",
+      "Bash(timeout 240 npx electron-vite build)",
+      "Skill(run)",
+      "Skill(run:*)",
+      "Bash(node -e \"try{require.resolve\\('playwright'\\);console.log\\('playwright OK'\\)}catch\\(e\\){try{require.resolve\\('playwright-core'\\);console.log\\('playwright-core OK'\\)}catch\\(e2\\){console.log\\('no playwright'\\)}}\")",
+      "Bash(node -e \"const p=require\\('/d/CODE/focusbookMain/package.json'\\); console.log\\('main:', p.main\\); console.log\\('scripts:', JSON.stringify\\(p.scripts,null,1\\)\\); console.log\\('has playwright dep:', !!\\(p.devDependencies?.playwright||p.dependencies?.playwright||p.devDependencies?.['playwright-core']\\)\\)\")",
+      "mcp__playwright__browser_resize",
+      "mcp__playwright__browser_navigate",
+      "mcp__playwright__browser_take_screenshot",
+      "mcp__playwright__browser_evaluate",
+      "mcp__playwright__browser_close",
+      "Bash(pkill -f \"http-server -p 8791\")",
+      "Bash(node -e \"const p=require\\('./package.json'\\); console.log\\('devDep electron:', p.devDependencies?.electron\\); console.log\\('dep electron:', p.dependencies?.electron\\)\")"
     ],
     "deny": [],
     "ask": []

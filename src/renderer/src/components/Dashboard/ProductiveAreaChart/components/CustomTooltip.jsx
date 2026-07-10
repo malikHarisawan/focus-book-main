@@ -37,31 +37,37 @@ const CustomTooltip = ({ active, payload, label, aggregatedData, hasSelection, z
       : 0
 
   return (
-    <div className="bg-white dark:bg-[#05070D] p-3 rounded-lg border border-slate-200 dark:border-slate-700 shadow-lg min-w-[180px]">
-      <p className="text-slate-900 dark:text-white font-medium mb-2">{label}</p>
+    <div
+      className="p-3 rounded-xl shadow-lg min-w-[180px] text-white"
+      style={{ background: 'var(--fb-tip)' }}
+    >
+      <p className="font-display font-semibold mb-2 text-white">{label}</p>
       <div className="space-y-1.5">
         <div className="flex items-center justify-between gap-4">
           <div className="flex items-center gap-2">
-            <div className="w-2.5 h-2.5 rounded-full bg-[#5051F9] dark:bg-[#22D3EE]" />
-            <span className="text-slate-600 dark:text-slate-300 text-sm">Productive:</span>
+            <div className="w-2.5 h-2.5 rounded-full" style={{ background: 'var(--c-deep)' }} />
+            <span className="text-white/70 text-sm">Focused:</span>
           </div>
-          <span className="text-slate-900 dark:text-white text-sm font-medium">{productiveTime}</span>
+          <span className="text-white text-sm font-semibold">{productiveTime}</span>
         </div>
         <div className="flex items-center justify-between gap-4">
           <div className="flex items-center gap-2">
-            <div className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: '#FF6B6B' }} />
-            <span className="text-slate-600 dark:text-slate-300 text-sm">Distracting:</span>
+            <div className="w-2.5 h-2.5 rounded-full" style={{ background: 'var(--c-distract)' }} />
+            <span className="text-white/70 text-sm">Distracted:</span>
           </div>
-          <span className="text-slate-900 dark:text-white text-sm font-medium">{distractingTime}</span>
+          <span className="text-white text-sm font-semibold">{distractingTime}</span>
         </div>
-        <div className="flex items-center justify-between gap-4 pt-1.5 mt-1.5 border-t border-slate-200 dark:border-slate-700">
-          <span className="text-slate-600 dark:text-slate-300 text-sm">Total:</span>
-          <span className="text-[#5051F9] dark:text-[#22D3EE] text-sm font-medium">{totalTime}</span>
+        <div className="flex items-center justify-between gap-4 pt-1.5 mt-1.5 border-t border-white/15">
+          <span className="text-white/70 text-sm">Total:</span>
+          <span className="text-white text-sm font-semibold">{totalTime}</span>
         </div>
         {totalSeconds > 0 && (
           <div className="flex items-center justify-between gap-4">
-            <span className="text-slate-600 dark:text-slate-300 text-sm">Productivity:</span>
-            <span className={`text-sm font-medium ${productivePercentage >= 50 ? 'text-[#5051F9] dark:text-[#22D3EE]' : 'text-[#FF6B6B]'}`}>
+            <span className="text-white/70 text-sm">Productivity:</span>
+            <span
+              className="text-sm font-semibold"
+              style={{ color: productivePercentage >= 50 ? 'var(--c-deep)' : 'var(--c-distract)' }}
+            >
               {productivePercentage}%
             </span>
           </div>

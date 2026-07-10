@@ -62,25 +62,34 @@ const ProductiveAreaChart = ({
   rawData,
   selectedDate,
   onZoomLevelChange,
-  onSelectionChange
+  onSelectionChange,
+  // Custom range support: when customData is passed, the chart renders it
+  // directly (one point per day) and skips zoom-driven data loading. hideTabs
+  // suppresses the Daily/Weekly/Monthly header tabs. initialZoom sets the
+  // starting zoom level for the normal (non-custom) path.
+  customData = null,
+  hideTabs = false,
+  initialZoom = 'day'
 }) => {
   // Get current theme
   const { resolvedTheme } = useTheme()
 
-  // Theme-aware colors - cyan accent in dark mode, purple in light
+  // Theme-aware colors — violet accent (both themes), salmon for distraction.
+  // Values match the design tokens (--c-* / --fb-*) for the two themes.
   const isDark = resolvedTheme === 'dark'
-  const accent = isDark ? '#22D3EE' : '#5051F9' // Cyan (dark) / Purple (light)
+  const accent = '#5B5BD6' // Violet accent — productive (both themes)
   const chartColors = {
-    productive: accent, // Cyan (dark) / Purple (light) - for productive time
-    neutral: isDark ? '#64748B' : '#22D3EE', // Slate (dark) / Cyan (light) - matches legend
-    distracting: '#FF6B6B', // Red/Salmon - for distracting time
-    selection: accent, // Selection same as productive
-    grid: isDark ? '#1E293B' : '#E8EDF1',
-    text: isDark ? '#94A3B8' : '#768396',
-    bg: isDark ? '#0B1220' : '#ffffff',
-    bgSecondary: isDark ? '#1E293B' : '#F4F7FE',
-    border: isDark ? '#1E293B' : '#E8EDF1',
+    productive: accent,
+    neutral: isDark ? '#57ABF5' : '#3E9BF0', // Collaboration blue
+    distracting: isDark ? '#F5788A' : '#F0596E', // Salmon — distracting
+    selection: accent,
+    grid: isDark ? '#272730' : '#ECECEA',
+    text: isDark ? '#8B8B99' : '#75757F',
+    bg: isDark ? '#15151D' : '#ffffff',
+    bgSecondary: isDark ? '#1E1E28' : '#F5F5F3',
+    border: isDark ? '#272730' : '#ECECEA',
   }
+  const distractColor = chartColors.distracting
 
   // State management using custom hooks
   const {
@@ -91,7 +100,7 @@ const ProductiveAreaChart = ({
     setZoomLevel,
     canZoomIn: canZoomInValue,
     canZoomOut: canZoomOutValue
-  } = useZoomState('hour', onZoomLevelChange)
+  } = useZoomState(initialZoom, onZoomLevelChange)
 
   const {
     selectedRange,
@@ -119,6 +128,8 @@ const ProductiveAreaChart = ({
 
   // Data processing function
   const updateDataForZoomLevel = async () => {
+    // In custom-range mode the parent supplies the series directly.
+    if (customData) return
     if (!rawData || !selectedDate) return
 
     setIsLoading(true)
@@ -141,19 +152,26 @@ const ProductiveAreaChart = ({
     }
   }, [currentData, selectedRange])
 
+  // Custom-range mode: mirror the parent-supplied series into currentData.
+  useEffect(() => {
+    if (customData) {
+      setCurrentData(customData)
+    }
+  }, [customData])
+
   // Handle initial data load
   useEffect(() => {
-    if (data && data.length > 0) {
+    if (!customData && data && data.length > 0) {
       setCurrentData(data)
     }
-  }, [data])
+  }, [data, customData])
 
   // Handle zoom level changes
   useEffect(() => {
-    if (rawData && selectedDate) {
+    if (!customData && rawData && selectedDate) {
       updateDataForZoomLevel()
     }
-  }, [zoomLevel, rawData, selectedDate])
+  }, [zoomLevel, rawData, selectedDate, customData])
 
   // Update selected apps when data changes
   useEffect(() => {
@@ -277,62 +295,65 @@ const ProductiveAreaChart = ({
   // Loading state
   if (!currentData || currentData.length === 0) {
     return (
-      <div className="bg-white dark:bg-[#05070D] p-4 rounded-xl h-[250px] flex items-center justify-center border border-slate-200 dark:border-slate-700/30">
+      <div className="bg-fb-surface p-4 rounded-[18px] h-[250px] flex items-center justify-center border border-fb-border">
         {isLoading ? (
-          <div className="flex items-center gap-2 text-teal-500">
-            <div className="animate-spin w-4 h-4 border-2 border-teal-500 border-t-transparent rounded-full"></div>
+          <div className="flex items-center gap-2 text-fb-accent">
+            <div className="animate-spin w-4 h-4 border-2 border-fb-accent border-t-transparent rounded-full"></div>
             <span>Loading data...</span>
           </div>
         ) : (
-          <span className="text-slate-500">No data available</span>
+          <span className="text-fb-muted">No data available</span>
         )}
       </div>
     )
   }
 
+  const tabClass = (active) =>
+    `px-3 py-1 text-xs font-semibold transition-all border-b-2 ${
+      active
+        ? 'text-fb-accent border-fb-accent'
+        : 'text-fb-muted hover:text-fb-text border-transparent'
+    }`
+
   return (
     <div
       ref={containerRef}
-      className="bg-white dark:bg-[#05070D] p-3 rounded-xl border border-slate-200 dark:border-slate-700/30 h-full flex flex-col"
+      className={hideTabs ? 'px-5 pb-4 h-full flex flex-col' : 'bg-fb-surface p-4 rounded-[18px] h-full flex flex-col'}
       tabIndex={0}
     >
-      {/* Compact Header with Tabs */}
+      {/* Header with Tabs + legend */}
       <div className="flex items-center justify-between mb-3">
-        <h3 className="text-slate-700 dark:text-white text-sm font-medium leading-tight">Productivity Over Time</h3>
-
-        {/* Tab Navigation - Daily/Weekly/Monthly */}
-        <div className="flex items-center gap-1">
-          <button
-            onClick={() => handleBreadcrumbClick('hour')}
-            className={`px-3 py-1 text-xs font-medium transition-all ${
-              zoomLevel === 'hour' || zoomLevel === 'day'
-                ? 'text-[#5051F9] border-b-2 border-[#5051F9] dark:text-[#22D3EE] dark:border-[#22D3EE]'
-                : 'text-[#768396] dark:text-[#94A3B8] hover:text-[#232360] dark:hover:text-white border-b-2 border-transparent'
-            }`}
-          >
-            Daily
-          </button>
-          <button
-            onClick={() => handleBreadcrumbClick('week')}
-            className={`px-3 py-1 text-xs font-medium transition-all ${
-              zoomLevel === 'week'
-                ? 'text-[#5051F9] border-b-2 border-[#5051F9] dark:text-[#22D3EE] dark:border-[#22D3EE]'
-                : 'text-[#768396] dark:text-[#94A3B8] hover:text-[#232360] dark:hover:text-white border-b-2 border-transparent'
-            }`}
-          >
-            Weekly
-          </button>
-          <button
-            onClick={() => handleBreadcrumbClick('month')}
-            className={`px-3 py-1 text-xs font-medium transition-all ${
-              zoomLevel === 'month'
-                ? 'text-[#5051F9] border-b-2 border-[#5051F9] dark:text-[#22D3EE] dark:border-[#22D3EE]'
-                : 'text-[#768396] dark:text-[#94A3B8] hover:text-[#232360] dark:hover:text-white border-b-2 border-transparent'
-            }`}
-          >
-            Monthly
-          </button>
+        <div>
+          {!hideTabs && (
+            <h3 className="font-display text-fb-text text-base font-semibold leading-tight">Focus over time</h3>
+          )}
+          <div className={`flex items-center gap-4 ${hideTabs ? '' : 'mt-1'}`}>
+            <span className="flex items-center gap-1.5 text-[12px] font-semibold text-fb-muted">
+              <span className="w-3.5 h-[3px] rounded-sm" style={{ background: chartColors.productive }} />
+              Focused
+            </span>
+            <span className="flex items-center gap-1.5 text-[12px] font-semibold text-fb-muted">
+              <span className="w-3.5 h-[3px] rounded-sm" style={{ background: distractColor }} />
+              Distracted
+            </span>
+          </div>
         </div>
+
+        {/* Tab Navigation - Daily/Weekly/Monthly (hidden in custom-range mode,
+            where the parent's granularity control drives the view) */}
+        {!hideTabs && (
+          <div className="flex items-center gap-1">
+            <button onClick={() => handleBreadcrumbClick('hour')} className={tabClass(zoomLevel === 'hour' || zoomLevel === 'day')}>
+              Daily
+            </button>
+            <button onClick={() => handleBreadcrumbClick('week')} className={tabClass(zoomLevel === 'week')}>
+              Weekly
+            </button>
+            <button onClick={() => handleBreadcrumbClick('month')} className={tabClass(zoomLevel === 'month')}>
+              Monthly
+            </button>
+          </div>
+        )}
       </div>
 
       <div className="flex-1 min-h-[180px]">
@@ -359,17 +380,17 @@ const ProductiveAreaChart = ({
               <stop offset="40%" stopColor={chartColors.neutral} stopOpacity={0.3} />
               <stop offset="100%" stopColor={chartColors.neutral} stopOpacity={0.05} />
             </linearGradient>
-            {/* Distracting gradient - Red/Salmon #FF6B6B */}
+            {/* Distracting gradient - salmon */}
             <linearGradient id="colorDistracting" x1="0" y1="0" x2="0" y2="1">
-              <stop offset="0%" stopColor="#FF6B6B" stopOpacity={0.5} />
-              <stop offset="40%" stopColor="#FF6B6B" stopOpacity={0.3} />
-              <stop offset="100%" stopColor="#FF6B6B" stopOpacity={0.05} />
+              <stop offset="0%" stopColor={distractColor} stopOpacity={0.5} />
+              <stop offset="40%" stopColor={distractColor} stopOpacity={0.3} />
+              <stop offset="100%" stopColor={distractColor} stopOpacity={0.05} />
             </linearGradient>
           </defs>
           <XAxis
             dataKey="day"
             stroke="transparent"
-            tick={{ fill: '#FFFFFF', fontSize: 11, fontWeight: 500 }}
+            tick={{ fill: chartColors.text, fontSize: 11, fontWeight: 500 }}
             tickLine={false}
             axisLine={false}
             dy={2}
@@ -389,10 +410,10 @@ const ProductiveAreaChart = ({
             allowDecimals={false}
             style={{ userSelect: 'none' }}
           />
-          <CartesianGrid strokeDasharray="3 3" stroke={isDark ? 'rgba(148, 163, 184, 0.12)' : 'rgba(100, 116, 139, 0.12)'} vertical={false} />
+          <CartesianGrid strokeDasharray="3 3" stroke={isDark ? 'rgba(139, 139, 153, 0.12)' : 'rgba(117, 117, 127, 0.12)'} vertical={false} />
           <Tooltip
             content={<CustomTooltip />}
-            cursor={{ stroke: isDark ? 'rgba(34, 211, 238, 0.35)' : 'rgba(80, 81, 249, 0.3)', strokeWidth: 1 }}
+            cursor={{ stroke: 'rgba(91, 91, 214, 0.3)', strokeWidth: 1 }}
             position={{ y: -30 }}
             wrapperStyle={{ outline: 'none' }}
           />
@@ -406,7 +427,7 @@ const ProductiveAreaChart = ({
             dataKey="distracting"
             name="Distracting"
             stackId="1"
-            stroke="#FF6B6B"
+            stroke={distractColor}
             strokeWidth={2}
             fill="url(#colorDistracting)"
             dot={false}

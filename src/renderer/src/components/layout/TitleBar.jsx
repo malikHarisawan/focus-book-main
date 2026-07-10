@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { Minus, Square, X, Maximize2, Minimize2 } from 'lucide-react'
+import { Minus, X, Maximize2, Minimize2 } from 'lucide-react'
 
 export function TitleBar() {
   const [isMaximized, setIsMaximized] = useState(false)
@@ -39,12 +39,12 @@ export function TitleBar() {
 
   return (
     <div
-      className="h-10 flex items-center justify-between px-4 select-none backdrop-blur-md transition-all bg-white/90 border-b border-[#E8EDF1] dark:bg-[#0B1220]/90 dark:border-[#1E293B]"
+      className="h-10 flex items-center justify-between px-4 select-none transition-all bg-fb-surface border-b border-fb-border"
       style={{ WebkitAppRegion: 'drag' }}
     >
       {/* App Title */}
       <div className="flex items-center gap-2">
-        <span className="text-sm font-semibold tracking-wide text-[#5051F9] dark:text-[#22D3EE]">
+        <span className="font-display text-sm font-semibold tracking-wide text-fb-accent">
           FocusBook
         </span>
       </div>
@@ -53,21 +53,21 @@ export function TitleBar() {
       <div className="flex items-center" style={{ WebkitAppRegion: 'no-drag' }}>
         <button
           onClick={handleMinimize}
-          className="h-8 w-10 flex items-center justify-center transition-all duration-200 text-[#768396] hover:text-[#232360] hover:bg-[#F4F7FE] dark:text-[#94A3B8] dark:hover:text-white dark:hover:bg-[#1E293B] rounded"
+          className="h-8 w-10 flex items-center justify-center transition-all duration-200 text-fb-muted hover:text-fb-text hover:bg-fb-surface2 rounded"
           title="Minimize"
         >
           <Minus size={14} />
         </button>
         <button
           onClick={handleMaximize}
-          className="h-8 w-10 flex items-center justify-center transition-all duration-200 text-[#768396] hover:text-[#232360] hover:bg-[#F4F7FE] dark:text-[#94A3B8] dark:hover:text-white dark:hover:bg-[#1E293B] rounded"
+          className="h-8 w-10 flex items-center justify-center transition-all duration-200 text-fb-muted hover:text-fb-text hover:bg-fb-surface2 rounded"
           title={isMaximized ? 'Restore' : 'Maximize'}
         >
           {isMaximized ? <Minimize2 size={14} /> : <Maximize2 size={14} />}
         </button>
         <button
           onClick={handleClose}
-          className="h-8 w-10 flex items-center justify-center transition-all duration-200 text-[#768396] hover:text-white hover:bg-[#FF6B6B] dark:text-[#94A3B8] dark:hover:text-white dark:hover:bg-[#FF6B6B] rounded"
+          className="h-8 w-10 flex items-center justify-center transition-all duration-200 text-fb-muted hover:text-white hover:bg-cat-distract rounded"
           title="Close"
         >
           <X size={14} />

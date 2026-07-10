@@ -8,7 +8,7 @@
 import { useState, useCallback } from 'react'
 import { getNextZoomLevel, getPreviousZoomLevel, canZoomIn, canZoomOut } from '../utils/zoomUtils'
 
-const useZoomState = (initialZoomLevel = 'hour', onZoomLevelChange) => {
+const useZoomState = (initialZoomLevel = 'day', onZoomLevelChange) => {
   const [zoomLevel, setZoomLevel] = useState(initialZoomLevel)
 
   const handleZoomLevelChange = useCallback(
@@ -34,7 +34,7 @@ const useZoomState = (initialZoomLevel = 'hour', onZoomLevelChange) => {
   }, [zoomLevel, handleZoomLevelChange])
 
   const resetZoom = useCallback(() => {
-    handleZoomLevelChange('hour')
+    handleZoomLevelChange('day')
   }, [handleZoomLevelChange])
 
   const setZoomLevelDirect = useCallback(

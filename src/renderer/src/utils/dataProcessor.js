@@ -192,9 +192,11 @@ export const processUsageChartData = (jsonData, date, viewType = 'day') => {
     console.log('data in the utility function ', jsonData)
     const hourlyData = []
 
-    for (let i = 9; i <= 21; i++) {
+    // Cover the full 24-hour day (12AM–11PM) so activity outside the old
+    // 9AM–9PM window is no longer silently dropped.
+    for (let i = 0; i < 24; i++) {
       hourlyData.push({
-        name: i === 12 ? '12PM' : i < 12 ? `${i}AM` : `${i - 12}PM`,
+        name: i === 0 ? '12AM' : i === 12 ? '12PM' : i < 12 ? `${i}AM` : `${i - 12}PM`,
         Code: 0,
         Browsing: 0,
         Communication: 0,
@@ -210,7 +212,7 @@ export const processUsageChartData = (jsonData, date, viewType = 'day') => {
       const hour = parseInt(hourKey.split(':')[0])
       if (isNaN(hour) || hour < 0 || hour >= 24) continue
 
-      const index = hour - 9
+      const index = hour
       if (index < 0 || index >= hourlyData.length) continue
 
       for (const app of Object.values(hourData)) {
@@ -447,6 +449,43 @@ export const processProductiveChartData = (jsonData, date, viewType = 'day') => 
 
     return monthData
   }
+}
+
+/**
+ * Custom date-range chart series: one point per day between startDate and
+ * endDate (inclusive), each holding that day's productive/neutral/distracting
+ * seconds. Same point shape as processProductiveChartData so it drops straight
+ * into ProductiveAreaChart. Dates are YYYY-MM-DD; order is auto-corrected if
+ * start is after end. Capped at 366 days to keep the axis readable.
+ */
+export const processCustomRangeChartData = (jsonData, startDate, endDate) => {
+  if (!jsonData || !startDate || !endDate) return []
+
+  let start = new Date(startDate + 'T00:00:00')
+  let end = new Date(endDate + 'T00:00:00')
+  if (isNaN(start) || isNaN(end)) return []
+  if (start > end) [start, end] = [end, start]
+
+  const out = []
+  const cursor = new Date(start)
+  let guard = 0
+  while (cursor <= end && guard < 366) {
+    const key = toLocalDateStr(cursor)
+    // Short "Mon D" label for the x-axis.
+    const label = cursor.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
+    const point = emptyPoint(label)
+
+    if (jsonData[key] && jsonData[key].apps) {
+      for (const app of Object.values(jsonData[key].apps)) {
+        accumulateProductivity(point, app)
+      }
+    }
+    out.push(point)
+
+    cursor.setDate(cursor.getDate() + 1)
+    guard++
+  }
+  return out
 }
 
 export const processMostUsedApps = (jsonData, date) => {

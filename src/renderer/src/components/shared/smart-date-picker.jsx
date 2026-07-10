@@ -74,18 +74,12 @@ const SmartDatePicker = ({ zoomLevel = 'hour', onDateChange, className = '' }) =
     return selectedDate === today
   }
 
+  const navBtn = 'flex items-center justify-center w-8 h-8 rounded-lg transition-all duration-200 text-fb-muted hover:text-fb-accent hover:bg-fb-surface2'
+
   return (
     <div className={`flex items-center gap-2 ${className}`}>
       {/* Previous Button */}
-      <button
-        onClick={handlePrevious}
-        className={`flex items-center justify-center w-8 h-8 rounded-lg transition-all duration-200 ${
-          theme === 'dark'
-            ? 'text-[#94A3B8] hover:text-[#22D3EE] hover:bg-[#1E293B]'
-            : 'text-[#768396] hover:text-[#5051F9] hover:bg-[#F4F7FE]'
-        }`}
-        title={`Previous ${getNavigationLabel()}`}
-      >
+      <button onClick={handlePrevious} className={navBtn} title={`Previous ${getNavigationLabel()}`}>
         <ChevronLeft size={16} />
       </button>
 
@@ -103,51 +97,28 @@ const SmartDatePicker = ({ zoomLevel = 'hour', onDateChange, className = '' }) =
         {/* Visible button */}
         <button
           onClick={openDatePicker}
-          className={`flex items-center gap-2 border rounded-lg px-3 py-2 text-sm transition-all duration-200 min-w-0 ${
-            theme === 'dark'
-              ? 'bg-[#0B1220] text-white border-[#1E293B] hover:bg-[#1E293B] hover:border-[#22D3EE]'
-              : 'bg-white text-[#232360] border-[#E8EDF1] hover:bg-[#F4F7FE] hover:border-[#5051F9]'
-          }`}
+          className="flex items-center gap-2 border rounded-lg px-3 py-2 text-sm transition-all duration-200 min-w-0 bg-fb-surface2 text-fb-text border-fb-border hover:border-fb-accent"
           title="Click to select specific date"
         >
           <span className="truncate">{getFormattedDateRange(zoomLevel)}</span>
-          <Calendar
-            size={14}
-            className={`flex-shrink-0 ${theme === 'dark' ? 'text-[#22D3EE]' : 'text-[#5051F9]'}`}
-          />
+          <Calendar size={14} className="flex-shrink-0 text-fb-accent" />
         </button>
       </div>
 
       {/* Next Button */}
-      <button
-        onClick={handleNext}
-        className={`flex items-center justify-center w-8 h-8 rounded-lg transition-all duration-200 ${
-          theme === 'dark'
-            ? 'text-[#94A3B8] hover:text-[#22D3EE] hover:bg-[#1E293B]'
-            : 'text-[#768396] hover:text-[#5051F9] hover:bg-[#F4F7FE]'
-        }`}
-        title={`Next ${getNavigationLabel()}`}
-      >
+      <button onClick={handleNext} className={navBtn} title={`Next ${getNavigationLabel()}`}>
         <ChevronRight size={16} />
       </button>
 
       {/* Today Button */}
       {!isToday() && (
-        <button
-          onClick={handleToday}
-          className={`flex items-center justify-center w-8 h-8 rounded-lg transition-all duration-200 ${
-            theme === 'dark'
-              ? 'text-[#94A3B8] hover:text-[#22D3EE] hover:bg-[#1E293B]'
-              : 'text-[#768396] hover:text-[#5051F9] hover:bg-[#F4F7FE]'
-          }`}
-          title="Go to today"
-        >
+        <button onClick={handleToday} className={navBtn} title="Go to today">
           <Home size={14} />
         </button>
       )}
 
       {/* Current period indicator */}
-      <div className={`text-xs hidden sm:block ${theme === 'dark' ? 'text-slate-500' : 'text-slate-400'}`}>
+      <div className="text-xs hidden sm:block text-fb-muted">
         {zoomLevel.charAt(0).toUpperCase() + zoomLevel.slice(1)} view
       </div>
     </div>

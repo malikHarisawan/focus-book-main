@@ -84,17 +84,17 @@ const AppUsageDetails = ({
     }
   }
 
-  // Get productivity color
+  // Get productivity color — uses the design category tokens.
   const getProductivityColor = (productivity) => {
     switch (productivity) {
       case 'Productive':
-        return 'bg-[#5051F9]/10 text-[#5051F9] border-[#5051F9]/30'
+        return 'bg-cat-deep/10 text-cat-deep border-cat-deep/30'
       case 'Neutral':
-        return 'bg-[#22D3EE]/10 text-[#22D3EE] border-[#22D3EE]/30'
+        return 'bg-cat-comms/10 text-cat-comms border-cat-comms/30'
       case 'Distracting':
-        return 'bg-[#FF6B6B]/10 text-[#FF6B6B] border-[#FF6B6B]/30'
+        return 'bg-cat-distract/10 text-cat-distract border-cat-distract/30'
       default:
-        return 'bg-[#768396]/10 text-[#768396] border-[#768396]/30'
+        return 'bg-fb-muted/10 text-fb-muted border-fb-muted/30'
     }
   }
 
@@ -198,21 +198,21 @@ const AppUsageDetails = ({
   }
 
   return (
-    <Card className="bg-white dark:bg-[#0B1220] border-[#E8EDF1] dark:border-[#1E293B] backdrop-blur-sm mt-3">
-      <CardHeader className="border-b border-[#E8EDF1] dark:border-[#1E293B] pb-2">
+    <Card className="bg-fb-surface border-fb-border mt-3">
+      <CardHeader className="border-b border-fb-border pb-2">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2">
-            <Clock className="h-5 w-5 text-[#5051F9]" />
-            <CardTitle className="text-[#232360] dark:text-white text-base">App Usage Details</CardTitle>
+            <Clock className="h-5 w-5 text-fb-accent" />
+            <CardTitle className="text-fb-text text-base">App Usage Details</CardTitle>
             <Badge
               variant="outline"
-              className="text-xs bg-[#5051F9]/10 text-[#5051F9] border-[#5051F9]/30"
+              className="text-xs bg-fb-accentsoft text-fb-accent border-fb-accent/30"
             >
               {getRangeDescription()}
             </Badge>
           </div>
           <div className="flex items-center gap-2">
-            <span className="text-sm text-[#768396] dark:text-[#94A3B8]">
+            <span className="text-sm text-fb-muted">
               {selectedApps.length} app{selectedApps.length !== 1 ? 's' : ''}
             </span>
             {selectedApps.length > 10 && (
@@ -220,7 +220,7 @@ const AppUsageDetails = ({
                 variant="ghost"
                 size="sm"
                 onClick={() => setShowAll(!showAll)}
-                className="text-[#5051F9] hover:text-[#4142E0] hover:bg-[#5051F9]/10"
+                className="text-fb-accent hover:brightness-110 hover:bg-fb-accentsoft"
               >
                 {showAll ? 'Show Less' : 'Show All'}
               </Button>
@@ -232,7 +232,7 @@ const AppUsageDetails = ({
                 e.stopPropagation()
                 onClose()
               }}
-              className="text-[#768396] dark:text-[#94A3B8] hover:text-[#232360] dark:hover:text-white hover:bg-[#F4F7FE] dark:hover:bg-[#1E293B]"
+              className="text-fb-muted hover:text-fb-text hover:bg-fb-surface2"
               title="Close details panel"
             >
               <ChevronUp className="h-4 w-4" />
@@ -242,26 +242,26 @@ const AppUsageDetails = ({
       </CardHeader>
 
       <CardContent className="p-0">
-          <div className="bg-[#F4F7FE] dark:bg-[#05070D] rounded-b-lg overflow-hidden">
+          <div className="bg-fb-surface2 rounded-b-lg overflow-hidden">
             {/* Header */}
-            <div className="grid grid-cols-11 text-xs text-[#768396] dark:text-[#94A3B8] p-2.5 border-b border-[#E8EDF1] dark:border-[#1E293B] bg-[#F4F7FE] dark:bg-[#1E293B]">
+            <div className="grid grid-cols-11 text-xs text-fb-muted p-2.5 border-b border-fb-border bg-fb-surface2">
               <button
                 onClick={() => handleSort('name')}
-                className="col-span-4 flex items-center gap-1 hover:text-[#5051F9] transition-colors text-left font-medium"
+                className="col-span-4 flex items-center gap-1 hover:text-fb-accent transition-colors text-left font-medium"
               >
                 Application
                 {getSortIcon('name')}
               </button>
               <button
                 onClick={() => handleSort('category')}
-                className="col-span-2 flex items-center gap-1 hover:text-[#5051F9] transition-colors text-left font-medium"
+                className="col-span-2 flex items-center gap-1 hover:text-fb-accent transition-colors text-left font-medium"
               >
                 Category
                 {getSortIcon('category')}
               </button>
               <button
                 onClick={() => handleSort('time')}
-                className="col-span-2 flex items-center gap-1 hover:text-[#5051F9] transition-colors text-left font-medium"
+                className="col-span-2 flex items-center gap-1 hover:text-fb-accent transition-colors text-left font-medium"
               >
                 Time Spent
                 {getSortIcon('time')}
@@ -271,35 +271,35 @@ const AppUsageDetails = ({
             </div>
 
             {/* App List */}
-            <div className="divide-y divide-[#E8EDF1] dark:divide-[#1E293B] max-h-80 overflow-y-auto custom-scrollbar">
+            <div className="divide-y divide-fb-border max-h-80 overflow-y-auto custom-scrollbar">
               {sortedApps.map((app, index) => (
                 <div
                   key={`${app.name}-${index}`}
-                  className="grid grid-cols-11 py-2.5 px-2.5 text-sm hover:bg-white dark:hover:bg-[#0B1220] transition-colors"
+                  className="grid grid-cols-11 py-2.5 px-2.5 text-sm hover:bg-fb-surface2 transition-colors"
                   onClick={(e) => e.stopPropagation()}
                 >
                   <div className="col-span-4 flex items-center gap-2">
-                    <div className="w-7 h-7 bg-gradient-to-br from-[#5051F9]/20 to-[#22D3EE]/20 rounded-lg flex items-center justify-center">
-                      <span className="text-xs font-medium text-[#5051F9]">
+                    <div className="w-7 h-7 bg-fb-accentsoft rounded-lg flex items-center justify-center">
+                      <span className="text-xs font-medium text-fb-accent">
                         {app.name?.charAt(0)?.toUpperCase() || '?'}
                       </span>
                     </div>
                     <div className="flex-1">
-                      <div className="text-[#232360] dark:text-white font-medium truncate text-sm">
+                      <div className="text-fb-text font-medium truncate text-sm">
                         {app.name || 'Unknown App'}
                       </div>
                       {app.domain && (
-                        <div className="text-xs text-[#768396] dark:text-[#94A3B8] truncate">{app.domain}</div>
+                        <div className="text-xs text-fb-muted truncate">{app.domain}</div>
                       )}
                     </div>
                   </div>
 
-                  <div className="col-span-2 text-[#232360] dark:text-white flex items-center gap-1">
+                  <div className="col-span-2 text-fb-text flex items-center gap-1">
                     <span className="text-sm">{getCategoryIcon(app.category)}</span>
                     {app.category || 'Unknown'}
                   </div>
 
-                  <div className="col-span-2 text-[#5051F9] font-medium">
+                  <div className="col-span-2 text-fb-accent font-medium">
                     {formatTime(app.timeSpentSeconds || 0)}
                   </div>
 
@@ -319,7 +319,7 @@ const AppUsageDetails = ({
                           <Button
                             variant="ghost"
                             size="icon"
-                            className="h-6 w-6 text-[#768396] dark:text-[#94A3B8] hover:text-[#232360] dark:hover:text-white"
+                            className="h-6 w-6 text-fb-muted hover:text-fb-text"
                             onClick={(e) => e.stopPropagation()}
                           >
                             <MoreHorizontal className="h-4 w-4" />
@@ -327,17 +327,17 @@ const AppUsageDetails = ({
                         </DropdownMenuTrigger>
                         <DropdownMenuContent
                           align="end"
-                          className="bg-white dark:bg-[#0B1220] border-[#E8EDF1] dark:border-[#1E293B] text-[#232360] dark:text-white"
+                          className="bg-fb-surface border-fb-border text-fb-text"
                           onClick={(e) => e.stopPropagation()}
                         >
                           <DropdownMenuLabel>Actions</DropdownMenuLabel>
-                          <DropdownMenuSeparator className="bg-[#E8EDF1] dark:bg-[#1E293B]" />
+                          <DropdownMenuSeparator className="bg-fb-border" />
                           <DropdownMenuSub>
                             <DropdownMenuSubTrigger className="flex items-center">
                               <Tag className="h-4 w-4 mr-2" />
                               <span>Change Category</span>
                             </DropdownMenuSubTrigger>
-                            <DropdownMenuSubContent className="bg-white dark:bg-[#0B1220] border-[#E8EDF1] dark:border-[#1E293B]">
+                            <DropdownMenuSubContent className="bg-fb-surface border-fb-border">
                               {categories.map((category) => (
                                 <DropdownMenuItem
                                   key={category}
@@ -366,8 +366,8 @@ const AppUsageDetails = ({
 
             {/* Footer */}
             {selectedApps.length > 0 && (
-              <div className="p-2.5 border-t border-[#E8EDF1] dark:border-[#1E293B] bg-[#F4F7FE] dark:bg-[#1E293B]">
-                <div className="flex items-center justify-between text-xs text-[#768396] dark:text-[#94A3B8]">
+              <div className="p-2.5 border-t border-fb-border bg-fb-surface2">
+                <div className="flex items-center justify-between text-xs text-fb-muted">
                   <span>
                     Total:{' '}
                     {selectedApps.reduce((sum, app) => sum + (app.timeSpentSeconds || 0), 0) > 0

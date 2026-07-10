@@ -1,72 +1,107 @@
-@import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;600;700&display=swap');
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&display=swap');
 
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
 
-/* CSS Variables for Dynamic Accent Colors */
+/*
+ * Design tokens — FocusBook redesign
+ * Single source of truth for surfaces, text, borders, and category colors.
+ * The reference design ships a light (default) and dark theme; both are
+ * defined here. Legacy variable names (--accent-primary, --bg-card, …) are
+ * kept as ALIASES that point at the new --fb-* tokens so older components that
+ * still read them stay in sync during the migration.
+ */
 :root {
-  /* Default accent colors - Purple/Blue theme */
-  --accent-primary: #5051F9;
-  --accent-secondary: #22D3EE;
-  
-  /* Light Mode Background Colors - From Figma */
-  --bg-main: #F4F7FE;
-  --bg-card: #FFFFFF;
-  --bg-secondary: #E8EDF1;
-  
-  /* Light Mode Text Colors - From Figma */
-  --text-primary: #232360;
-  --text-secondary: #768396;
-  --text-tertiary: #94A3B8;
-  
-  /* Light Mode Border Colors */
-  --border-primary: #E8EDF1;
-  --border-secondary: #E7EBEC;
-  
-  /* Chart Colors */
-  --chart-blue: #22D3EE;
-  --chart-orange: #FF6B6B;
+  /* --- New design system: light theme (default) --- */
+  --fb-bg: #F4F4F2;
+  --fb-surface: #FFFFFF;
+  --fb-surface2: #F5F5F3;
+  --fb-text: #16161D;
+  --fb-muted: #75757F;
+  --fb-border: #ECECEA;
+  --fb-track: #EFEFF3;
+  --fb-accent: #5B5BD6;
+  --fb-accentsoft: rgba(91, 91, 214, 0.10);
+  --fb-tip: #1D1D26;
+  --fb-shadow: 0 1px 3px rgba(20, 20, 29, 0.05), 0 12px 30px rgba(20, 20, 29, 0.04);
+  --fb-baridle: #E2E2EC;
+  --fb-livebg: rgba(47, 191, 159, 0.12);
+
+  /* Category colors (light) */
+  --c-deep: #5B5BD6;      /* Productive / deep work — accent */
+  --c-create: #2FBF9F;    /* Creative */
+  --c-comms: #3E9BF0;     /* Collaboration / neutral */
+  --c-break: #F0A93B;     /* Break */
+  --c-distract: #F0596E;  /* Distraction */
+
+  /* --- Legacy aliases (point at new tokens) --- */
+  --accent-primary: var(--fb-accent);
+  --accent-secondary: var(--c-comms);
+  --bg-main: var(--fb-bg);
+  --bg-card: var(--fb-surface);
+  --bg-secondary: var(--fb-surface2);
+  --text-primary: var(--fb-text);
+  --text-secondary: var(--fb-muted);
+  --text-tertiary: var(--fb-muted);
+  --border-primary: var(--fb-border);
+  --border-secondary: var(--fb-border);
+  --chart-blue: var(--c-comms);
+  --chart-orange: var(--c-distract);
 }
 
 .dark {
-  /* Dark Mode accent colors - Exact Figma values */
-  --accent-primary: #5051F9;
-  --accent-secondary: #22D3EE;
-  
-  /* Dark Mode Background Colors - Cyber near-black (cyan pops) */
-  --bg-main: #05070D;
-  --bg-card: #0B1220;
-  --bg-input: #16202E;
-  
-  /* Dark Mode Text Colors - Exact Figma values */
-  --text-primary: #FFFFFF;
-  --text-secondary: #94A3B8;
-  --text-tertiary: #768396;
-  
-  /* Dark Mode Border Colors */
-  --border-primary: #1E293B;
-  --border-secondary: #94A3B8;
-  
-  /* Chart Colors */
-  --chart-blue: #22D3EE;
-  --chart-orange: #FF6B6B;
+  /* --- New design system: dark theme --- */
+  --fb-bg: #0B0B10;
+  --fb-surface: #15151D;
+  --fb-surface2: #1E1E28;
+  --fb-text: #ECECF2;
+  --fb-muted: #8B8B99;
+  --fb-border: #272730;
+  --fb-track: #22222C;
+  --fb-accent: #5B5BD6;
+  --fb-accentsoft: rgba(124, 124, 240, 0.16);
+  --fb-tip: #2A2A36;
+  --fb-shadow: 0 1px 2px rgba(0, 0, 0, 0.5);
+  --fb-baridle: #2C2C38;
+  --fb-livebg: rgba(63, 210, 176, 0.14);
+
+  /* Category colors (dark) */
+  --c-deep: #5B5BD6;
+  --c-create: #3FD2B0;
+  --c-comms: #57ABF5;
+  --c-break: #F5B85A;
+  --c-distract: #F5788A;
+
+  /* --- Legacy aliases (point at new tokens) --- */
+  --accent-primary: var(--fb-accent);
+  --accent-secondary: var(--c-comms);
+  --bg-main: var(--fb-bg);
+  --bg-card: var(--fb-surface);
+  --bg-input: var(--fb-surface2);
+  --text-primary: var(--fb-text);
+  --text-secondary: var(--fb-muted);
+  --text-tertiary: var(--fb-muted);
+  --border-primary: var(--fb-border);
+  --border-secondary: var(--fb-border);
+  --chart-blue: var(--c-comms);
+  --chart-orange: var(--c-distract);
 }
 
-/* Soothing, Modern Base Styles - Using DM Sans */
+/* Base styles — Manrope (UI) + Space Grotesk (display/headings) */
 @layer base {
   body {
-    font-family: 'DM Sans', 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
-    font-feature-settings: 'cv11', 'ss01';
+    font-family: 'Manrope', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
     font-weight: 400;
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
-    letter-spacing: 0.01em;
+    background: var(--fb-bg);
+    color: var(--fb-text);
   }
 
   h1, h2, h3, h4, h5, h6 {
-    font-family: 'DM Sans', 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    font-family: 'Space Grotesk', 'Manrope', system-ui, sans-serif;
     font-weight: 600;
     letter-spacing: -0.01em;
   }
@@ -77,17 +112,22 @@
   }
 
   h2 {
-    font-weight: 500;
+    font-weight: 600;
   }
 
   h3, h4, h5, h6 {
-    font-weight: 500;
+    font-weight: 600;
   }
 
   code, pre, .font-mono {
-    font-family: 'SF Mono', 'JetBrains Mono', 'Courier New', monospace;
+    font-family: 'Space Grotesk', 'SF Mono', 'JetBrains Mono', monospace;
     font-feature-settings: 'liga' 1, 'calt' 1;
   }
+}
+
+/* Space Grotesk display helper — for stat numbers and time values */
+.font-display {
+  font-family: 'Space Grotesk', 'Manrope', system-ui, sans-serif;
 }
 
 /* Accent color utility classes */
@@ -111,41 +151,31 @@
   background-color: var(--accent-secondary);
 }
 
-/* Subtle Background Pattern */
+/* Subtle Background Pattern — neutralized for the calm light theme.
+   The reference uses a flat warm background, so keep these near-invisible. */
 .subtle-grid {
   background-image:
-    linear-gradient(rgba(67, 24, 255, 0.02) 1px, transparent 1px),
-    linear-gradient(90deg, rgba(67, 24, 255, 0.02) 1px, transparent 1px);
+    linear-gradient(rgba(91, 91, 214, 0.015) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(91, 91, 214, 0.015) 1px, transparent 1px);
   background-size: 48px 48px;
   background-position: 0 0, 0 0;
 }
 
 .dark .subtle-grid {
   background-image:
-    linear-gradient(rgba(34, 211, 238, 0.035) 1px, transparent 1px),
-    linear-gradient(90deg, rgba(34, 211, 238, 0.035) 1px, transparent 1px);
+    linear-gradient(rgba(124, 124, 240, 0.03) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(124, 124, 240, 0.03) 1px, transparent 1px);
 }
 
-/* Smooth Gradient Overlay */
+/* Smooth Gradient Overlay — soft violet, very subtle */
 .gradient-overlay {
-  background: linear-gradient(
-    135deg,
-    rgba(67, 24, 255, 0.02) 0%,
-    transparent 50%,
-    rgba(57, 184, 255, 0.02) 100%
-  );
+  background: transparent;
 }
 
 .dark .gradient-overlay {
   background:
-    radial-gradient(ellipse 80% 50% at 50% -10%, rgba(80, 81, 249, 0.10) 0%, transparent 60%),
-    radial-gradient(ellipse 60% 50% at 100% 0%, rgba(34, 211, 238, 0.06) 0%, transparent 55%),
-    linear-gradient(
-      135deg,
-      rgba(80, 81, 249, 0.04) 0%,
-      transparent 50%,
-      rgba(34, 211, 238, 0.03) 100%
-    );
+    radial-gradient(ellipse 80% 50% at 50% -10%, rgba(91, 91, 214, 0.08) 0%, transparent 60%),
+    radial-gradient(ellipse 60% 50% at 100% 0%, rgba(63, 210, 176, 0.04) 0%, transparent 55%);
 }
 
 /* Softer Shadow Effects */
@@ -238,42 +268,40 @@
 
 .hover-glow:hover {
   box-shadow:
-    0 4px 12px rgba(34, 211, 238, 0.12),
-    0 8px 24px rgba(34, 211, 238, 0.08);
+    0 4px 12px rgba(91, 91, 214, 0.10),
+    0 8px 24px rgba(91, 91, 214, 0.06);
 }
 
 .dark .hover-glow:hover {
   box-shadow:
-    0 0 0 1px rgba(34, 211, 238, 0.25),
-    0 4px 16px rgba(34, 211, 238, 0.18),
-    0 8px 32px rgba(80, 81, 249, 0.12);
+    0 0 0 1px rgba(124, 124, 240, 0.25),
+    0 4px 16px rgba(124, 124, 240, 0.16),
+    0 8px 32px rgba(91, 91, 214, 0.12);
 }
 
-/* Gradient Text - Cyber cyan/blue accent */
+/* Gradient Text - violet accent */
 .gradient-text {
-  background: linear-gradient(135deg, #22d3ee 0%, #3b82f6 100%);
+  background: linear-gradient(135deg, #5B5BD6 0%, #8b5bd6 100%);
   -webkit-background-clip: text;
   background-clip: text;
   -webkit-text-fill-color: transparent;
 }
 
-/* Glassmorphism surface - reference cyber cards (translucent slate + blur) */
+/* Glassmorphism surface — uses the surface token so it tracks the theme */
 .glass-card {
-  background-color: rgba(11, 18, 32, 0.6);
-  backdrop-filter: blur(12px);
-  -webkit-backdrop-filter: blur(12px);
-  border: 1px solid rgba(148, 163, 184, 0.12);
+  background-color: var(--fb-surface);
+  border: 1px solid var(--fb-border);
 }
 
 .dark .glass-panel {
-  background-color: rgba(11, 18, 32, 0.45);
+  background-color: rgba(21, 21, 29, 0.6);
   backdrop-filter: blur(8px);
   -webkit-backdrop-filter: blur(8px);
 }
 
-/* Cyan glow border for active/accent elements */
+/* Accent glow border for active/accent elements */
 .cyber-glow {
-  box-shadow: 0 0 0 1px rgba(34, 211, 238, 0.4), 0 0 12px rgba(34, 211, 238, 0.15);
+  box-shadow: 0 0 0 1px rgba(91, 91, 214, 0.4), 0 0 12px rgba(91, 91, 214, 0.15);
 }
 
 /* Subtle Vignette Effect */

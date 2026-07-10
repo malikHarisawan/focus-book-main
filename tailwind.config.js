@@ -9,11 +9,35 @@ module.exports = {
   theme: {
     extend: {
       fontFamily: {
-        heading: ['Plus Jakarta Sans', 'Inter', 'SF Pro Display', 'sans-serif'],
-        body: ['Plus Jakarta Sans', 'Inter', 'SF Pro Text', 'sans-serif'],
-        mono: ['SF Mono', 'JetBrains Mono', 'monospace'],
+        heading: ['Space Grotesk', 'Manrope', 'system-ui', 'sans-serif'],
+        display: ['Space Grotesk', 'Manrope', 'system-ui', 'sans-serif'],
+        body: ['Manrope', 'system-ui', 'sans-serif'],
+        sans: ['Manrope', 'system-ui', 'sans-serif'],
+        mono: ['Space Grotesk', 'SF Mono', 'JetBrains Mono', 'monospace'],
       },
       colors: {
+        // --- New design-system tokens (read the CSS variables in main.css) ---
+        // Use as bg-fb-surface, text-fb-muted, border-fb-border, etc.
+        fb: {
+          bg: 'var(--fb-bg)',
+          surface: 'var(--fb-surface)',
+          surface2: 'var(--fb-surface2)',
+          text: 'var(--fb-text)',
+          muted: 'var(--fb-muted)',
+          border: 'var(--fb-border)',
+          track: 'var(--fb-track)',
+          accent: 'var(--fb-accent)',
+          accentsoft: 'var(--fb-accentsoft)',
+          tip: 'var(--fb-tip)',
+        },
+        // Category / productivity colors (theme-aware via CSS vars)
+        cat: {
+          deep: 'var(--c-deep)',
+          create: 'var(--c-create)',
+          comms: 'var(--c-comms)',
+          break: 'var(--c-break)',
+          distract: 'var(--c-distract)',
+        },
         // Brand Colors - Design System
         brand: {
           // Primary Purple-Blue
@@ -57,16 +81,17 @@ module.exports = {
         // Legacy color mappings for compatibility
         meta: {
           blue: {
-            50: '#EEF4FF',
-            100: '#E0EAFF',
-            200: '#C7D7FE',
-            300: '#A4BCFD',
-            400: '#39B8FF',
-            500: '#4318FF',
-            600: '#3B0FE8',
-            700: '#2E0BBF',
-            800: '#25099C',
-            900: '#1C0778',
+            // Repointed to the redesign's violet accent so badge.jsx tracks the new palette.
+            50: '#EDEDFB',
+            100: '#DEDEF8',
+            200: '#C4C4F1',
+            300: '#A3A3E8',
+            400: '#8383DE',
+            500: '#5B5BD6',
+            600: '#4A4AC0',
+            700: '#3C3C9E',
+            800: '#31317E',
+            900: '#26265F',
           },
           gray: {
             50: '#F4F7FE',
@@ -93,28 +118,30 @@ module.exports = {
             900: '#155528',
           },
           orange: {
-            50: '#fff4e6',
-            100: '#ffe4c2',
-            200: '#ffd199',
-            300: '#ffbe70',
-            400: '#FF6B6B',
-            500: '#FF5630',
-            600: '#e04520',
-            700: '#c7341c',
-            800: '#ad2418',
-            900: '#941014',
+            // Break / warning — repointed to the reference amber.
+            50: '#fdf1e0',
+            100: '#fbe1bd',
+            200: '#f7cd8f',
+            300: '#f4ba62',
+            400: '#F0A93B',
+            500: '#e2951f',
+            600: '#c47d18',
+            700: '#9e6413',
+            800: '#7c4e0f',
+            900: '#5c3a0b',
           },
           red: {
-            50: '#ffebe9',
-            100: '#ffd0cc',
-            200: '#ffb2ab',
-            300: '#ff9489',
-            400: '#ff7567',
-            500: '#fa383e',
-            600: '#e52e34',
-            700: '#cc242a',
-            800: '#b31a20',
-            900: '#991016',
+            // Distraction — repointed to the reference salmon-red.
+            50: '#fdeaed',
+            100: '#fbd2d8',
+            200: '#f7abb6',
+            300: '#f48494',
+            400: '#F26B7E',
+            500: '#F0596E',
+            600: '#d94257',
+            700: '#b83447',
+            800: '#932a39',
+            900: '#71212d',
           }
         },
         // Dark theme specific colors
