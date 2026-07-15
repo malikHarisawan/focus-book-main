@@ -166,7 +166,8 @@ export default function SettingsPage() {
                   { id: 'appearance', label: 'Appearance', icon: Palette },
                   { id: 'notifications', label: 'Notifications', icon: Bell },
                   { id: 'Categories Management', label: 'Categories Management', icon: Lock },
-                  { id: 'ai', label: 'AI Assistant', icon: Bot },
+                  // AI service disabled — AI Assistant settings tab hidden. Restore to re-enable.
+                  // { id: 'ai', label: 'AI Assistant', icon: Bot },
                   { id: 'data', label: 'Data Management', icon: Database },
                   { id: 'integrations', label: 'Integrations', icon: Globe },
                   { id: 'preferences', label: 'Preferences', icon: Sliders }
@@ -508,8 +509,9 @@ export default function SettingsPage() {
               </div>
             )}
 
-            {/* AI Assistant Settings */}
-            {activeTab === 'ai' && (
+            {/* AI Assistant Settings — DISABLED. Gated to `false` so it never renders,
+                even via a ?tab=ai deep link. Restore `activeTab === 'ai'` to re-enable. */}
+            {false && activeTab === 'ai' && (
               <div className="space-y-6 animate-fadeIn">
                 <h3 className="text-lg font-medium text-slate-900 dark:text-slate-200 border-b border-slate-200 dark:border-slate-700/30 pb-2">
                   AI Assistant Configuration

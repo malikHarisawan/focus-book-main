@@ -119,6 +119,7 @@ class LocalAppUsageService {
           formattedData[dateStr][hourKey][record.appName] = {
             time: record.timeSpent,
             category: record.category,
+            mode: record.mode,
             description: record.description,
             domain: record.domain,
             timestamps: record.timestamps || []
@@ -127,6 +128,7 @@ class LocalAppUsageService {
           formattedData[dateStr].apps[record.appName] = {
             time: record.timeSpent,
             category: record.category,
+            mode: record.mode,
             description: record.description,
             domain: record.domain,
             timestamps: record.timestamps || []
@@ -155,6 +157,7 @@ class LocalAppUsageService {
           dateData[hourKey][record.appName] = {
             time: record.timeSpent,
             category: record.category,
+            mode: record.mode,
             description: record.description,
             domain: record.domain,
             timestamps: record.timestamps || []
@@ -163,6 +166,7 @@ class LocalAppUsageService {
           dateData.apps[record.appName] = {
             time: record.timeSpent,
             category: record.category,
+            mode: record.mode,
             description: record.description,
             domain: record.domain,
             timestamps: record.timestamps || []
@@ -198,6 +202,7 @@ class LocalAppUsageService {
                   $set: {
                     timeSpent: appData.time,
                     category: appData.category,
+                    mode: appData.mode,
                     description: appData.description,
                     domain: appData.domain,
                     timestamps: appData.timestamps || []
@@ -211,6 +216,7 @@ class LocalAppUsageService {
                 appName: appName,
                 timeSpent: appData.time,
                 category: appData.category,
+                mode: appData.mode,
                 description: appData.description,
                 domain: appData.domain,
                 timestamps: appData.timestamps || []
@@ -241,6 +247,7 @@ class LocalAppUsageService {
                     $set: {
                       timeSpent: appData.time,
                       category: appData.category,
+                      mode: appData.mode,
                       description: appData.description,
                       domain: appData.domain,
                       timestamps: appData.timestamps || []
@@ -254,6 +261,7 @@ class LocalAppUsageService {
                   appName: appName,
                   timeSpent: appData.time,
                   category: appData.category,
+                  mode: appData.mode,
                   description: appData.description,
                   domain: appData.domain,
                   timestamps: appData.timestamps || []
@@ -717,6 +725,37 @@ class LocalAppUsageService {
         sql = `UPDATE app_usage SET category = ?, updated_at = CURRENT_TIMESTAMP
                WHERE LOWER(app_name) LIKE ? OR LOWER(description) LIKE ?`
         params = [newCategory, like, like]
+      }
+      const result = await this.db.run(sql, params)
+      return (result && (result.changes ?? result.numReplaced)) || 0
+    })
+  }
+
+  /**
+   * Bulk-update the Level-2 work-MODE for all app_usage rows matching a pattern.
+   * The mode analogue of retagByPattern: when the user pins a per-app work-mode in
+   * the Activity table, this rewrites past rows too so the change is visible
+   * immediately (not just on future tracking ticks). Applies across all dates/hours.
+   *
+   * WHERE column mirrors retagByPattern: 'domain' matches the domain column (all
+   * URLs on a site), otherwise app_name OR description (native apps). `pattern` is a
+   * bound parameter — no SQL injection.
+   *
+   * @returns {Promise<number>} number of rows updated
+   */
+  async retagModeByPattern(matchType, pattern, newMode) {
+    return this.db.executeWithRetry(async () => {
+      if (!pattern || !newMode) return 0
+      const like = `%${pattern.toLowerCase()}%`
+      let sql
+      let params
+      if (matchType === 'domain') {
+        sql = `UPDATE app_usage SET mode = ?, updated_at = CURRENT_TIMESTAMP WHERE LOWER(domain) LIKE ?`
+        params = [newMode, like]
+      } else {
+        sql = `UPDATE app_usage SET mode = ?, updated_at = CURRENT_TIMESTAMP
+               WHERE LOWER(app_name) LIKE ? OR LOWER(description) LIKE ?`
+        params = [newMode, like, like]
       }
       const result = await this.db.run(sql, params)
       return (result && (result.changes ?? result.numReplaced)) || 0

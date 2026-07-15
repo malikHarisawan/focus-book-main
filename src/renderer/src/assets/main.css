@@ -21,6 +21,7 @@
   --fb-text: #16161D;
   --fb-muted: #75757F;
   --fb-border: #ECECEA;
+  --fb-rowline: #F3F3F1;
   --fb-track: #EFEFF3;
   --fb-accent: #5B5BD6;
   --fb-accentsoft: rgba(91, 91, 214, 0.10);
@@ -59,6 +60,7 @@
   --fb-text: #ECECF2;
   --fb-muted: #8B8B99;
   --fb-border: #272730;
+  --fb-rowline: #1F1F28;
   --fb-track: #22222C;
   --fb-accent: #5B5BD6;
   --fb-accentsoft: rgba(124, 124, 240, 0.16);

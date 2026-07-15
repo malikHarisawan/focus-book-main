@@ -2,16 +2,18 @@ import { useEffect, useState } from 'react'
 import { Hexagon, Globe, Bot, Check, Copy, ArrowRight, ArrowLeft, X } from 'lucide-react'
 import { Button } from '../ui/button'
 
-// First-run welcome. Three slides — what FocusBook does, the (optional) browser
-// extension, and the (optional) AI key. Dismissible from slide 1 via Skip/X.
-// On finish/skip the parent persists onboardingCompleted via setUiState.
+// First-run welcome. Two slides — what FocusBook does and the (optional) browser
+// extension. Dismissible from slide 1 via Skip/X. On finish/skip the parent
+// persists onboardingCompleted via setUiState.
+// NOTE: the AI service is disabled, so the former third "AI key" slide is hidden
+// and SLIDES is 2. Restore SLIDES = 3 and the step === 2 render to re-enable.
 export default function WelcomeModal({ onComplete }) {
   const [step, setStep] = useState(0)
   const [bridgeStatus, setBridgeStatus] = useState(null)
   const [copied, setCopied] = useState(false)
   const [hasAiKey, setHasAiKey] = useState(false)
 
-  const SLIDES = 3
+  const SLIDES = 2
 
   // Poll the browser-bridge status while on the extension slide so the
   // "connected" state updates live as the user installs/pairs the extension.
@@ -86,7 +88,8 @@ export default function WelcomeModal({ onComplete }) {
               onCopy={copyToken}
             />
           )}
-          {step === 2 && <SlideAi hasAiKey={hasAiKey} />}
+          {/* AI service disabled — AI onboarding slide hidden. Restore to re-enable. */}
+          {/* {step === 2 && <SlideAi hasAiKey={hasAiKey} />} */}
 
           {/* Step dots */}
           <div className="mt-6 flex items-center justify-center gap-1.5">

@@ -1,9 +1,11 @@
 import React, { useEffect, useState } from 'react'
 import ProductivityOverview from './components/Dashboard/productivity-overview'
 import Settings from './components/Settings/page'
-import Activities from './components/Activity/page'
+import Apps from './components/Activity/page'
 import FocusPage from './components/Focus/page'
-import ChatPage from './components/Chat/page'
+// AI service disabled — Chat/Insights page is not routed. Restore this import and
+// the /chat route below to re-enable.
+// import ChatPage from './components/Chat/page'
 import UpdateNotification from './components/UpdateNotification'
 import WelcomeModal from './components/Onboarding/WelcomeModal'
 import { DateProvider } from './context/DateContext'
@@ -52,9 +54,12 @@ function App() {
             <Routes>
               <Route path="/" element={<ProductivityOverview />} />
               <Route path="/settings" element={<Settings />} />
-              <Route path="/activity" element={<Activities />} />
+              <Route path="/apps" element={<Apps />} />
+              {/* Back-compat: old /activity links still resolve to the Apps page. */}
+              <Route path="/activity" element={<Apps />} />
               <Route path="/focus" element={<FocusPage />} />
-              <Route path="/chat" element={<ChatPage />} />
+              {/* AI service disabled — /chat route removed. Restore to re-enable. */}
+              {/* <Route path="/chat" element={<ChatPage />} /> */}
             </Routes>
           </MainLayout>
           <UpdateNotification />

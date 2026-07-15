@@ -15,9 +15,14 @@ const TYPES = [
 
 const typeLabel = (t) => (t === 'distracted' ? 'Distracting' : t === 'productive' ? 'Productive' : 'Neutral')
 
+// Sentinel <option> value meaning "no mode pin — use the category's default_mode".
+const NO_MODE = ''
+
 export default function CategoryRulesPanel() {
   const [categories, setCategories] = useState([])
   const [rules, setRules] = useState([])
+  const [modes, setModes] = useState([])
+  const [modeOverrides, setModeOverrides] = useState({}) // { appIdentifier: modeName }
   const [loading, setLoading] = useState(true)
   const [status, setStatus] = useState('')
 
@@ -30,10 +35,11 @@ export default function CategoryRulesPanel() {
   const [newRulePattern, setNewRulePattern] = useState('')
   const [newRuleCategory, setNewRuleCategory] = useState('')
   const [newRuleMatchType, setNewRuleMatchType] = useState('keyword')
+  const [newRuleMode, setNewRuleMode] = useState(NO_MODE)
 
   // Inline rule editing: the id of the rule being edited + its draft values.
   const [editingRuleId, setEditingRuleId] = useState(null)
-  const [editDraft, setEditDraft] = useState({ pattern: '', category: '', match_type: 'keyword' })
+  const [editDraft, setEditDraft] = useState({ pattern: '', category: '', match_type: 'keyword', mode: NO_MODE })
 
   const api = window.activeWindow
 
@@ -43,12 +49,16 @@ export default function CategoryRulesPanel() {
       return
     }
     try {
-      const [cats, rls] = await Promise.all([
+      const [cats, rls, mds, overrides] = await Promise.all([
         api.loadAllCategories(),
-        api.getCategoryRules ? api.getCategoryRules() : Promise.resolve([])
+        api.getCategoryRules ? api.getCategoryRules() : Promise.resolve([]),
+        api.loadAllModes ? api.loadAllModes() : Promise.resolve([]),
+        api.getModeOverrides ? api.getModeOverrides() : Promise.resolve({})
       ])
       setCategories(Array.isArray(cats) ? cats : [])
       setRules(Array.isArray(rls) ? rls : [])
+      setModes(Array.isArray(mds) ? mds : [])
+      setModeOverrides(overrides && typeof overrides === 'object' ? overrides : {})
       if (!newRuleCategory && cats?.length) setNewRuleCategory(cats[0].name)
     } catch (e) {
       console.error('Failed to load categories/rules:', e)
@@ -99,13 +109,29 @@ export default function CategoryRulesPanel() {
   const handleAddRule = async () => {
     const pattern = newRulePattern.trim()
     if (!pattern || !newRuleCategory) return
-    const ok = await api.addCategoryRule(pattern, newRuleCategory, newRuleMatchType, 0)
+    const ok = await api.addCategoryRule(
+      pattern,
+      newRuleCategory,
+      newRuleMatchType,
+      0,
+      newRuleMode || null
+    )
     if (ok) {
       flash(`Rule added: "${pattern}" → ${newRuleCategory}`)
       setNewRulePattern('')
+      setNewRuleMode(NO_MODE)
       await load()
     } else {
       flash('That rule already exists')
+    }
+  }
+
+  const handleDeleteOverride = async (appIdentifier) => {
+    if (!api.removeModeOverride) return
+    const ok = await api.removeModeOverride(appIdentifier)
+    if (ok) {
+      flash(`Removed mode pin for "${appIdentifier}"`)
+      await load()
     }
   }
 
@@ -122,7 +148,8 @@ export default function CategoryRulesPanel() {
     setEditDraft({
       pattern: rule.pattern,
       category: rule.category,
-      match_type: rule.match_type
+      match_type: rule.match_type,
+      mode: rule.mode || NO_MODE
     })
   }
 
@@ -136,7 +163,10 @@ export default function CategoryRulesPanel() {
     const ok = await api.updateCategoryRule(id, {
       pattern,
       category: editDraft.category,
-      match_type: editDraft.match_type
+      match_type: editDraft.match_type,
+      // Send null (not '') to clear a pin, so the DB stores NULL and getMode falls
+      // back to the category default.
+      mode: editDraft.mode || null
     })
     if (ok) {
       flash('Rule updated')
@@ -146,6 +176,9 @@ export default function CategoryRulesPanel() {
       flash('Could not update rule')
     }
   }
+
+  // Color for a mode chip, from the loaded modes list (falls back to a neutral grey).
+  const modeColor = (name) => modes.find((m) => m.name === name)?.color || '#7a7a7a'
 
   if (loading) {
     return <div className="text-sm text-slate-400 py-4">Loading categories…</div>
@@ -241,7 +274,9 @@ export default function CategoryRulesPanel() {
         </h4>
         <p className="text-xs text-slate-500 dark:text-slate-400 mb-3">
           When an app or website matches a pattern, it&apos;s put in that category. &quot;App&quot;
-          matches the program/exe; &quot;Keyword&quot; matches the window title or URL.
+          matches the program/exe; &quot;Keyword&quot; matches the window title or URL. Optionally
+          pin a <span className="font-medium">work-mode</span> to force how matching activity is
+          counted (Deep work, Creative, …), overriding the category&apos;s default.
         </p>
         <div className="space-y-1.5 mb-4 max-h-72 overflow-y-auto pr-1">
           {rules.map((r) =>
@@ -276,6 +311,19 @@ export default function CategoryRulesPanel() {
                   <option value="keyword">Keyword</option>
                   <option value="app">App</option>
                 </select>
+                <select
+                  value={editDraft.mode}
+                  onChange={(e) => setEditDraft({ ...editDraft, mode: e.target.value })}
+                  title="Pin a work-mode (optional)"
+                  className="text-sm bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded px-2 py-1 text-slate-700 dark:text-slate-300"
+                >
+                  <option value={NO_MODE}>— mode: default —</option>
+                  {modes.map((m) => (
+                    <option key={m.name} value={m.name}>
+                      {m.name}
+                    </option>
+                  ))}
+                </select>
                 <button
                   onClick={() => saveEditRule(r.id)}
                   className="text-emerald-500 hover:text-emerald-600"
@@ -303,6 +351,16 @@ export default function CategoryRulesPanel() {
                 <span className="text-[10px] uppercase tracking-wide text-slate-400 border border-slate-300 dark:border-slate-700 rounded px-1">
                   {r.match_type}
                 </span>
+                {r.mode && (
+                  <span
+                    className="text-[10px] font-semibold rounded px-1.5 py-0.5 flex items-center gap-1"
+                    style={{ backgroundColor: `${modeColor(r.mode)}22`, color: modeColor(r.mode) }}
+                    title={`Pinned work-mode: ${r.mode}`}
+                  >
+                    <span className="w-1.5 h-1.5 rounded-full" style={{ background: modeColor(r.mode) }} />
+                    {r.mode}
+                  </span>
+                )}
                 <span className="flex-1" />
                 <button
                   onClick={() => startEditRule(r)}
@@ -353,12 +411,68 @@ export default function CategoryRulesPanel() {
             <option value="keyword">Keyword</option>
             <option value="app">App</option>
           </select>
+          <select
+            value={newRuleMode}
+            onChange={(e) => setNewRuleMode(e.target.value)}
+            title="Pin a work-mode (optional)"
+            className="text-sm bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded px-2 py-2 text-slate-700 dark:text-slate-300"
+          >
+            <option value={NO_MODE}>— mode: default —</option>
+            {modes.map((m) => (
+              <option key={m.name} value={m.name}>
+                {m.name}
+              </option>
+            ))}
+          </select>
           <button
             onClick={handleAddRule}
             className="inline-flex items-center gap-1 text-sm bg-slate-900 dark:bg-slate-200 text-white dark:text-slate-900 rounded px-3 py-2 hover:opacity-90"
           >
             <Plus className="h-4 w-4" /> Add Rule
           </button>
+        </div>
+      </section>
+
+      {/* App mode overrides — pins set from the Activity page's mode picker. This is
+          a review/clear surface; the primary way to CREATE one is the Activity row. */}
+      <section>
+        <h4 className="text-md font-medium text-slate-800 dark:text-slate-300 mb-1">
+          App Mode Overrides
+        </h4>
+        <p className="text-xs text-slate-500 dark:text-slate-400 mb-3">
+          Per-app work-mode pins. Set one from the Applications list (each row&apos;s Mode
+          picker); remove it here to let the app fall back to automatic mode detection.
+        </p>
+        <div className="space-y-1.5">
+          {Object.entries(modeOverrides).length === 0 && (
+            <div className="text-xs text-slate-400">
+              No overrides yet. Pin a mode from the Applications page.
+            </div>
+          )}
+          {Object.entries(modeOverrides).map(([identifier, mode]) => (
+            <div
+              key={identifier}
+              className="flex items-center gap-2 text-sm bg-slate-100 dark:bg-[#05070D] rounded px-3 py-1.5"
+            >
+              <code className="text-slate-700 dark:text-slate-300 truncate max-w-[45%]">{identifier}</code>
+              <span className="text-slate-400">→</span>
+              <span
+                className="text-[11px] font-semibold rounded px-1.5 py-0.5 flex items-center gap-1"
+                style={{ backgroundColor: `${modeColor(mode)}22`, color: modeColor(mode) }}
+              >
+                <span className="w-1.5 h-1.5 rounded-full" style={{ background: modeColor(mode) }} />
+                {mode}
+              </span>
+              <span className="flex-1" />
+              <button
+                onClick={() => handleDeleteOverride(identifier)}
+                className="text-slate-400 hover:text-red-500"
+                title="Remove override"
+              >
+                <Trash2 className="h-3.5 w-3.5" />
+              </button>
+            </div>
+          ))}
         </div>
       </section>
     </div>

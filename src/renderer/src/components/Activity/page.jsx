@@ -1,1000 +1,597 @@
 'use client'
 
-import { use, useEffect, useRef, useState, useMemo } from 'react'
-import { Badge } from '../ui/badge'
-import { Button } from '../ui/button'
-import {
-  Calendar,
-  Filter,
-  MoreHorizontal,
-  RefreshCw,
-  Globe,
-  FileText,
-  Video,
-  BookOpen,
-  MessageSquare,
-  Package,
-  User,
-  Briefcase,
-  Terminal,
-  CodeIcon,
-  Tag,
-  Check,
-  Sparkles,
-  Sliders
-} from 'lucide-react'
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuLabel,
-  DropdownMenuSeparator,
-  DropdownMenuTrigger,
-  DropdownMenuSub,
-  DropdownMenuSubTrigger,
-  DropdownMenuSubContent
-} from '../ui/dropdown-menu'
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '../ui/table'
-import { Card, CardContent, CardHeader, CardTitle } from '../ui/card'
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '../ui/tabs'
-
+import { useEffect, useState, useMemo, useRef, useLayoutEffect } from 'react'
+import { createPortal } from 'react-dom'
+import { Search, Check, ChevronDown, RefreshCw } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
 import { useToast } from '../../hooks/use-toast'
-import CategoryBadge from './category-badge'
-import BulkCategoryDialog from './bulk-categories-dialog'
-import SummaryTab from './SummaryTab'
-import SummarySkeleton from './SummarySkeleton'
 import {
   formatAppsData,
   getProductivityType,
   refreshCategoryMapping,
   getCategoryList,
-  getCategoryColorFromDB
+  getCategoryColorFromDB,
+  getModeList,
+  getModeColor
 } from '../../utils/dataProcessor'
-import { getCategoryIconComponent } from '../../utils/categoryVisuals'
-import { generateSummary, clearSummaryCache } from '../../utils/aiSummaryService'
 import { useDate } from '../../context/DateContext'
-import { useTheme } from '../../context/ThemeContext'
+import SmartDatePicker from '../shared/smart-date-picker'
+
+// Productivity → design token color + soft background.
+const PROD = {
+  Productive: { color: '#1FA05A', bg: 'rgba(31,160,90,.13)' },
+  Neutral: { color: 'var(--fb-muted)', bg: 'rgba(130,130,145,.14)' },
+  Distracting: { color: 'var(--c-distract)', bg: 'rgba(240,89,110,.13)' }
+}
+
+// Deterministic tile color for an app, from a small on-brand palette.
+const TILE_PALETTE = ['#2C7ED6', '#5B5BD6', '#2FBF9F', '#3E9BF0', '#8A5BD6', '#E0322B', '#F0A93B', '#1FA855', '#4A154B', '#0DA37F']
+const tileColor = (name = '') => {
+  let h = 0
+  for (let i = 0; i < name.length; i++) h = (h * 31 + name.charCodeAt(i)) >>> 0
+  return TILE_PALETTE[h % TILE_PALETTE.length]
+}
+const monogram = (name = '') => {
+  const clean = name.replace(/[^a-zA-Z0-9]/g, '')
+  return (clean.slice(0, 2) || name.slice(0, 2) || '?').toUpperCase()
+}
+
+const getProductivityDisplay = (type) =>
+  type === 'productive' ? 'Productive' : type === 'distracted' ? 'Distracting' : 'Neutral'
 
 export default function AppUsageTable() {
-  const { resolvedTheme } = useTheme()
-
-  // Theme-aware colors for timeline grid
-  const gridBorderColors = {
-    major: resolvedTheme === 'dark' ? 'rgba(148, 163, 184, 0.4)' : 'rgba(100, 116, 139, 0.3)',
-    minor: resolvedTheme === 'dark' ? 'rgba(148, 163, 184, 0.15)' : 'rgba(148, 163, 184, 0.1)',
-  }
-
-  const [filter, setFilter] = useState('All')
-  const [sortBy, setSortBy] = useState('timeSpent')
-  const [sortOrder, setSortOrder] = useState('desc')
-  const [apps, setApps] = useState([])
-  // Category names for the "Change Category" menu — DB-driven via getCategoryList,
-  // seeded from the cache and refreshed alongside the data loads below.
-  const [categoryNames, setCategoryNames] = useState(() =>
-    getCategoryList().map((c) => c.name)
-  )
-  const [summary, setSummary] = useState(null)
-  const [isLoadingSummary, setIsLoadingSummary] = useState(false)
-  const [summaryError, setSummaryError] = useState(null)
-  // Table is the default tab; the AI summary is generated lazily only when the
-  // user actually opens the Summary tab (see the tab-change handler below).
-  const [activeTab, setActiveTab] = useState('table')
-  // Ref mirror of activeTab so the category-update listener (registered once per
-  // date) always reads the current tab instead of a stale closure value.
-  const activeTabRef = useRef('table')
-  // Guards against re-generating the summary every time the user re-visits the
-  // Summary tab within the same date. Reset when the date changes.
-  const [summaryLoadedForDate, setSummaryLoadedForDate] = useState(null)
-  const { selectedDate, handleDateChange } = useDate()
+  const { selectedDate } = useDate()
   const { toast } = useToast()
   const navigate = useNavigate()
 
+  const [apps, setApps] = useState([])
+  const [categories, setCategories] = useState(() => getCategoryList())
+  const [query, setQuery] = useState('')
+  const [catFilter, setCatFilter] = useState('all') // 'all' | category name
+  const [sortKey, setSortKey] = useState('time') // 'time' | 'name'
+  const [sortDir, setSortDir] = useState('desc')
+  // Category menu: which app's menu is open + the anchor button's screen rect.
+  // Rendered via a portal with fixed positioning so it escapes the table card's
+  // `overflow-hidden` (which was clipping the dropdown).
+  const [openCat, setOpenCat] = useState(null)
+  const [menuRect, setMenuRect] = useState(null)
+  // Mode menu: same portal pattern as the category menu, tracked separately so the
+  // two pickers never fight over one piece of state.
+  const [openMode, setOpenMode] = useState(null)
+  const [modeMenuRect, setModeMenuRect] = useState(null)
+  const modes = useMemo(() => getModeList(), [])
+
+  const openCategoryMenu = (appId, e) => {
+    setOpenMode(null)
+    if (openCat === appId) {
+      setOpenCat(null)
+      return
+    }
+    const rect = e.currentTarget.getBoundingClientRect()
+    setMenuRect(rect)
+    setOpenCat(appId)
+  }
+
+  const openModeMenu = (appId, e) => {
+    setOpenCat(null)
+    if (openMode === appId) {
+      setOpenMode(null)
+      return
+    }
+    const rect = e.currentTarget.getBoundingClientRect()
+    setModeMenuRect(rect)
+    setOpenMode(appId)
+  }
+
   useEffect(() => {
     loadApps()
-    // Summary is generated lazily when the Summary tab is opened, not on mount.
-    // Reset the per-date guard so a date change re-generates on the next open.
-    setSummaryLoadedForDate(null)
-    handleVisibilityChange()
-    document.addEventListener('visibilitychange', handleVisibilityChange)
-
-    // Listen for category updates (in case of multiple windows or external updates)
-    const removeCategoryListener = window.activeWindow.onCategoryUpdated((data) => {
-      console.log('Activity page received category update:', data)
-      loadApps()
-      // Invalidate the cached summary; only regenerate now if the Summary tab is
-      // actually open, otherwise it'll regenerate the next time it's opened.
-      clearSummaryCache(selectedDate)
-      setSummaryLoadedForDate(null)
-      if (activeTabRef.current === 'summary') {
-        loadSummary(true)
-        setSummaryLoadedForDate(selectedDate)
-      }
-    })
-
+    const onVis = () => document.visibilityState === 'visible' && loadApps()
+    document.addEventListener('visibilitychange', onVis)
+    const removeListener = window.activeWindow.onCategoryUpdated(() => loadApps())
     return () => {
-      document.removeEventListener('visibilitychange', handleVisibilityChange)
-      if (removeCategoryListener) {
-        removeCategoryListener()
-      }
+      document.removeEventListener('visibilitychange', onVis)
+      if (removeListener) removeListener()
     }
   }, [selectedDate])
 
-  function handleVisibilityChange() {
-    if (document.visibilityState === 'visible') {
-      loadApps()
-    }
-  }
-
-  // Lazily generate the AI summary the first time the Summary tab is opened for
-  // a given date. Switching to Table never triggers generation.
-  const handleTabChange = (value) => {
-    setActiveTab(value)
-    activeTabRef.current = value
-    if (value === 'summary' && summaryLoadedForDate !== selectedDate) {
-      setSummaryLoadedForDate(selectedDate)
-      loadSummary()
-    }
-  }
-  
-  // Load application usage data
   async function loadApps() {
-    // Ensure the DB-driven category productivity map is populated before
-    // formatAppsData reads it, otherwise productivity labels default to Neutral.
     await refreshCategoryMapping()
-    // Refresh the category name list (now that metadata is loaded) so the
-    // "Change Category" menu reflects any user-added categories.
-    const names = getCategoryList().map((c) => c.name)
-    if (names.length > 0) setCategoryNames(names)
+    const list = getCategoryList()
+    if (list.length > 0) setCategories(list)
     const jsonData = await window.activeWindow.getAppUsageStats()
-    const appsData = formatAppsData(jsonData, selectedDate)
-    setApps(appsData)
+    setApps(formatAppsData(jsonData, selectedDate))
   }
 
-  // Load AI-powered summary
-  async function loadSummary(forceRefresh = false) {
-    setIsLoadingSummary(true)
-    setSummaryError(null)
-    
-    try {
-      // Wait for apps to be loaded if not already
-      let appsData = apps
-      if (apps.length === 0) {
-        const jsonData = await window.activeWindow.getAppUsageStats()
-        appsData = formatAppsData(jsonData, selectedDate)
-      }
-
-      const result = await generateSummary(selectedDate, appsData, forceRefresh)
-      
-      if (result.success) {
-        setSummary(result.data)
-        
-        // Show toast for cache hits or AI generation
-        if (result.fromCache && !forceRefresh) {
-          console.log('✅ Using cached summary')
-        } else if (!result.isFallback) {
-          toast({
-            title: 'Summary Generated',
-            description: 'AI analysis completed successfully',
-          })
-        }
-      } else {
-        setSummaryError(result.error)
-        setSummary(result.data) // Fallback data
-      }
-    } catch (error) {
-      console.error('Error loading summary:', error)
-      setSummaryError(error.message)
-      toast({
-        title: 'Summary Error',
-        description: 'Failed to generate summary. Showing basic statistics.',
-        variant: 'destructive'
-      })
-    } finally {
-      setIsLoadingSummary(false)
-    }
-  }
-
-  // Manual refresh handler
-  const handleRefreshSummary = () => {
-    clearSummaryCache(selectedDate)
-    setSummaryLoadedForDate(selectedDate)
-    loadSummary(true)
-  }
-
-  // Handle bulk category changes
-  const handleBulkCategorize = async (appIds, category) => {
-    // Calculate the new productivity status based on the category
-    const productivityType = getProductivityType(category)
-    const newProductivity = getProductivityDisplay(productivityType)
-
-    // Update local state with both category and productivity
-    setApps(apps.map((app) => (appIds.includes(app.id) ? { ...app, category, productivity: newProductivity } : app)))
-
-    // Show toast for bulk categorization
-    const count = appIds.length
-    toast({
-      title: 'Categories Updated',
-      description: `${count} ${count === 1 ? 'application' : 'applications'} categorized as "${category}"`,
-      duration: 3000
-    })
-
-    // Save all the category changes permanently
-    try {
-      const appsToUpdate = apps.filter((app) => appIds.includes(app.id))
-      for (const app of appsToUpdate) {
-        const appIdentifier = app.domain || app.name
-        await window.activeWindow.updateAppCategory(appIdentifier, category)
-      }
-
-      // Refresh the category mapping to ensure consistency across the app
-      await refreshCategoryMapping()
-      
-      // Clear summary cache and reload since categories changed
-      clearSummaryCache(selectedDate)
-      loadSummary(true)
-    } catch (error) {
-      console.error('Failed to save bulk category changes:', error)
-      toast({
-        title: 'Error',
-        description: 'Some category changes may not have been saved permanently',
-        variant: 'destructive'
-      })
-    }
-  }
-
-  // Helper function to get productivity display value from productivity type
-  const getProductivityDisplay = (productivityType) => {
-    switch (productivityType) {
-      case 'productive':
-        return 'Productive'
-      case 'distracted':
-        return 'Distracting'
-      case 'neutral':
-        return 'Neutral'
-      default:
-        return 'Neutral'
-    }
-  }
-
-  // Change a category from the Activity table. This creates/updates a
-  // classification RULE (not a per-app override the tracker would overwrite)
-  // and retags matching history, so the change persists across past + future.
+  // Rule-based category change (creates/updates a classification rule + retags
+  // history), with the same toast feedback the old page had.
   const handleCategoryChange = async (appId, newCategory) => {
-    const appToUpdate = apps.find((app) => app.id === appId)
-    if (appToUpdate) {
-      // Calculate the new productivity status based on the category
-      const productivityType = getProductivityType(newCategory)
-      const newProductivity = getProductivityDisplay(productivityType)
-
-      // Optimistically update local state with both category and productivity
-      setApps(apps.map((app) => (app.id === appId ? { ...app, category: newCategory, productivity: newProductivity } : app)))
-
-      try {
-        const result = await window.activeWindow.retagAppCategory(appToUpdate, newCategory)
-        if (!result?.success) {
-          throw new Error(result?.error || 'Retag failed')
-        }
-
-        // Convey the rule-based scope so the user understands it applies broadly.
-        const scope =
-          result.matchType === 'domain'
-            ? `All “${result.pattern}” activity`
-            : `“${appToUpdate.name}”`
-        toast({
-          title: result.ruleCreated ? 'Rule created' : 'Rule updated',
-          description: `${scope} is now categorized as “${newCategory}”.`,
-          duration: 3500
-        })
-
-        // Refresh the category mapping and reload so retagged rows show.
-        await refreshCategoryMapping()
-        await loadApps()
-
-        // Clear summary cache; only regenerate if the Summary tab is open.
-        clearSummaryCache(selectedDate)
-        setSummaryLoadedForDate(null)
-        if (activeTabRef.current === 'summary') {
-          setSummaryLoadedForDate(selectedDate)
-          loadSummary(true)
-        }
-      } catch (error) {
-        console.error('Failed to save category change permanently:', error)
-        // Roll back the optimistic update on failure.
-        await loadApps()
-        toast({
-          title: 'Error',
-          description: 'Failed to save category change.',
-          variant: 'destructive'
-        })
-      }
+    const app = apps.find((a) => a.id === appId)
+    if (!app) return
+    const newProductivity = getProductivityDisplay(getProductivityType(newCategory))
+    // Optimistic update.
+    setApps((prev) =>
+      prev.map((a) => (a.id === appId ? { ...a, category: newCategory, productivity: newProductivity } : a))
+    )
+    setOpenCat(null)
+    try {
+      const result = await window.activeWindow.retagAppCategory(app, newCategory)
+      if (!result?.success) throw new Error(result?.error || 'Retag failed')
+      const scope =
+        result.matchType === 'domain' ? `All "${result.pattern}" activity` : `"${app.name}"`
+      toast({
+        title: result.ruleCreated ? 'Rule created' : 'Rule updated',
+        description: `${scope} is now categorized as "${newCategory}".`,
+        duration: 3500
+      })
+      await refreshCategoryMapping()
+      await loadApps()
+    } catch (error) {
+      console.error('Failed to save category change:', error)
+      await loadApps()
+      toast({ title: 'Error', description: 'Failed to save category change.', variant: 'destructive' })
     }
   }
 
-  // Filter and sort data
-  const filteredData = apps
-    .filter((app) => {
-      if (filter === 'All') return true
-      return app.productivity === filter
-    })
-    .sort((a, b) => {
-      if (sortBy === 'timeSpent') {
-        return sortOrder === 'desc'
-          ? b.timeSpentSeconds - a.timeSpentSeconds
+  // Per-app work-mode override. Unlike a category change (which creates a rule and
+  // retags history), a mode override is a per-app pin the tracker's getMode honours
+  // on the next tick. Mode is derived, so we do NOT rewrite history rows — we update
+  // the visible rows optimistically and let future ticks apply the pin.
+  const handleModeChange = async (appId, newMode) => {
+    const app = apps.find((a) => a.id === appId)
+    if (!app) return
+    // Key the override to match the tracker's getMode lookup, which reads
+    // `sig.appKey || sig.domain || sig.exe` (appKey wins and is always set). The
+    // row's `key` IS that stored appKey — the friendly name for native apps, the
+    // URL for browser tabs — so keying off it guarantees getMode finds the pin on
+    // the next tick. Fall back to name only if the key is somehow missing.
+    const identifier = app.key || app.name
+    // Optimistic update.
+    setApps((prev) => prev.map((a) => (a.id === appId ? { ...a, mode: newMode } : a)))
+    setOpenMode(null)
+    try {
+      // Pass the row so the retag matches history the same way a category change
+      // does (browser rows retag the whole site by domain; native apps by name).
+      const ok = await window.activeWindow.setModeOverride(identifier, newMode, app)
+      if (!ok) throw new Error('Failed to set mode override')
+      toast({
+        title: 'Mode pinned',
+        description: `"${app.name}" is now counted as "${newMode}".`,
+        duration: 3500
+      })
+      await loadApps()
+    } catch (error) {
+      console.error('Failed to save mode change:', error)
+      await loadApps()
+      toast({ title: 'Error', description: 'Failed to save mode change.', variant: 'destructive' })
+    }
+  }
+
+  // Totals by productivity (seconds).
+  const totals = useMemo(() => {
+    const t = { Productive: 0, Neutral: 0, Distracting: 0, total: 0 }
+    for (const a of apps) {
+      t[a.productivity] = (t[a.productivity] || 0) + a.timeSpentSeconds
+      t.total += a.timeSpentSeconds
+    }
+    return t
+  }, [apps])
+
+  const fmt = (secs) => {
+    const h = Math.floor(secs / 3600)
+    const m = Math.floor((secs % 3600) / 60)
+    if (h && m) return `${h}h ${m}m`
+    if (h) return `${h}h`
+    return `${m}m`
+  }
+  const pct = (v) => (totals.total > 0 ? Math.round((v / totals.total) * 100) : 0)
+
+  // Only apps with meaningful time; filter + sort.
+  const rows = useMemo(() => {
+    const q = query.trim().toLowerCase()
+    const maxSecs = Math.max(1, ...apps.map((a) => a.timeSpentSeconds))
+    let list = apps.filter((a) => a.timeSpentSeconds > 60)
+    if (catFilter !== 'all') list = list.filter((a) => a.category === catFilter)
+    if (q) list = list.filter((a) => a.name.toLowerCase().includes(q))
+    list.sort((a, b) => {
+      const r =
+        sortKey === 'name'
+          ? a.name.toLowerCase().localeCompare(b.name.toLowerCase())
           : a.timeSpentSeconds - b.timeSpentSeconds
-      }
-      if (sortBy === 'name') {
-        return sortOrder === 'desc' ? b.name.localeCompare(a.name) : a.name.localeCompare(b.name)
-      }
-      return 0
+      return sortDir === 'asc' ? r : -r
     })
+    return list.map((a) => ({
+      ...a,
+      mono: monogram(a.name),
+      tile: tileColor(a.name),
+      barPct: Math.round((a.timeSpentSeconds / maxSecs) * 100)
+    }))
+  }, [apps, query, catFilter, sortKey, sortDir])
 
-  const filteredtimeData = filteredData.filter((app) => app.timeSpent > 1)
-  const totalTimeSeconds = apps.reduce((total, app) => total + app.timeSpentSeconds, 0)
-  const totalHours = Math.floor(totalTimeSeconds / 3600)
-  const totalMinutes = Math.floor((totalTimeSeconds % 3600) / 60)
-  const totalTimeFormatted = `${totalHours}h ${totalMinutes}m`
-
-  // Calculate productivity percentages
-  const productiveTime = apps
-    .filter((app) => app.productivity === 'Productive')
-    .reduce((total, app) => total + app.timeSpentSeconds, 0)
-
-  const neutralTime = apps
-    .filter((app) => app.productivity === 'Neutral')
-    .reduce((total, app) => total + app.timeSpentSeconds, 0)
-
-  const distractingTime = apps
-    .filter((app) => app.productivity === 'Distracting')
-    .reduce((total, app) => total + app.timeSpentSeconds, 0)
-
-  const productivePercentage = Math.round((productiveTime / totalTimeSeconds) * 100)
-  const neutralPercentage = Math.round((neutralTime / totalTimeSeconds) * 100)
-  const distractingPercentage = Math.round((distractingTime / totalTimeSeconds) * 100)
-
-  const toggleSort = (column) => {
-    if (sortBy === column) {
-      setSortOrder(sortOrder === 'asc' ? 'desc' : 'asc')
-    } else {
-      setSortBy(column)
-      setSortOrder('desc')
+  const toggleSort = (key) => {
+    if (sortKey === key) setSortDir((d) => (d === 'asc' ? 'desc' : 'asc'))
+    else {
+      setSortKey(key)
+      setSortDir(key === 'name' ? 'asc' : 'desc')
     }
   }
+  const arrow = (key) => (sortKey === key ? (sortDir === 'asc' ? '▲' : '▼') : '')
 
-  // DB-driven category icon (icon component + color both from the categories
-  // table). Replaces the old hardcoded per-category switch.
-  const getCategoryIcon = (category) => {
-    const Icon = getCategoryIconComponent(category)
-    return <Icon className="h-4 w-4" style={{ color: getCategoryColorFromDB(category) }} />
-  }
-  const handleDate = (e) => {
-    handleDateChange(e.target.value)
-  }
+  const isToday = selectedDate === new Date().toISOString().split('T')[0]
+  const prettyDate = new Date(selectedDate + 'T00:00:00').toLocaleDateString('en-US', {
+    weekday: 'long',
+    month: 'short',
+    day: 'numeric'
+  })
+
   return (
-    <Card className="bg-background/50 border-border/50 backdrop-blur-sm">
-      <CardHeader className="border-b border-border/50 pb-2">
-        <div className="flex items-center justify-between">
-          <CardTitle className="text-foreground text-base">Application Usage</CardTitle>
-          <div className="flex items-center space-x-1.5">
-            <div className="relative inline-flex items-center bg-muted/50 text-primary border border-primary/50 text-xs px-2 py-1 rounded-md">
-              <input
-                type="date"
-                value={selectedDate}
-                onChange={handleDate}
-                className="bg-transparent text-primary outline-none text-xs"
-                style={{ colorScheme: resolvedTheme === 'dark' ? 'dark' : 'light' }}
-              />
+    <div className="max-w-[1420px] mx-auto w-full px-3 pb-8 flex flex-col gap-5">
+      {/* Header */}
+      <header className="flex items-start justify-between gap-6 flex-wrap pt-3">
+        <div>
+          <h1 className="font-display text-[26px] font-semibold tracking-tight m-0 text-fb-text">Applications</h1>
+          <p className="mt-1.5 text-fb-muted text-sm">
+            {prettyDate} · {apps.filter((a) => a.timeSpentSeconds > 60).length} apps tracked{isToday ? ' today' : ''}
+          </p>
+        </div>
+        <div className="flex items-center gap-2.5 flex-shrink-0">
+          <SmartDatePicker zoomLevel="day" onDateChange={loadApps} />
+          <button
+            onClick={loadApps}
+            className="h-10 w-10 rounded-lg border border-fb-border bg-fb-surface text-fb-muted hover:text-fb-accent hover:border-fb-accent flex items-center justify-center transition-all"
+            title="Refresh"
+          >
+            <RefreshCw className="h-4 w-4" />
+          </button>
+        </div>
+      </header>
 
-              <Calendar className="absolute right-2 w-4 h-4 text-primary pointer-events-none" />
-            </div>
-
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  className="h-8 border-border bg-muted/50"
-                >
-                  <Filter className="mr-2 h-4 w-4" />
-                  {filter}
-                </Button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent
-                align="end"
-                className="bg-background border-border text-foreground cursor-default"
-              >
-                <DropdownMenuItem onClick={() => setFilter('All')}>All</DropdownMenuItem>
-                <DropdownMenuItem onClick={() => setFilter('Productive')}>
-                  Productive
-                </DropdownMenuItem>
-                <DropdownMenuItem onClick={() => setFilter('Neutral')}>Neutral</DropdownMenuItem>
-                <DropdownMenuItem onClick={() => setFilter('Distracting')}>
-                  Distracting
-                </DropdownMenuItem>
-              </DropdownMenuContent>
-            </DropdownMenu>
-
-            <BulkCategoryDialog apps={apps} onCategorize={handleBulkCategorize} />
-
-            <Button
-              onClick={loadApps}
-              variant="ghost"
-              size="icon"
-              className="h-8 w-8 text-muted-foreground"
-            >
-              <RefreshCw className="h-4 w-4" />
-            </Button>
+      {/* Summary bar */}
+      <section className="rounded-[18px] border border-fb-border bg-fb-surface shadow-[var(--fb-shadow)] px-6 py-5 flex items-center gap-8 flex-wrap">
+        <div className="flex-none">
+          <div className="text-[13px] font-semibold text-fb-muted">Total active time</div>
+          <div className="font-display text-[36px] font-semibold tracking-tight mt-2 leading-none text-fb-text">
+            {fmt(totals.total)}
           </div>
         </div>
-      </CardHeader>
-      <CardContent className="p-0">
-        <Tabs value={activeTab} onValueChange={handleTabChange} className="w-full">
-          <div className="px-4 pt-4 pb-2 flex items-center justify-between">
-            <TabsList className="bg-muted/50 p-0.5">
-              <TabsTrigger
-                value="table"
-                className="data-[state=active]:bg-muted data-[state=active]:text-primary"
-              >
-                Table
-              </TabsTrigger>
-              <TabsTrigger
-                value="summary"
-                className="data-[state=active]:bg-muted data-[state=active]:text-primary"
-              >
-                <Sparkles className="h-4 w-4 mr-1.5" />
-                Summary
-              </TabsTrigger>
-            </TabsList>
-
-            <div className="flex items-center space-x-4">
-              <div className="text-sm text-muted-foreground">
-                Total time: <span className="text-primary font-mono">{totalTimeFormatted}</span>
-              </div>
-              {/* Refresh only makes sense on the Summary tab, where the AI runs. */}
-              {activeTab === 'summary' && (
-              <Button
-                onClick={handleRefreshSummary}
-                variant="ghost"
-                size="sm"
-                className="h-8 text-muted-foreground"
-                disabled={isLoadingSummary}
-              >
-                <RefreshCw className={`h-4 w-4 mr-1.5 ${isLoadingSummary ? 'animate-spin' : ''}`} />
-                Refresh Summary
-              </Button>
-              )}
-            </div>
+        <div className="flex-1 min-w-[280px]">
+          <div className="flex h-3.5 rounded-lg overflow-hidden gap-0.5" style={{ background: 'var(--fb-track)' }}>
+            <div style={{ width: `${pct(totals.Productive)}%`, background: '#1FA05A' }} />
+            <div style={{ width: `${pct(totals.Neutral)}%`, background: 'var(--fb-muted)' }} />
+            <div style={{ width: `${pct(totals.Distracting)}%`, background: 'var(--c-distract)' }} />
           </div>
+          <div className="flex gap-6 mt-3.5 flex-wrap">
+            <LegendStat color="#1FA05A" label="Productive" value={fmt(totals.Productive)} />
+            <LegendStat color="var(--fb-muted)" label="Neutral" value={fmt(totals.Neutral)} />
+            <LegendStat color="var(--c-distract)" label="Distracting" value={fmt(totals.Distracting)} />
+          </div>
+        </div>
+      </section>
 
-          <TabsContent value="summary" className="mt-0">
-            {isLoadingSummary ? (
-              <SummarySkeleton />
-            ) : (
-              <SummaryTab summary={summary} date={selectedDate} />
-            )}
-          </TabsContent>
-
-          <TabsContent value="table" className="mt-0">
-            <div className="rounded-md border border-border/50 overflow-hidden mx-6 mb-6">
-              <Table>
-                <TableHeader className="bg-muted/50">
-                  <TableRow className="hover:bg-muted/80 border-border/50">
-                    <TableHead className="text-muted-foreground w-[300px]">
-                      <Button
-                        variant="ghost"
-                        className="p-0 font-medium text-muted-foreground hover:text-foreground"
-                        onClick={() => toggleSort('name')}
-                      >
-                        Application
-                        {sortBy === 'name' && (
-                          <span className="ml-1">{sortOrder === 'asc' ? '↑' : '↓'}</span>
-                        )}
-                      </Button>
-                    </TableHead>
-                    <TableHead className="text-muted-foreground">Category</TableHead>
-                    <TableHead className="text-muted-foreground">
-                      <Button
-                        variant="ghost"
-                        className="p-0 font-medium text-muted-foreground hover:text-foreground"
-                        onClick={() => toggleSort('timeSpent')}
-                      >
-                        Time Spent
-                        {sortBy === 'timeSpent' && (
-                          <span className="ml-1">{sortOrder === 'asc' ? '↑' : '↓'}</span>
-                        )}
-                      </Button>
-                    </TableHead>
-                    <TableHead className="text-muted-foreground">Productivity</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {filteredData
-                    .filter((app) => app.timeSpentSeconds > 60)
-                    .map((app) => (
-                      <TableRow key={app.id} className="hover:bg-muted/50 border-border/30">
-                        <TableCell className="font-medium text-foreground">
-                          <div className="flex items-center">
-                            <span className="mr-2 text-lg">{app.icon}</span>
-                            {app.name}
-                          </div>
-                        </TableCell>
-                        <TableCell className="text-muted-foreground">
-                          <div className="flex items-center space-x-2 text-muted-foreground">
-                            <CategoryBadge category={app.category} />
-                          </div>
-                        </TableCell>
-                        <TableCell className="text-primary font-mono">{app.timeSpent}</TableCell>
-                        <TableCell>
-                          <ProductivityBadge productivity={app.productivity} />
-                        </TableCell>
-                        <TableCell className="text-muted-foreground">{app.lastUsed}</TableCell>
-                        <TableCell className="text-muted-foreground">{app.sessions}</TableCell>
-                        <TableCell className="text-right">
-                          <DropdownMenu className="hover:cursor-pointer">
-                            <DropdownMenuTrigger asChild>
-                              <Button
-                                variant="ghost"
-                                size="icon"
-                                className="h-8 w-8 text-muted-foreground"
-                              >
-                                <MoreHorizontal className="h-4 w-4" />
-                              </Button>
-                            </DropdownMenuTrigger>
-                            <DropdownMenuContent
-                              align="end"
-                              className="bg-white dark:bg-slate-900 border-gray-300 dark:border-slate-700 text-gray-900 dark:text-slate-50 shadow-xl"
-                            >
-                              <DropdownMenuLabel className="text-gray-900 dark:text-slate-200">Actions</DropdownMenuLabel>
-                              <DropdownMenuSeparator className="bg-gray-300 dark:bg-slate-700" />
-                              <DropdownMenuItem className="hover:bg-gray-100 dark:hover:bg-slate-800 cursor-pointer">
-                                View Details
-                              </DropdownMenuItem>
-
-                              {/* Add category submenu */}
-                              <DropdownMenuSub>
-                                <DropdownMenuSubTrigger className="flex items-center hover:bg-gray-100 dark:hover:bg-slate-800">
-                                  <Tag className="h-4 w-4 mr-2" />
-                                  <span>Change Category</span>
-                                </DropdownMenuSubTrigger>
-                                <DropdownMenuSubContent className="bg-white dark:bg-slate-900 border-gray-300 dark:border-slate-700 text-gray-900 dark:text-slate-50 shadow-xl">
-                                  {categoryNames.map((category) => (
-                                    <DropdownMenuItem
-                                      key={category}
-                                      className="flex items-center hover:bg-gray-100 dark:hover:bg-slate-800 cursor-pointer"
-                                      onClick={() => handleCategoryChange(app.id, category)}
-                                    >
-                                      {getCategoryIcon(category)}
-                                      <span className="ml-2">{category}</span>
-                                      {app.category === category && (
-                                        <Check className="h-4 w-4 ml-auto" />
-                                      )}
-                                    </DropdownMenuItem>
-                                  ))}
-                                  <DropdownMenuSeparator className="bg-gray-300 dark:bg-slate-700" />
-                                  <DropdownMenuItem
-                                    className="flex items-center text-primary hover:bg-gray-100 dark:hover:bg-slate-800 cursor-pointer text-xs"
-                                    onClick={() =>
-                                      navigate('/settings?tab=Categories Management')
-                                    }
-                                  >
-                                    <Sliders className="h-3.5 w-3.5 mr-2" />
-                                    Manage all rules →
-                                  </DropdownMenuItem>
-                                </DropdownMenuSubContent>
-                              </DropdownMenuSub>
-
-                              <DropdownMenuSeparator className="bg-gray-300 dark:bg-slate-700" />
-                              <DropdownMenuItem className="text-red-500 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-950/20 cursor-pointer">
-                                Ignore App
-                              </DropdownMenuItem>
-                            </DropdownMenuContent>
-                          </DropdownMenu>
-                        </TableCell>
-                      </TableRow>
-                    ))}
-                </TableBody>
-              </Table>
-            </div>
-          </TabsContent>
-        </Tabs>
-      </CardContent>
-    </Card>
-  )
-}
-
-// Replace the existing ProductivityBadge component with this:
-function ProductivityBadge({ productivity }) {
-  const getProductivityColor = () => {
-    switch (productivity) {
-      case 'Productive':
-        return 'bg-green-500/10 text-green-400 border-green-500/30'
-      case 'Neutral':
-        return 'bg-amber-500/10 text-amber-400 border-amber-500/30'
-      case 'Distracting':
-        return 'bg-red-500/10 text-red-400 border-red-500/30'
-      default:
-        return 'bg-muted/10 text-muted-foreground border-border/30'
-    }
-  }
-
-  return (
-    <Badge variant="outline" className={`${getProductivityColor()} text-xs`}>
-      {productivity}
-    </Badge>
-  )
-}
-
-function AppTimelineChart({ date }) {
-  const [timelineData, setTimelineData] = useState([])
-  const [isLoading, setIsLoading] = useState(true)
-
-  useEffect(() => {
-    async function loadTimelineData() {
-      try {
-        setIsLoading(true)
-        // Get app usage data for the selected date
-        const jsonData = await window.activeWindow.getAppUsageStats(date)
-        // Extract timeline data
-        const extractedData = extractTimelineData(jsonData, date)
-        setTimelineData(extractedData)
-      } catch (error) {
-        console.error('Error loading timeline data:', error)
-      } finally {
-        setIsLoading(false)
-      }
-    }
-
-    loadTimelineData()
-  }, [date])
-
-  // Sort timeline data to show most used apps at the top
-  const sortedTimelineData = useMemo(() => {
-    return [...timelineData].sort((a, b) => {
-      // Calculate total time for each app
-      const totalTimeA = a.segments.reduce((sum, segment) => sum + segment.duration, 0)
-      const totalTimeB = b.segments.reduce((sum, segment) => sum + segment.duration, 0)
-      return totalTimeB - totalTimeA
-    })
-  }, [timelineData])
-
-  return (
-    <div className="h-full w-full flex flex-col p-6">
-      <div className="text-sm text-muted-foreground mb-4">
-        Application usage timeline for {date === getFormattedDate() ? 'Today' : date}
+      {/* Search + category filter chips */}
+      <div className="flex items-center gap-3.5 flex-wrap">
+        <div className="relative flex-1 min-w-[220px] max-w-[340px]">
+          <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-fb-muted" />
+          <input
+            type="text"
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+            placeholder="Search applications"
+            className="w-full text-[13.5px] py-2.5 pl-9 pr-3.5 rounded-xl border border-fb-border bg-fb-surface text-fb-text placeholder:text-fb-muted outline-none focus:border-fb-accent transition-colors"
+          />
+        </div>
+        <div className="flex gap-1.5 flex-wrap flex-1">
+          <Chip active={catFilter === 'all'} onClick={() => setCatFilter('all')} label="All apps" />
+          {categories.map((c) => (
+            <Chip
+              key={c.name}
+              active={catFilter === c.name}
+              onClick={() => setCatFilter(c.name)}
+              label={c.name}
+              dot={getCategoryColorFromDB(c.name)}
+            />
+          ))}
+        </div>
       </div>
 
-      {isLoading ? (
-        <div className="flex-1 flex items-center justify-center">
-          <div className="text-muted-foreground">Loading timeline data...</div>
+      {/* Table */}
+      <section className="rounded-[18px] border border-fb-border bg-fb-surface shadow-[var(--fb-shadow)] overflow-hidden">
+        {/* Column header */}
+        <div className="grid grid-cols-[2.2fr_1.5fr_1.3fr_1.2fr_0.9fr] gap-4 px-6 py-4 border-b border-fb-border items-center">
+          <button onClick={() => toggleSort('name')} className="flex items-center gap-1.5 text-left text-[12.5px] font-semibold uppercase tracking-wide text-fb-muted">
+            Application <span className="text-fb-accent text-[11px]">{arrow('name')}</span>
+          </button>
+          <div className="text-[12.5px] font-semibold uppercase tracking-wide text-fb-muted">Category</div>
+          <div className="text-[12.5px] font-semibold uppercase tracking-wide text-fb-muted">Mode</div>
+          <button onClick={() => toggleSort('time')} className="flex items-center gap-1.5 text-left text-[12.5px] font-semibold uppercase tracking-wide text-fb-muted">
+            Time spent <span className="text-fb-accent text-[11px]">{arrow('time')}</span>
+          </button>
+          <div className="text-[12.5px] font-semibold uppercase tracking-wide text-fb-muted">Productivity</div>
         </div>
-      ) : sortedTimelineData.length === 0 ? (
-        <div className="flex-1 flex items-center justify-center">
-          <div className="text-muted-foreground">No timeline data available for this date</div>
-        </div>
-      ) : (
-        <div className="flex-1 flex flex-col">
-          {' '}
-          {/* Time labels - 24 hour markers with labels every 4 hours */}
-          <div className="relative flex text-xs text-foreground0 mb-2">
-            {Array.from({ length: 5 }).map((_, i) => {
-              const hour = i * 4
-              const hourLabel =
-                hour === 0 || hour === 24
-                  ? '12 AM'
-                  : hour === 12
-                    ? '12 PM'
-                    : hour > 12
-                      ? `${hour - 12} PM`
-                      : `${hour} AM`
 
-              return (
+        {/* Rows */}
+        {rows.map((r) => {
+          const pm = PROD[r.productivity] || PROD.Neutral
+          const catColor = getCategoryColorFromDB(r.category)
+          const modeColor = getModeColor(r.mode)
+          return (
+            <div
+              key={r.id}
+              className="grid grid-cols-[2.2fr_1.5fr_1.3fr_1.2fr_0.9fr] gap-4 px-6 py-3.5 items-center transition-colors hover:bg-fb-surface2"
+              style={{ borderBottom: '1px solid var(--fb-rowline, var(--fb-border))' }}
+            >
+              {/* App */}
+              <div className="flex items-center gap-3 min-w-0">
                 <div
-                  key={i}
-                  className="text-center"
-                  style={{
-                    position: 'absolute',
-                    left: `${(hour / 24) * 100}%`,
-                    width: '40px',
-                    marginLeft: '-20px' // Center the label
-                  }}
+                  className="w-9 h-9 rounded-[11px] flex-none flex items-center justify-center text-white font-display font-semibold text-sm"
+                  style={{ background: r.tile }}
                 >
-                  {hourLabel}
+                  {r.mono}
                 </div>
-              )
-            })}
-          </div>
-          {/* Timeline grid */}
-          <div className="flex-1 border-t border-l border-border/30 relative overflow-y-auto custom-scrollbar">
-            {' '}
-            {/* Vertical grid lines - 24 hour markers with emphasis on 4-hour marks */}
-            <div className="absolute inset-0 flex pointer-events-none">
-              {Array.from({ length: 25 }).map((_, i) => (
-                <div
-                  key={i}
-                  className="h-full border-r"
-                  style={{
-                    width: `${100 / 24}%`,
-                    borderColor:
-                      i % 4 === 0 ? gridBorderColors.major : gridBorderColors.minor
-                  }}
-                ></div>
-              ))}
+                <span className="text-[14.5px] font-semibold truncate text-fb-text">{r.name}</span>
+              </div>
+
+              {/* Category — opens a portal-rendered menu (see below) */}
+              <div onClick={(e) => e.stopPropagation()}>
+                <button
+                  onClick={(e) => openCategoryMenu(r.id, e)}
+                  className="inline-flex items-center gap-2 text-[12.5px] font-semibold px-2.5 py-1.5 rounded-lg border transition-all hover:border-fb-accent"
+                  style={{ borderColor: 'var(--fb-border)', color: catColor }}
+                >
+                  <span className="w-2 h-2 rounded-[3px]" style={{ background: catColor }} />
+                  {r.category}
+                  <ChevronDown className="h-3 w-3 opacity-60" />
+                </button>
+              </div>
+
+              {/* Mode — same portal-menu pattern as Category, pins a per-app work-mode */}
+              <div onClick={(e) => e.stopPropagation()}>
+                <button
+                  onClick={(e) => openModeMenu(r.id, e)}
+                  className="inline-flex items-center gap-2 text-[12.5px] font-semibold px-2.5 py-1.5 rounded-lg border transition-all hover:border-fb-accent"
+                  style={{ borderColor: 'var(--fb-border)', color: modeColor }}
+                >
+                  <span className="w-2 h-2 rounded-full" style={{ background: modeColor }} />
+                  {r.mode}
+                  <ChevronDown className="h-3 w-3 opacity-60" />
+                </button>
+              </div>
+
+              {/* Time */}
+              <div>
+                <div className="font-display text-[15px] font-semibold text-fb-text">{fmt(r.timeSpentSeconds)}</div>
+                <div className="h-[5px] rounded-full mt-1.5 max-w-[150px] overflow-hidden" style={{ background: 'var(--fb-track)' }}>
+                  <div className="h-full rounded-full" style={{ width: `${r.barPct}%`, background: catColor }} />
+                </div>
+              </div>
+
+              {/* Productivity badge */}
+              <div>
+                <span
+                  className="inline-flex items-center gap-1.5 text-[12.5px] font-semibold px-2.5 py-1 rounded-lg"
+                  style={{ color: pm.color, background: pm.bg }}
+                >
+                  <span className="w-1.5 h-1.5 rounded-full" style={{ background: pm.color }} />
+                  {r.productivity}
+                </span>
+              </div>
             </div>
-            {/* App timelines */}
-            <div className="absolute top-4 left-0 right-0 space-y-6 pb-4">
-              {sortedTimelineData.slice(0, 10).map((app, index) => (
-                <AppTimelineRow
-                  key={index}
-                  name={app.name}
-                  icon={app.icon}
-                  segments={app.segments}
-                />
-              ))}
-            </div>
+          )
+        })}
+
+        {rows.length === 0 && (
+          <div className="py-12 text-center text-fb-muted text-sm">
+            {apps.length === 0 ? 'No activity tracked for this day.' : 'No applications match your search.'}
           </div>
-        </div>
+        )}
+      </section>
+
+      {/* Category menu — portal-rendered so it never gets clipped by the table
+          card's overflow-hidden, and flips upward when near the viewport bottom. */}
+      {openCat != null && menuRect && (
+        <CategoryMenu
+          rect={menuRect}
+          categories={categories}
+          current={apps.find((a) => a.id === openCat)?.category}
+          onPick={(name) => handleCategoryChange(openCat, name)}
+          onManage={() => {
+            setOpenCat(null)
+            navigate('/settings?tab=Categories Management')
+          }}
+          onClose={() => setOpenCat(null)}
+        />
+      )}
+
+      {/* Mode menu — mirrors the category menu; pins a per-app work-mode override. */}
+      {openMode != null && modeMenuRect && (
+        <ModeMenu
+          rect={modeMenuRect}
+          modes={modes}
+          current={apps.find((a) => a.id === openMode)?.mode}
+          onPick={(name) => handleModeChange(openMode, name)}
+          onManage={() => {
+            setOpenMode(null)
+            navigate('/settings?tab=Categories Management')
+          }}
+          onClose={() => setOpenMode(null)}
+        />
       )}
     </div>
   )
 }
 
-function AppTimelineRow({ name, icon, segments }) {
-  return (
-    <div className="flex items-center">
-      <div className="w-40 flex items-center">
-        <span className="mr-2">{icon}</span>
-        <span className="text-sm text-foreground truncate" title={name}>
-          {name}
-        </span>
-      </div>
-      <div className="flex-1 h-4 relative">
-        {segments.map((segment, i) => {
-          // Convert 24-hour time to percentage (0-24 hours to 0-100%)
-          const startPercent = (segment.start / 24) * 100
-          const widthPercent = (segment.duration / 24) * 100
+// Fixed-positioned category picker rendered into document.body via a portal.
+function CategoryMenu({ rect, categories, current, onPick, onManage, onClose }) {
+  const ref = useRef(null)
+  const [pos, setPos] = useState({ left: rect.left, top: rect.bottom + 6, flip: false })
 
-          let bgColor = 'bg-green-500'
-          if (segment.color === 'amber') bgColor = 'bg-amber-500'
-          if (segment.color === 'red') bgColor = 'bg-red-500'
-          if (segment.color === 'blue') bgColor = 'bg-blue-500'
-          if (segment.color === 'purple') bgColor = 'bg-purple-500'
-          if (segment.color === 'gray') bgColor = 'bg-slate-500'
+  // After mount, measure the menu and decide whether to flip above the anchor
+  // and/or shift left so it stays within the viewport.
+  useLayoutEffect(() => {
+    const el = ref.current
+    if (!el) return
+    const mh = el.offsetHeight
+    const mw = el.offsetWidth
+    const margin = 8
+    const spaceBelow = window.innerHeight - rect.bottom
+    const flip = spaceBelow < mh + margin && rect.top > mh + margin
+    let left = rect.left
+    if (left + mw > window.innerWidth - margin) left = window.innerWidth - mw - margin
+    if (left < margin) left = margin
+    const top = flip ? rect.top - mh - 6 : rect.bottom + 6
+    setPos({ left, top, flip })
+  }, [rect])
 
-          // Calculate the start and end times for the tooltip
-          const startHour = Math.floor(segment.start)
-          const startMinute = Math.floor((segment.start - startHour) * 60)
-          const endHour = Math.floor(segment.start + segment.duration)
-          const endMinute = Math.floor((segment.start + segment.duration - endHour) * 60)
-
-          const tooltipTime = `${startHour}:${startMinute.toString().padStart(2, '0')} - ${endHour}:${endMinute.toString().padStart(2, '0')}`
-          const tooltipDuration = `${Math.floor(segment.duration * 60)} minutes`
-
-          return (
-            <div
-              key={i}
-              className={`absolute h-3 rounded-sm ${bgColor} hover:brightness-110 cursor-pointer transition-all`}
-              style={{
-                left: `${startPercent}%`,
-                width: `${widthPercent}%`,
-                top: '2px'
-              }}
-              title={`${name} | ${tooltipTime} | ${tooltipDuration}`}
-            ></div>
-          )
-        })}
-      </div>
-    </div>
-  )
-}
-function StatCard({ title, value, percentage, color }) {
-  const getColor = () => {
-    switch (color) {
-      case 'green':
-        return 'from-green-500 to-emerald-500'
-      case 'blue':
-        return 'from-blue-500 to-cyan-500'
-      case 'red':
-        return 'from-red-500 to-pink-500'
-      default:
-        return 'from-muted to-muted/80'
+  // Close on outside click, scroll, or Escape.
+  useEffect(() => {
+    const onDown = (e) => {
+      if (ref.current && !ref.current.contains(e.target)) onClose()
     }
-  }
-
-  return (
-    <div className="bg-muted/50 rounded-lg border border-border/50 p-4">
-      <div className="text-sm text-muted-foreground mb-1">{title}</div>
-      <div className="text-xl font-mono text-foreground mb-2">{value}</div>
-      <div className="flex items-center justify-between mb-1">
-        <div className="text-xs text-muted-foreground">{percentage}% of total</div>
-      </div>
-      <div className="h-2 bg-muted rounded-full overflow-hidden">
-        <div
-          className={`h-full bg-gradient-to-r ${getColor()} rounded-full`}
-          style={{ width: `${percentage}%` }}
-        ></div>
-      </div>
-    </div>
-  )
-}
-
-function AppCategoryDistribution() {
-  // This would be a real chart in a production app
-  return (
-    <div className="h-full w-full flex p-6">
-      <div className="flex-1 flex items-center justify-center">
-        <div className="relative w-56 h-56">
-          {/* Development - 35% */}
-          <div className="absolute inset-0 bg-cyan-500/20 rounded-full"></div>
-          <div
-            className="absolute inset-0 bg-cyan-500 rounded-full"
-            style={{ clipPath: 'polygon(50% 50%, 50% 0%, 100% 0%, 100% 65%, 65% 65%)' }}
-          ></div>
-
-          {/* Office - 15% */}
-          <div
-            className="absolute inset-0 bg-blue-500 rounded-full"
-            style={{ clipPath: 'polygon(50% 50%, 65% 65%, 100% 65%, 100% 100%, 80% 100%)' }}
-          ></div>
-
-          {/* Communication - 20% */}
-          <div
-            className="absolute inset-0 bg-purple-500 rounded-full"
-            style={{ clipPath: 'polygon(50% 50%, 80% 100%, 30% 100%)' }}
-          ></div>
-
-          {/* Entertainment - 20% */}
-          <div
-            className="absolute inset-0 bg-red-500 rounded-full"
-            style={{ clipPath: 'polygon(50% 50%, 30% 100%, 0% 100%, 0% 50%)' }}
-          ></div>
-
-          {/* Social Media - 10% */}
-          <div
-            className="absolute inset-0 bg-amber-500 rounded-full"
-            style={{ clipPath: 'polygon(50% 50%, 0% 50%, 0% 0%, 50% 0%)' }}
-          ></div>
-
-          <div className="absolute inset-0 flex items-center justify-center">
-            <div className="bg-background/80 rounded-full w-28 h-28 flex flex-col items-center justify-center">
-              <div className="text-xs text-muted-foreground">Categories</div>
-              <div className="text-lg font-mono text-primary">5</div>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      <div className="w-64 flex flex-col justify-center space-y-3">
-        <div className="flex items-center text-sm">
-          <div className="h-3 w-3 rounded-sm bg-cyan-500 mr-2"></div>
-          <div className="text-foreground flex-1">Development</div>
-          <div className="text-primary font-mono">35%</div>
-        </div>
-        <div className="flex items-center text-sm">
-          <div className="h-3 w-3 rounded-sm bg-blue-500 mr-2"></div>
-          <div className="text-foreground flex-1">Office</div>
-          <div className="text-primary font-mono">15%</div>
-        </div>
-        <div className="flex items-center text-sm">
-          <div className="h-3 w-3 rounded-sm bg-purple-500 mr-2"></div>
-          <div className="text-foreground flex-1">Communication</div>
-          <div className="text-primary font-mono">20%</div>
-        </div>
-        <div className="flex items-center text-sm">
-          <div className="h-3 w-3 rounded-sm bg-red-500 mr-2"></div>
-          <div className="text-foreground flex-1">Entertainment</div>
-          <div className="text-primary font-mono">20%</div>
-        </div>
-        <div className="flex items-center text-sm">
-          <div className="h-3 w-3 rounded-sm bg-amber-500 mr-2"></div>
-          <div className="text-foreground flex-1">Social Media</div>
-          <div className="text-primary font-mono">10%</div>
-        </div>
-      </div>
-    </div>
-  )
-}
-// Format date to YYYY-MM-DD for consistency with your data structure
-function getFormattedDate(date = new Date()) {
-  const year = date.getFullYear()
-  const month = String(date.getMonth() + 1).padStart(2, '0')
-  const day = String(date.getDate()).padStart(2, '0')
-  return `${year}-${month}-${day}`
-}
-
-// Format duration in milliseconds to human-readable format
-function formatDuration(durationMs) {
-  const hours = Math.floor(durationMs / (1000 * 60 * 60))
-  const minutes = Math.floor((durationMs % (1000 * 60 * 60)) / (1000 * 60))
-
-  if (hours > 0) {
-    return `${hours}h ${minutes}m`
-  } else {
-    return `${minutes}m`
-  }
-}
-function extractTimelineData(jsonData, date) {
-  // Use a Map to group apps by name or domain identity
-  const appMap = new Map()
-
-  if (jsonData && jsonData[date] && jsonData[date].apps) {
-    for (const [appName, appData] of Object.entries(jsonData[date].apps)) {
-      if (appData.timestamps && appData.timestamps.length > 0) {
-        // Create a unique identifier for the app (domain or description)
-        const appIdentifier = appData.category || appData.description || appName
-
-        // If this app hasn't been added yet, create a new entry
-        if (!appMap.has(appIdentifier)) {
-          appMap.set(appIdentifier, {
-            name: appIdentifier,
-            icon: getAppIcon(appName, appData.category),
-            category: appData.category,
-            segments: []
-          })
-        }
-
-        // Add segments to the existing app entry
-        const appEntry = appMap.get(appIdentifier)
-        appData.timestamps.forEach((timestamp) => {
-          const startTime = new Date(timestamp.start)
-          const durationHours = timestamp.duration / (1000 * 60 * 60)
-          const startHour = startTime.getHours() + startTime.getMinutes() / 60
-          const color = getCategoryTimelineColor(appData.category)
-
-          appEntry.segments.push({
-            start: startHour,
-            duration: durationHours,
-            color: color
-          })
-        })
-      }
+    const onKey = (e) => e.key === 'Escape' && onClose()
+    document.addEventListener('mousedown', onDown)
+    document.addEventListener('keydown', onKey)
+    window.addEventListener('scroll', onClose, true)
+    return () => {
+      document.removeEventListener('mousedown', onDown)
+      document.removeEventListener('keydown', onKey)
+      window.removeEventListener('scroll', onClose, true)
     }
-  }
-  const result = Array.from(appMap.values())
-  console.log('timeline array ==>', result)
-  return Array.from(appMap.values())
-}
-// Helper function to get color based on category
-function getCategoryTimelineColor(category) {
-  switch (category) {
-    case 'Code':
-      return 'green'
-    case 'Entertainment':
-      return 'red'
-    case 'Communication':
-      return 'blue'
-    case 'Browsing':
-      return 'amber'
-    case 'Utilities':
-      return 'purple'
-    default:
-      return 'gray'
-  }
+  }, [onClose])
+
+  return createPortal(
+    <div
+      ref={ref}
+      className="fixed z-[100] rounded-xl border border-fb-border bg-fb-surface shadow-xl p-1.5 min-w-[200px] max-h-[60vh] overflow-y-auto custom-scrollbar"
+      style={{ left: pos.left, top: pos.top }}
+      onClick={(e) => e.stopPropagation()}
+    >
+      <div className="text-[11px] font-bold uppercase tracking-wide text-fb-muted px-2.5 pt-2 pb-1.5">
+        Set category
+      </div>
+      {categories.map((c) => {
+        const active = c.name === current
+        return (
+          <button
+            key={c.name}
+            onClick={() => onPick(c.name)}
+            className="w-full flex items-center gap-2.5 px-2.5 py-2 rounded-lg transition-colors hover:bg-fb-surface2"
+            style={{ background: active ? 'var(--fb-surface2)' : 'transparent' }}
+          >
+            <span className="w-2.5 h-2.5 rounded-[3px] flex-none" style={{ background: getCategoryColorFromDB(c.name) }} />
+            <span className="text-[13.5px] font-medium flex-1 text-left text-fb-text">{c.name}</span>
+            {active && <Check className="h-3.5 w-3.5 text-fb-accent" />}
+          </button>
+        )
+      })}
+      <div className="border-t border-fb-border mt-1 pt-1">
+        <button
+          onClick={onManage}
+          className="w-full text-left text-[12px] font-semibold text-fb-accent px-2.5 py-2 rounded-lg hover:bg-fb-surface2"
+        >
+          Manage all rules →
+        </button>
+      </div>
+    </div>,
+    document.body
+  )
 }
 
-// Helper function to get icon for app
-function getAppIcon(appName, category) {
-  if (appName.includes('Code') || appName.includes('Visual Studio')) return '💻'
-  if (appName.includes('Chrome') || appName.includes('Brave') || appName.includes('Edge'))
-    return '🌐'
-  if (appName.includes('Teams') || appName.includes('Slack')) return '💬'
-  if (appName.includes('Spotify')) return '🎵'
-  if (appName.includes('YouTube')) return '📺'
-  if (appName.includes('Twitter') || appName.includes('X')) return '🐦'
-  if (appName.includes('LinkedIn')) return '👔'
+// Fixed-positioned work-mode picker, structurally identical to CategoryMenu so the
+// two behave the same (flip near the viewport bottom, close on outside/scroll/Esc).
+function ModeMenu({ rect, modes, current, onPick, onManage, onClose }) {
+  const ref = useRef(null)
+  const [pos, setPos] = useState({ left: rect.left, top: rect.bottom + 6, flip: false })
 
-  // Default icons based on category
-  switch (category) {
-    case 'Code':
-      return '💻'
-    case 'Entertainment':
-      return '🎮'
-    case 'Communication':
-      return '📱'
-    case 'Browsing':
-      return '🌐'
-    case 'Utilities':
-      return '🛠️'
-    default:
-      return '📊'
-  }
+  useLayoutEffect(() => {
+    const el = ref.current
+    if (!el) return
+    const mh = el.offsetHeight
+    const mw = el.offsetWidth
+    const margin = 8
+    const spaceBelow = window.innerHeight - rect.bottom
+    const flip = spaceBelow < mh + margin && rect.top > mh + margin
+    let left = rect.left
+    if (left + mw > window.innerWidth - margin) left = window.innerWidth - mw - margin
+    if (left < margin) left = margin
+    const top = flip ? rect.top - mh - 6 : rect.bottom + 6
+    setPos({ left, top, flip })
+  }, [rect])
+
+  useEffect(() => {
+    const onDown = (e) => {
+      if (ref.current && !ref.current.contains(e.target)) onClose()
+    }
+    const onKey = (e) => e.key === 'Escape' && onClose()
+    document.addEventListener('mousedown', onDown)
+    document.addEventListener('keydown', onKey)
+    window.addEventListener('scroll', onClose, true)
+    return () => {
+      document.removeEventListener('mousedown', onDown)
+      document.removeEventListener('keydown', onKey)
+      window.removeEventListener('scroll', onClose, true)
+    }
+  }, [onClose])
+
+  return createPortal(
+    <div
+      ref={ref}
+      className="fixed z-[100] rounded-xl border border-fb-border bg-fb-surface shadow-xl p-1.5 min-w-[200px] max-h-[60vh] overflow-y-auto custom-scrollbar"
+      style={{ left: pos.left, top: pos.top }}
+      onClick={(e) => e.stopPropagation()}
+    >
+      <div className="text-[11px] font-bold uppercase tracking-wide text-fb-muted px-2.5 pt-2 pb-1.5">
+        Set work-mode
+      </div>
+      {modes.map((m) => {
+        const active = m.name === current
+        return (
+          <button
+            key={m.name}
+            onClick={() => onPick(m.name)}
+            className="w-full flex items-center gap-2.5 px-2.5 py-2 rounded-lg transition-colors hover:bg-fb-surface2"
+            style={{ background: active ? 'var(--fb-surface2)' : 'transparent' }}
+          >
+            <span className="w-2.5 h-2.5 rounded-full flex-none" style={{ background: getModeColor(m.name) }} />
+            <span className="text-[13.5px] font-medium flex-1 text-left text-fb-text">{m.name}</span>
+            {active && <Check className="h-3.5 w-3.5 text-fb-accent" />}
+          </button>
+        )
+      })}
+      <div className="border-t border-fb-border mt-1 pt-1">
+        <button
+          onClick={onManage}
+          className="w-full text-left text-[12px] font-semibold text-fb-accent px-2.5 py-2 rounded-lg hover:bg-fb-surface2"
+        >
+          Manage overrides →
+        </button>
+      </div>
+    </div>,
+    document.body
+  )
+}
+
+function LegendStat({ color, label, value }) {
+  return (
+    <div className="flex items-center gap-2">
+      <span className="w-2.5 h-2.5 rounded-[3px]" style={{ background: color }} />
+      <span className="text-[13px] font-semibold text-fb-text">{label}</span>
+      <span className="font-display text-[13px] font-semibold text-fb-muted">{value}</span>
+    </div>
+  )
+}
+
+function Chip({ active, onClick, label, dot }) {
+  return (
+    <button
+      onClick={onClick}
+      className="flex items-center gap-1.5 text-[12.5px] font-semibold px-3 py-1.5 rounded-full border transition-all"
+      style={{
+        borderColor: active ? 'var(--fb-accent)' : 'var(--fb-border)',
+        background: active ? 'var(--fb-accentsoft)' : 'var(--fb-surface)',
+        color: active ? 'var(--fb-accent)' : 'var(--fb-muted)'
+      }}
+    >
+      {dot && <span className="w-2 h-2 rounded-[3px]" style={{ background: dot }} />}
+      {label}
+    </button>
+  )
 }

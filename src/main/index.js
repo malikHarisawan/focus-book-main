@@ -535,53 +535,62 @@ async function initializeBackendServices() {
     console.error('❌ Failed to enable auto-startup:', error.message)
   }
 
-  // Start AI service with config from config.json
-  try {
-    const userDataPath = app.getPath('userData')
-    const configPath = path.join(userDataPath, 'config.json')
-
-    let aiConfig = {
-      provider: 'openai',
-      openaiKey: '',
-      geminiKey: ''
-    }
-
-    // Read config.json if it exists
-    if (fs.existsSync(configPath)) {
-      try {
-        const configData = fs.readFileSync(configPath, 'utf-8')
-        const savedConfig = JSON.parse(configData)
-
-        // Map config.json format to AIServiceManager format
-        aiConfig.provider = savedConfig.provider || 'openai'
-        if (savedConfig.provider === 'gemini') {
-          aiConfig.geminiKey = savedConfig.apiKey || ''
-        } else {
-          aiConfig.openaiKey = savedConfig.apiKey || ''
-        }
-
-        console.log('📋 Loaded AI config from:', configPath)
-        console.log('🤖 AI Provider:', aiConfig.provider)
-      } catch (configError) {
-        console.warn('⚠️ Could not parse config.json, using defaults:', configError.message)
-      }
-    }
-
-    // Only start the AI service if a key is actually configured. The service's
-    // startup requires a valid provider key and exits otherwise, so starting it
-    // keyless just crash-loops it on every launch. AI features stay unavailable
-    // until the user adds a key in Settings (which restarts the service).
-    const hasKey = Boolean((aiConfig.openaiKey || '').trim() || (aiConfig.geminiKey || '').trim())
-    if (hasKey) {
-      await aiServiceManager.start(aiConfig)
-      console.log('✅ AI service started successfully')
-    } else {
-      console.log('📋 No AI key configured — AI service not started (add one in Settings to enable).')
-    }
-  } catch (error) {
-    console.error('❌ Failed to start AI service:', error.message)
-    console.log('📋 AI insights will not be available.')
-  }
+  // --- AI service DISABLED ---
+  // The local AI service (Chat/Insights) is currently disabled: the Python process
+  // is never spawned. The IPC handlers, preload bridges, and Settings AI config
+  // reading are left intact but the UI entry points (sidebar link, /chat route,
+  // Settings AI panel) are hidden, so nothing tries to reach a service that isn't
+  // running. To re-enable, uncomment the startup block below and restore the UI
+  // entry points (see git history / the WORK_MODE_ENGINE notes).
+  //
+  // // Start AI service with config from config.json
+  // try {
+  //   const userDataPath = app.getPath('userData')
+  //   const configPath = path.join(userDataPath, 'config.json')
+  //
+  //   let aiConfig = {
+  //     provider: 'openai',
+  //     openaiKey: '',
+  //     geminiKey: ''
+  //   }
+  //
+  //   // Read config.json if it exists
+  //   if (fs.existsSync(configPath)) {
+  //     try {
+  //       const configData = fs.readFileSync(configPath, 'utf-8')
+  //       const savedConfig = JSON.parse(configData)
+  //
+  //       // Map config.json format to AIServiceManager format
+  //       aiConfig.provider = savedConfig.provider || 'openai'
+  //       if (savedConfig.provider === 'gemini') {
+  //         aiConfig.geminiKey = savedConfig.apiKey || ''
+  //       } else {
+  //         aiConfig.openaiKey = savedConfig.apiKey || ''
+  //       }
+  //
+  //       console.log('📋 Loaded AI config from:', configPath)
+  //       console.log('🤖 AI Provider:', aiConfig.provider)
+  //     } catch (configError) {
+  //       console.warn('⚠️ Could not parse config.json, using defaults:', configError.message)
+  //     }
+  //   }
+  //
+  //   // Only start the AI service if a key is actually configured. The service's
+  //   // startup requires a valid provider key and exits otherwise, so starting it
+  //   // keyless just crash-loops it on every launch. AI features stay unavailable
+  //   // until the user adds a key in Settings (which restarts the service).
+  //   const hasKey = Boolean((aiConfig.openaiKey || '').trim() || (aiConfig.geminiKey || '').trim())
+  //   if (hasKey) {
+  //     await aiServiceManager.start(aiConfig)
+  //     console.log('✅ AI service started successfully')
+  //   } else {
+  //     console.log('📋 No AI key configured — AI service not started (add one in Settings to enable).')
+  //   }
+  // } catch (error) {
+  //   console.error('❌ Failed to start AI service:', error.message)
+  //   console.log('📋 AI insights will not be available.')
+  // }
+  console.log('📋 AI service is disabled in this build.')
 
 
   // Initialize the browser extension bridge (WebSocket URL source). This is a
@@ -709,6 +718,32 @@ app.whenReady().then(async () => {
     }
   })
 
+  // Work-modes (Level 2) metadata: [{ name, rollup, color, icon }, ...]. The
+  // renderer uses this to drive the mode donut/drill-down palette and the
+  // mode -> productive/neutral/distracted rollup.
+  ipcMain.handle('get-all-modes', async () => {
+    try {
+      await hybridConnection.whenReady()
+      const categoriesService = hybridConnection.getCategoriesService()
+      return await categoriesService.getModes()
+    } catch (error) {
+      console.error('Error loading modes:', error)
+      return []
+    }
+  })
+
+  // Category -> default_mode map { categoryName: modeName } for getMode's fallback.
+  ipcMain.handle('get-category-default-modes', async () => {
+    try {
+      await hybridConnection.whenReady()
+      const categoriesService = hybridConnection.getCategoriesService()
+      return await categoriesService.getCategoryDefaultModes()
+    } catch (error) {
+      console.error('Error loading category default modes:', error)
+      return {}
+    }
+  })
+
   // --- Category + rule CRUD (Settings "Categories Management") ---
   // Broadcast so any open window refreshes its DB-driven category cache.
   const broadcastCategoriesUpdated = () => {
@@ -753,14 +788,65 @@ app.whenReady().then(async () => {
     }
   })
 
-  ipcMain.handle('rule-add', async (event, { pattern, category, matchType, priority }) => {
+  ipcMain.handle('rule-add', async (event, { pattern, category, matchType, priority, mode }) => {
     try {
       const svc = hybridConnection.getCategoriesService()
-      const result = await svc.addCategoryRule(pattern, category, matchType, priority)
+      const result = await svc.addCategoryRule(pattern, category, matchType, priority, mode)
       broadcastCategoriesUpdated()
       return result
     } catch (error) {
       console.error('Error adding category rule:', error)
+      return false
+    }
+  })
+
+  // --- Per-app work-mode (Level 2) overrides (Settings + Activity-row mode picker) ---
+  // Each mutation broadcasts categories-updated so every preload reloads its
+  // in-memory modeOverrides map and getMode honours the change on the next tick.
+  ipcMain.handle('mode-override-get', async () => {
+    try {
+      const svc = hybridConnection.getCategoriesService()
+      return await svc.getModeOverrides()
+    } catch (error) {
+      console.error('Error loading mode overrides:', error)
+      return {}
+    }
+  })
+
+  ipcMain.handle('mode-override-set', async (event, { appIdentifier, mode, matchType, pattern }) => {
+    try {
+      const svc = hybridConnection.getCategoriesService()
+      const result = await svc.setModeOverride(appIdentifier, mode)
+
+      // Also rewrite the MODE on existing app_usage rows so the change is visible
+      // immediately in the Activity table (not just on the next tracking tick).
+      // Without this the row re-reads its old stored mode on reload and appears to
+      // "not change". Mirrors the category retag. The pattern/matchType come from
+      // the preload (derived from the row like retagAppCategory); fall back to the
+      // identifier as an app-name match when they're absent.
+      const usageSvc = hybridConnection.getAppUsageService()
+      const effMatchType = matchType || 'app'
+      const effPattern = pattern || appIdentifier
+      const retagged = await usageSvc.retagModeByPattern(effMatchType, effPattern, mode)
+
+      broadcastCategoriesUpdated()
+      mainWindow?.webContents.send('app-category-updated', { pattern: effPattern, mode })
+
+      return { success: result === true, retagged }
+    } catch (error) {
+      console.error('Error setting mode override:', error)
+      return { success: false, error: error.message }
+    }
+  })
+
+  ipcMain.handle('mode-override-delete', async (event, { appIdentifier }) => {
+    try {
+      const svc = hybridConnection.getCategoriesService()
+      const result = await svc.removeModeOverride(appIdentifier)
+      broadcastCategoriesUpdated()
+      return result
+    } catch (error) {
+      console.error('Error deleting mode override:', error)
       return false
     }
   })

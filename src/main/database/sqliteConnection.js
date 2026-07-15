@@ -240,6 +240,50 @@ class SQLiteConnection extends DatabaseAdapter {
         await this.run('ALTER TABLE categories ADD COLUMN icon TEXT')
       }
 
+      // Work-mode (Level 2) migration for older databases. The `modes` table and
+      // its seed rows come from schema.sql via CREATE TABLE IF NOT EXISTS /
+      // INSERT OR IGNORE, so they self-apply; only the NEW COLUMNS on the
+      // pre-existing categories/category_rules tables need ALTER TABLE here.
+      if (!categoriesInfo.some((col) => col.name === 'default_mode')) {
+        console.log('Adding default_mode column to categories table...')
+        await this.run('ALTER TABLE categories ADD COLUMN default_mode TEXT')
+      }
+
+      const categoryRulesInfo = await this.all('PRAGMA table_info(category_rules)')
+      if (!categoryRulesInfo.some((col) => col.name === 'mode')) {
+        console.log('Adding mode column to category_rules table...')
+        await this.run('ALTER TABLE category_rules ADD COLUMN mode TEXT')
+      }
+
+      // Per-row Level-2 mode on app_usage. Old rows stay NULL; the renderer derives
+      // a mode from the category (getMode) when the stored value is absent, so
+      // history renders correctly without a backfill.
+      const appUsageInfo = await this.all('PRAGMA table_info(app_usage)')
+      if (!appUsageInfo.some((col) => col.name === 'mode')) {
+        console.log('Adding mode column to app_usage table...')
+        await this.run('ALTER TABLE app_usage ADD COLUMN mode TEXT')
+        await this.run('CREATE INDEX IF NOT EXISTS idx_app_usage_mode ON app_usage(mode)')
+      }
+
+      // Backfill default_mode on existing category rows that predate the column, so
+      // getMode() has a sensible Level-2 fallback for every built-in category. Only
+      // rows still NULL are touched, so user edits are never overwritten.
+      const modeDefaults = {
+        Code: 'Deep work',
+        Browsing: 'Deep work',
+        Communication: 'Collaboration',
+        Utilities: 'Break',
+        Entertainment: 'Distraction',
+        'Social Media': 'Distraction',
+        Miscellaneous: 'Break'
+      }
+      for (const [name, mode] of Object.entries(modeDefaults)) {
+        await this.run(
+          'UPDATE categories SET default_mode = ? WHERE name = ? AND default_mode IS NULL',
+          [mode, name]
+        )
+      }
+
       console.log('✅ Schema migrations completed successfully')
     } catch (error) {
       console.warn('Schema migration warning:', error.message)
@@ -581,7 +625,9 @@ class SQLiteConnection extends DatabaseAdapter {
     const tableMap = {
       'appUsage': 'app_usage',
       'categories': 'categories',
+      'modes': 'modes',
       'customCategoryMappings': 'custom_category_mappings',
+      'modeOverrides': 'mode_overrides',
       'categoryRules': 'category_rules',
       'focusSessions': 'focus_sessions',
       'focus_session_interruptions': 'focus_session_interruptions'
@@ -602,6 +648,10 @@ class SQLiteConnection extends DatabaseAdapter {
         'customCategory': 'custom_category',
         '_id': 'id'
       },
+      'modeOverrides': {
+        'appIdentifier': 'app_identifier',
+        '_id': 'id'
+      },
       'categoryRules': {
         '_id': 'id'
       },
@@ -620,6 +670,9 @@ class SQLiteConnection extends DatabaseAdapter {
         '_id': 'id'
       },
       'categories': {
+        '_id': 'id'
+      },
+      'modes': {
         '_id': 'id'
       }
     }

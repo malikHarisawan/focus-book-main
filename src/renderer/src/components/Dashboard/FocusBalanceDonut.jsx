@@ -1,12 +1,13 @@
 /**
  * FocusBalanceDonut — reference "Focus balance" card.
  *
- * An SVG donut of the productive / neutral / distracting split, with a legend
- * listing each segment and its time. Center shows the productive share.
+ * An SVG donut over an arbitrary set of segments (the dashboard feeds it the
+ * five work-modes: Deep work / Creative / Collaboration / Break / Distraction),
+ * with a legend listing each segment and its time. Center shows a headline share.
  *
  * Data in (all numeric, same unit the rest of the dashboard uses):
- *   segments: [{ name, value, color }]  — color is a CSS color string
- *   centerBig, centerSub                — text for the donut center
+ *   segments: [{ name, value, color, timeStr }]  — color is a CSS color string
+ *   centerBig, centerSub                         — text for the donut center
  */
 import { useState } from 'react'
 

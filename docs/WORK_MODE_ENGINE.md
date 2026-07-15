@@ -221,13 +221,33 @@ signals feed the scorer, both in-memory in the preload tracking loop — no new 
 - `getMode` / `getModeRollup` / `getModeColor` in `dataProcessor.js` (§4). Verdict seam
   untouched. Nothing renders yet, but modes resolve and roll up correctly.
 
-**Phase 2 — the scorer**
-- `src/main/classification/modeScorer.js` (pure) + `modeWeights.js` (§3).
-- Build the signature + `sessionLen`/`switchRate` in `src/preload/index.js` (§5); add the
-  signature cache. Track mode alongside category.
+**Phase 2 — the scorer — DONE**
+- `src/preload/classification/modeScorer.js` (pure, dependency-free) + `modeWeights.js`
+  (all tuning) + `modeScorer.test.js` (10 cases, run with `node`).
+- `getMode(signature)` resolver in `src/preload/index.js`: override → rule.mode →
+  scorer → category default, with a per-signature cache (FIFO, cap 500) that clears
+  on category/rule edits.
+- Signals: `sessionLen` (continuous-run tracker) + `switchRate` (5-min rolling ring
+  buffer of foreground switches), both in-memory in the tracking loop.
+- Mode is stored on each app record next to `category` in `updateAppTime` /
+  `updateChromeTime`, persisted to a new `app_usage.mode` column (migrated for old
+  DBs), and read back through `getAllAppUsageData` / `getAppUsageForDate`.
+- Verified: scorer cases pass, DB round-trip persists+reads mode end-to-end,
+  migrations idempotent, full build green.
 
-**Phase 3 — UI surfaces**
-- Mode donut (new), AreaChart drill-down, stat-card/summary mode totals (§4).
+**Phase 3 — UI surfaces — DONE**
+- `getModeTotals(jsonData, date, view)` in `dataProcessor.js` — per-mode seconds +
+  a rollup that reconciles EXACTLY with `getProductivityTotals` (verified).
+- `ModeBalanceDonut` — the 5-mode donut, colored by the design-system mode tokens
+  (`--c-deep/-create/-comms/-break/-distract`, theme-aware), center shows deep-focus
+  share. Wired into `productivity-overview` beside a "Time by mode" per-mode total grid.
+- AreaChart drill-down: `accumulateProductivity` now also accrues a `modes` split
+  onto EVERY chart point (via `emptyPoint`), and `CustomTooltip` renders a "By mode"
+  section. Inner mode sums equal the outer productive/distracting bands by construction.
+- Per-app mode comes from `app.mode` (Phase 2) with a `getMode(category)` fallback,
+  so old/unlabelled data still splits sensibly.
+- Verified: rollup reconciles to the exact productive/neutral/distracting totals,
+  full build green.
 
 **Phase 4 — tuning + settings**
 - `CategoryRulesPanel`: pin-a-mode UI. "Why this mode?" score-breakdown affordance.
@@ -241,8 +261,8 @@ signals feed the scorer, both in-memory in the preload tracking loop — no new 
 | `src/main/database/schema.sql` | `modes` table, seed rows, `category_rules.mode` column, default category→mode |
 | `src/main/database/localCategoriesService.js` | modes CRUD; expose `mode` on rules |
 | `src/preload/index.js` | build signature; `getMode`; cache; `sessionLen`/`switchRate` |
-| **`src/main/classification/modeScorer.js`** (new) | heuristic scorer |
-| **`src/main/classification/modeWeights.js`** (new) | tunable weight config |
+| **`src/preload/classification/modeScorer.js`** (new) | heuristic scorer |
+| **`src/preload/classification/modeWeights.js`** (new) | tunable weight config |
 | `src/renderer/src/utils/dataProcessor.js` | `getMode`/`getModeRollup`/`getModeColor` (additive; verdict seam untouched) |
 | **`FocusBalanceDonut` / new `ModeBalanceDonut`** | 5-mode donut |
 | `ProductiveAreaChart` | keep 3 bands; add mode drill-down on hover/click |

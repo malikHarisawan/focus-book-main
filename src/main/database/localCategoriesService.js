@@ -152,6 +152,92 @@ class LocalCategoriesService {
     })
   }
 
+  // --- Work-modes (Level 2) ---
+  // The five work-modes and their metadata are seeded in schema.sql; the renderer
+  // reads them to drive the mode donut/drill-down palette and the mode -> verdict
+  // rollup. Shape: { name, rollup, color, icon }. rollup is the source of truth for
+  // mode -> Level-1 (productive/neutral/distracted) so the AreaChart bands stay in
+  // sync without any hardcoded mapping in the renderer.
+  async getModes() {
+    return this.db.executeWithRetry(async () => {
+      const modes = await this.db.find('modes', {}, { sort: { name: 1 } })
+      return modes.map((m) => ({
+        name: m.name,
+        rollup: m.rollup,
+        color: m.color || null,
+        icon: m.icon || null
+      }))
+    })
+  }
+
+  // Update a mode's presentation/rollup by name (color/icon/rollup). The five mode
+  // names are fixed by the schema CHECK, so there is no add/delete — only edit.
+  async updateMode(name, updates) {
+    return this.db.executeWithRetry(async () => {
+      const set = {}
+      if (updates.rollup !== undefined) set.rollup = updates.rollup
+      if (updates.color !== undefined) set.color = updates.color
+      if (updates.icon !== undefined) set.icon = updates.icon
+      if (Object.keys(set).length === 0) return false
+      const result = await this.db.update('modes', { name: name }, { $set: set })
+      return (result.numReplaced || result) > 0
+    })
+  }
+
+  // The category -> default_mode lookup used by getMode's fallback layer. Returns a
+  // plain map { categoryName: modeName } so the renderer/preload can resolve a mode
+  // for any category without a per-row lookup.
+  async getCategoryDefaultModes() {
+    return this.db.executeWithRetry(async () => {
+      const categories = await this.db.find('categories', {})
+      const map = {}
+      categories.forEach((c) => {
+        if (c && c.name && c.default_mode) map[c.name] = c.default_mode
+      })
+      return map
+    })
+  }
+
+  // --- Per-app work-mode (Level 2) overrides ---
+  // Mirrors the custom-category-mapping methods but for MODE. The preload loads
+  // these into an in-memory map that getMode consults first (before rule/scorer/
+  // default), so a user pin takes effect on the next tracking tick. Keyed by the
+  // same identifier getMode looks up (appKey / domain / exe).
+
+  // Return all overrides as a plain { appIdentifier: modeName } map.
+  async getModeOverrides() {
+    return this.db.executeWithRetry(async () => {
+      const overrides = await this.db.find('modeOverrides', {})
+      const result = {}
+      overrides.forEach((o) => {
+        if (o && o.appIdentifier && o.mode) result[o.appIdentifier] = o.mode
+      })
+      return result
+    })
+  }
+
+  // Upsert a per-app mode override. Returns true on success.
+  async setModeOverride(appIdentifier, mode) {
+    return this.db.executeWithRetry(async () => {
+      if (!appIdentifier || !mode) return false
+      const existing = await this.db.findOne('modeOverrides', { appIdentifier })
+      if (existing) {
+        await this.db.update('modeOverrides', { appIdentifier }, { $set: { mode } })
+      } else {
+        await this.db.insert('modeOverrides', { appIdentifier, mode })
+      }
+      return true
+    })
+  }
+
+  // Remove a per-app mode override so the app falls back to rule/scorer/default.
+  async removeModeOverride(appIdentifier) {
+    return this.db.executeWithRetry(async () => {
+      const result = await this.db.remove('modeOverrides', { appIdentifier })
+      return result > 0
+    })
+  }
+
   async getCustomCategoryMappings() {
     return this.db.executeWithRetry(async () => {
       const mappings = await this.db.find('customCategoryMappings', {})
@@ -167,7 +253,9 @@ class LocalCategoriesService {
 
   // Return all classification rules. The preload sorts them for matching; here we
   // just surface the rows with a stable shape { id, pattern, category, match_type,
-  // priority }. id is included so the settings UI can edit/delete specific rules.
+  // priority, mode }. id is included so the settings UI can edit/delete specific
+  // rules. `mode` is the optional Level-2 override (null when the rule doesn't pin
+  // a work-mode; getMode then falls back to the category's default_mode).
   async getCategoryRules() {
     return this.db.executeWithRetry(async () => {
       const rules = await this.db.find('categoryRules', {})
@@ -176,26 +264,31 @@ class LocalCategoriesService {
         pattern: r.pattern,
         category: r.category,
         match_type: r.match_type || r.matchType,
-        priority: typeof r.priority === 'number' ? r.priority : 0
+        priority: typeof r.priority === 'number' ? r.priority : 0,
+        mode: r.mode || null
       }))
     })
   }
 
   // Add a classification rule. Returns true on insert, false if an identical
   // (pattern, match_type) already exists (the table's UNIQUE constraint).
-  async addCategoryRule(pattern, category, matchType = 'keyword', priority = 0) {
+  // `mode` (optional) pins a Level-2 work-mode on the rule; null/undefined leaves
+  // it unset so getMode falls back to the category's default_mode.
+  async addCategoryRule(pattern, category, matchType = 'keyword', priority = 0, mode = null) {
     return this.db.executeWithRetry(async () => {
       const existing = await this.db.findOne('categoryRules', {
         pattern: pattern,
         match_type: matchType
       })
       if (existing) return false
-      await this.db.insert('categoryRules', {
+      const row = {
         pattern: pattern,
         category: category,
         match_type: matchType,
         priority: priority
-      })
+      }
+      if (mode) row.mode = mode
+      await this.db.insert('categoryRules', row)
       return true
     })
   }
@@ -238,6 +331,7 @@ class LocalCategoriesService {
       if (updates.priority !== undefined) set.priority = updates.priority
       if (updates.pattern !== undefined) set.pattern = updates.pattern
       if (updates.match_type !== undefined) set.match_type = updates.match_type
+      if (updates.mode !== undefined) set.mode = updates.mode
       if (Object.keys(set).length === 0) return false
       const result = await this.db.update('categoryRules', { _id: id }, { $set: set })
       return (result.numReplaced || 0) > 0

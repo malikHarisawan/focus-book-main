@@ -15,11 +15,23 @@
  *   date: 'YYYY-MM-DD'
  */
 import { useMemo, useState } from 'react'
-import { getProductivity } from '../../utils/dataProcessor'
+import { getMode } from '../../utils/dataProcessor'
 
-// Productivity → design category color.
-const prodColor = (p) =>
-  p === 'Productive' ? 'var(--c-deep)' : p === 'Distracting' ? 'var(--c-distract)' : 'var(--c-comms)'
+// The five work-modes in canonical order, each mapped to its design-system color
+// token (theme-aware) so the timeline matches the Focus-balance donut.
+const MODE_ORDER = ['Deep work', 'Creative', 'Collaboration', 'Break', 'Distraction']
+const MODE_TOKEN = {
+  'Deep work': 'var(--c-deep)',
+  Creative: 'var(--c-create)',
+  Collaboration: 'var(--c-comms)',
+  Break: 'var(--c-break)',
+  Distraction: 'var(--c-distract)'
+}
+const modeColor = (mode) => MODE_TOKEN[mode] || 'var(--fb-muted)'
+
+// Resolve an app record to its work-mode, mirroring dataProcessor's modeForApp
+// (an explicit app.mode wins, else the category's default mode).
+const modeForApp = (app) => (app && app.mode ? app.mode : getMode(app ? app.category : undefined))
 
 // Minutes-since-midnight → "2:39 PM".
 const clock = (mins) => {
@@ -54,7 +66,7 @@ function buildSegments(rawData, date) {
   const day = rawData?.[date]
   if (!day) return { segments: [], startHour: 8, endHour: 19 }
 
-  const segments = [] // { startMin, endMin, productivity, category, label, ms, approx }
+  const segments = [] // { startMin, endMin, mode, category, label, ms, approx }
 
   for (const [key, hourData] of Object.entries(day)) {
     if (key === 'apps') continue
@@ -63,7 +75,7 @@ function buildSegments(rawData, date) {
 
     for (const [name, d] of Object.entries(hourData)) {
       const label = d.domain || d.description || name
-      const productivity = getProductivity(d.category)
+      const mode = modeForApp(d)
       const stamps = Array.isArray(d.timestamps) ? d.timestamps : []
 
       // Prefer real timestamps: each is an actual usage moment.
@@ -76,7 +88,7 @@ function buildSegments(rawData, date) {
           segments.push({
             startMin: ts.start,
             endMin: ts.start + ts.durMin,
-            productivity,
+            mode,
             category: d.category,
             label,
             ms: ts.durMin * 60000,
@@ -90,7 +102,7 @@ function buildSegments(rawData, date) {
         segments.push({
           startMin: hour * 60,
           endMin: hour * 60 + Math.min(60, durMin),
-          productivity,
+          mode,
           category: d.category,
           label,
           ms: d.time,
@@ -113,16 +125,16 @@ function buildSegments(rawData, date) {
   return { segments, startHour, endHour }
 }
 
-// Merge adjacent/overlapping segments that share the same productivity into one
+// Merge adjacent/overlapping segments that share the same work-mode into one
 // block, tracking the real span and total active time. Keeps the label of the
 // longest-running app in the run.
 function mergeBlocks(segments) {
   const blocks = []
   for (const seg of segments) {
     const last = blocks[blocks.length - 1]
-    // Merge when the same productivity and this segment starts before/at the
-    // running block's end (with a small 2-minute tolerance for tick gaps).
-    if (last && last.productivity === seg.productivity && seg.startMin <= last.endMin + 2) {
+    // Merge when the same mode and this segment starts before/at the running
+    // block's end (with a small 2-minute tolerance for tick gaps).
+    if (last && last.mode === seg.mode && seg.startMin <= last.endMin + 2) {
       last.endMin = Math.max(last.endMin, seg.endMin)
       last.totalMs += seg.ms
       last.approx = last.approx || seg.approx
@@ -135,7 +147,7 @@ function mergeBlocks(segments) {
       blocks.push({
         startMin: seg.startMin,
         endMin: seg.endMin,
-        productivity: seg.productivity,
+        mode: seg.mode,
         category: seg.category,
         label: seg.label,
         totalMs: seg.ms,
@@ -165,9 +177,9 @@ export default function DayTimeline({ rawData, date }) {
       i,
       left: ((b.startMin - START) / SPAN) * 100,
       width: Math.max(0.6, ((b.endMin - b.startMin) / SPAN) * 100),
-      color: prodColor(b.productivity),
+      color: modeColor(b.mode),
       label: b.label,
-      cat: b.productivity,
+      cat: b.mode,
       range: `${prefix}${clock(b.startMin)} – ${clock(b.endMin)}`,
       dur: fmtDur(durMin),
       opacity: hover == null || hover === i ? 1 : 0.38
@@ -186,11 +198,11 @@ export default function DayTimeline({ rawData, date }) {
 
   return (
     <div>
-      {/* Legend */}
+      {/* Legend — the five work-modes, colored to match the Focus-balance donut. */}
       <div className="flex gap-4 flex-wrap mb-4">
-        <Legend color="var(--c-deep)" label="Productive" />
-        <Legend color="var(--c-comms)" label="Neutral" />
-        <Legend color="var(--c-distract)" label="Distracting" />
+        {MODE_ORDER.map((m) => (
+          <Legend key={m} color={MODE_TOKEN[m]} label={m} />
+        ))}
       </div>
 
       <div className="relative">

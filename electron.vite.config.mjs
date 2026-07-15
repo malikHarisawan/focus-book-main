@@ -72,7 +72,26 @@ export default defineConfig({
     ]
   },
   preload: {
-    plugins: [externalizeDepsPlugin()]
+    plugins: [
+      externalizeDepsPlugin(),
+      {
+        // electron-vite leaves `require('./classification/modeScorer')` in the built
+        // preload as an external require (it does not inline relative requires under
+        // externalizeDepsPlugin). So we must physically emit those files next to the
+        // built preload, or it crashes on load (blank screen — window.activeWindow /
+        // electronAPI never get exposed). This mirrors the copy-database-files plugin.
+        name: 'copy-preload-classification',
+        closeBundle() {
+          const srcDir = resolve('src/preload/classification')
+          const outDir = resolve('out/preload/classification')
+          if (existsSync(srcDir)) {
+            if (!existsSync(outDir)) mkdirSync(outDir, { recursive: true })
+            cpSync(srcDir, outDir, { recursive: true })
+            console.log('Copied preload classification files to', outDir)
+          }
+        }
+      }
+    ]
   },
   renderer: {
     resolve: {

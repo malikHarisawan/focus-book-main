@@ -3,6 +3,7 @@ const activeWindows = require('electron-active-window')
 import APP_CATEGORIES from './categories'
 const { execFile } = require('child_process')
 const util = require('util')
+const { scoreSignature } = require('./classification/modeScorer')
 const execFilePromise = util.promisify(execFile)
 let appUsageData = {}
 let lastActiveApp = null
@@ -11,10 +12,60 @@ let Distracted_List = ['Entertainment']
 let customCategoryMappings = {}
 let exclusionList = { apps: [], domains: [] }
 // DB-driven classification rules, loaded from the category_rules table. Each rule
-// is { pattern, category, match_type: 'app'|'keyword', priority }. Falls back to
-// the hardcoded APP_CATEGORIES only if the table is empty/unreachable. See the
+// is { pattern, category, match_type: 'app'|'keyword', priority, mode }. Falls back
+// to the hardcoded APP_CATEGORIES only if the table is empty/unreachable. See the
 // categorization design notes; getCategory consumes this.
 let categoryRules = []
+
+// --- Work-mode (Level 2) tracking state ---
+// category -> default_mode map from the DB; the fallback layer of getMode when the
+// scorer is low-confidence and no rule/override pins a mode.
+let categoryDefaultModes = {}
+// user per-app mode overrides { appIdentifier: modeName } (Phase 4 wires the UI;
+// the resolver already honours them so pins take effect immediately once set).
+let modeOverrides = {}
+// Rolling buffer of foreground-app-switch timestamps (ms) used to derive switchRate.
+// Trimmed to the scorer's window on every read; capped so it can't grow unbounded.
+let switchTimestamps = []
+const SWITCH_WINDOW_MS = 5 * 60 * 1000
+// Continuous run tracking for sessionLen: the current foreground app key and when
+// that continuous run began. Reset whenever the foreground app changes.
+let currentRunKey = null
+let currentRunStart = Date.now()
+// Cache of scorer verdicts keyed by a stable signature hash, so the pure scorer is
+// consulted once per unique context rather than every tracking tick.
+const modeCache = new Map()
+const MODE_CACHE_MAX = 500
+
+// Record a foreground-app switch and return the number of switches within the
+// rolling window (the switchRate signal). `now` is injectable for testing.
+function recordSwitchAndRate(now = Date.now()) {
+  switchTimestamps.push(now)
+  const cutoff = now - SWITCH_WINDOW_MS
+  // Drop entries older than the window; keep the array bounded.
+  switchTimestamps = switchTimestamps.filter((t) => t >= cutoff)
+  if (switchTimestamps.length > 1000) {
+    switchTimestamps = switchTimestamps.slice(-1000)
+  }
+  return switchTimestamps.length
+}
+
+// How many switches fall in the current window without recording a new one.
+function currentSwitchRate(now = Date.now()) {
+  const cutoff = now - SWITCH_WINDOW_MS
+  return switchTimestamps.filter((t) => t >= cutoff).length
+}
+
+// Continuous run length (ms) for the given app key. When the key changes, the run
+// resets to now; otherwise it accumulates since the run began.
+function sessionLenFor(appKey, now = Date.now()) {
+  if (appKey !== currentRunKey) {
+    currentRunKey = appKey
+    currentRunStart = now
+    return 0
+  }
+  return now - currentRunStart
+}
 
 // Chromium browsers whose active tab is enriched by the extension bridge.
 // Extracting this set widens support to Edge without duplicating the
@@ -399,6 +450,9 @@ async function updateAppUsage() {
       console.log(
         `App switched: From ${lastActiveApp ? lastActiveApp.windowClass : 'unknown'} to ${currentAppClass}`
       )
+      // Feed the switchRate signal used by the mode scorer: a genuine foreground
+      // change is one tick in the rolling 5-minute churn window.
+      recordSwitchAndRate()
     }
 
     let appIdentifier = isBrowserExe(currentWindow.windowClass)
@@ -694,10 +748,25 @@ function updateAppTime(
   // classification is unaffected.
   const appKey = resolveDisplayName(description, appClass)
 
+  // Level-2 work-mode. Build a signature from what we know about this non-browser
+  // context and resolve via the layered getMode (override -> rule -> scorer ->
+  // category default). sessionLen/switchRate come from the in-memory trackers.
+  const appMode = getMode({
+    exe: appClass,
+    appName: appKey,
+    appKey,
+    category: appCategory,
+    title: description || appKey,
+    hour: new Date().getHours(),
+    sessionLen: sessionLenFor(appKey),
+    switchRate: currentSwitchRate()
+  })
+
   if (!appUsageData[formattedDate].apps.hasOwnProperty(appKey)) {
     appUsageData[formattedDate].apps[appKey] = {
       time: 0,
       category: appCategory,
+      mode: appMode,
       description: description,
       timestamps: []
     }
@@ -705,6 +774,7 @@ function updateAppTime(
 
   appUsageData[formattedDate].apps[appKey].time += timeSpent
   appUsageData[formattedDate].apps[appKey].category = appCategory
+  appUsageData[formattedDate].apps[appKey].mode = appMode
 
   // Only add timestamps when app is switched or on first entry
   if (hasAppSwitched || appUsageData[formattedDate].apps[appKey].timestamps.length === 0) {
@@ -739,6 +809,7 @@ function updateAppTime(
     appUsageData[formattedDate][formattedHour][appKey] = {
       time: 0,
       category: appCategory,
+      mode: appMode,
       description: description,
       timestamps: []
     }
@@ -746,6 +817,7 @@ function updateAppTime(
 
   appUsageData[formattedDate][formattedHour][appKey].time += timeSpent
   appUsageData[formattedDate][formattedHour][appKey].category = appCategory
+  appUsageData[formattedDate][formattedHour][appKey].mode = appMode
 
   const timestamps = appUsageData[formattedDate][formattedHour][appKey].timestamps
 
@@ -827,10 +899,28 @@ function updateChromeTime(
       ? getCategory(description || 'Browsing')
       : getCategory(active_url || appKey || description || windowName)
 
+  // Level-2 work-mode for the browser tab. The title + domain + url give the scorer
+  // its richest signal (e.g. 'Zoom Meeting' on zoom.us -> Collaboration even though
+  // the category is Browsing). Private tabs have no URL/title to inspect, so they
+  // resolve off the category default via getMode's fallback.
+  const chromeMode = getMode({
+    exe: 'chrome.exe',
+    appName: appKey,
+    appKey,
+    category: chromeCategory,
+    title: browserSource === 'private' ? description : windowName,
+    domain: active_domain || active_url,
+    url: active_url,
+    hour: new Date().getHours(),
+    sessionLen: sessionLenFor(appKey),
+    switchRate: currentSwitchRate()
+  })
+
   if (!appUsageData[formattedDate].apps.hasOwnProperty(appKey)) {
     appUsageData[formattedDate].apps[appKey] = {
       time: 0,
       category: chromeCategory,
+      mode: chromeMode,
       domain: active_domain || active_url,
       description: description,
       degraded: isDegraded,
@@ -841,6 +931,7 @@ function updateChromeTime(
 
   appUsageData[formattedDate].apps[appKey].time += timeSpent
   appUsageData[formattedDate].apps[appKey].category = chromeCategory
+  appUsageData[formattedDate].apps[appKey].mode = chromeMode
 
   console.log(`Updated time for ${appKey}: ${appUsageData[formattedDate].apps[appKey].time}ms`)
 
@@ -877,6 +968,7 @@ function updateChromeTime(
     appUsageData[formattedDate][formattedHour][appKey] = {
       time: 0,
       category: chromeCategory,
+      mode: chromeMode,
       domain: active_domain || active_url,
       description: description,
       degraded: isDegraded,
@@ -886,6 +978,7 @@ function updateChromeTime(
 
   appUsageData[formattedDate][formattedHour][appKey].time += timeSpent
   appUsageData[formattedDate][formattedHour][appKey].category = chromeCategory
+  appUsageData[formattedDate][formattedHour][appKey].mode = chromeMode
 
   const timestamps = appUsageData[formattedDate][formattedHour][appKey].timestamps
 
@@ -1018,6 +1111,18 @@ loadCategoryRules().then((rules) => {
   console.log(`Loaded ${rules.length} category rules from DB`)
 })
 
+// Load the category -> default_mode map that backs getMode's fallback layer.
+loadCategoryDefaultModes().then((map) => {
+  categoryDefaultModes = map
+  console.log('Loaded category default modes:', map)
+})
+
+// Load per-app work-mode overrides so getMode honours user pins from the start.
+loadModeOverrides().then((map) => {
+  modeOverrides = map
+  console.log('Loaded mode overrides:', map)
+})
+
 loadExclusionList().then((list) => {
   exclusionList = list
   console.log('Loaded exclusion list:', list)
@@ -1064,6 +1169,79 @@ function getCategory(app) {
   }
 
   return 'Miscellaneous'
+}
+
+// Find the first category_rule whose pattern matches the given text, in the same
+// pre-sorted order getCategory uses (app rules first, then priority). Returns the
+// rule object so callers can read its optional `mode` pin. Null when nothing matches.
+function matchCategoryRule(text) {
+  const title = String(text || '').toLowerCase()
+  if (!title) return null
+  for (const rule of categoryRules) {
+    if (rule.pattern && title.includes(String(rule.pattern).toLowerCase())) {
+      return rule
+    }
+  }
+  return null
+}
+
+// Stable hash for the scorer cache: identical contexts share a verdict. Session/
+// switch signals are bucketed (not raw) so near-identical states reuse the cache
+// while genuinely different focus/churn states re-score.
+function signatureCacheKey(sig) {
+  const focusBucket = (sig.sessionLen || 0) >= 15 * 60 * 1000 ? 'long' : 'short'
+  const churnBucket = (sig.switchRate || 0) >= 6 ? 'high' : (sig.switchRate || 0) <= 1 ? 'calm' : 'mid'
+  return [
+    (sig.exe || '').toLowerCase(),
+    (sig.category || ''),
+    (sig.domain || '').toLowerCase(),
+    (sig.title || '').toLowerCase().slice(0, 80),
+    focusBucket,
+    churnBucket
+  ].join('|')
+}
+
+// Resolve the Level-2 work-mode for a signature. Layered, first hit wins:
+//   1. user per-app mode override
+//   2. a matching rule that pins a mode (category_rules.mode)
+//   3. the heuristic scorer, when it is confident
+//   4. the category's default_mode (from the DB), else the scorer's best guess
+// Never throws; always returns a mode string.
+function getMode(signature) {
+  const sig = signature || {}
+
+  // 1. User override (per app identifier / domain / exe).
+  const overrideKey = sig.appKey || sig.domain || sig.exe
+  if (overrideKey && modeOverrides[overrideKey]) {
+    return modeOverrides[overrideKey]
+  }
+
+  // 2. Rule-pinned mode. Match against the same haystack getCategory sees.
+  const rule = matchCategoryRule(sig.title || sig.url || sig.domain || sig.exe)
+  if (rule && rule.mode) {
+    return rule.mode
+  }
+
+  // 3 + 4. Scorer with cache, falling back to the category default when the scorer
+  //        is not confident enough to trust its guess.
+  const key = signatureCacheKey(sig)
+  let verdict = modeCache.get(key)
+  if (!verdict) {
+    verdict = scoreSignature(sig)
+    if (modeCache.size >= MODE_CACHE_MAX) {
+      // Simple FIFO eviction: drop the oldest inserted key.
+      const oldest = modeCache.keys().next().value
+      if (oldest !== undefined) modeCache.delete(oldest)
+    }
+    modeCache.set(key, verdict)
+  }
+
+  if (verdict && !verdict.lowConfidence && verdict.mode) {
+    return verdict.mode
+  }
+
+  // 4. Fallback: category default_mode, else the scorer's best-effort mode, else Break.
+  return categoryDefaultModes[sig.category] || (verdict && verdict.mode) || 'Break'
 }
 
 function getCategoryColor(cat) {
@@ -1316,6 +1494,91 @@ async function loadAllCategories() {
   }
 }
 
+// Work-modes (Level 2) metadata for the renderer: [{ name, rollup, color, icon }].
+// Drives the mode donut/drill-down palette and the mode -> verdict rollup.
+async function loadAllModes() {
+  try {
+    const data = await ipcRenderer.invoke('get-all-modes')
+    return Array.isArray(data) ? data : []
+  } catch (error) {
+    console.error('Error loading modes:', error)
+    return []
+  }
+}
+
+// Category -> default_mode map { categoryName: modeName }, the fallback layer of
+// getMode when no rule/override pins a work-mode.
+async function loadCategoryDefaultModes() {
+  try {
+    const data = await ipcRenderer.invoke('get-category-default-modes')
+    return data && typeof data === 'object' ? data : {}
+  } catch (error) {
+    console.error('Error loading category default modes:', error)
+    return {}
+  }
+}
+
+// Per-app work-mode overrides { appIdentifier: modeName }. getMode consults this
+// map FIRST (before rule/scorer/default), so a user pin takes effect on the next
+// tracking tick. Loaded at startup and reloaded on categories-updated.
+async function loadModeOverrides() {
+  try {
+    const data = await ipcRenderer.invoke('mode-override-get')
+    return data && typeof data === 'object' ? data : {}
+  } catch (error) {
+    console.error('Error loading mode overrides:', error)
+    return {}
+  }
+}
+
+// --- Mode-override CRUD wrappers (used by the Activity-row picker + Settings) ---
+async function getModeOverrides() {
+  return loadModeOverrides()
+}
+// Pin a per-app work-mode. Beyond saving the override (which the tracker's getMode
+// honours on future ticks), this ALSO retags existing app_usage rows so the change
+// shows immediately in the Activity table — mirroring retagAppCategory. `app` is the
+// optional row object ({ name, domain, description }); when provided we derive the
+// same matchType/pattern the category retag uses so a browser row retags the whole
+// site and a native app retags by name.
+async function setModeOverride(appIdentifier, mode, app) {
+  try {
+    let matchType = 'app'
+    let pattern = appIdentifier
+    if (app) {
+      const domain = app.domain ? toRuleDomain(app.domain) : ''
+      matchType = domain ? 'domain' : 'app'
+      pattern = domain || app.name || app.description || appIdentifier
+    }
+
+    // Flush in-memory tracking to the DB first, so the retag covers today's
+    // not-yet-persisted rows and the reload below doesn't discard them.
+    await saveData()
+
+    const result = await ipcRenderer.invoke('mode-override-set', {
+      appIdentifier,
+      mode,
+      matchType,
+      pattern
+    })
+
+    // Refresh this preload's override cache so live tracking pins immediately.
+    modeOverrides = await loadModeOverrides()
+
+    // Reload the in-memory appUsageData snapshot from the (now-retagged) DB, so the
+    // renderer's post-change refresh reads the new mode instead of the stale copy.
+    await loadData()
+
+    return result && result.success !== false
+  } catch (error) {
+    console.error('Error in setModeOverride:', error)
+    return false
+  }
+}
+async function removeModeOverride(appIdentifier) {
+  return ipcRenderer.invoke('mode-override-delete', { appIdentifier })
+}
+
 // --- Category + rule CRUD wrappers (used by Settings) ---
 async function addCategory(name, type, color, icon) {
   return ipcRenderer.invoke('category-add', { name, type, color, icon })
@@ -1330,8 +1593,8 @@ async function getCategoryRules() {
   const rules = await ipcRenderer.invoke('load-category-rules')
   return Array.isArray(rules) ? rules : []
 }
-async function addCategoryRule(pattern, category, matchType, priority) {
-  return ipcRenderer.invoke('rule-add', { pattern, category, matchType, priority })
+async function addCategoryRule(pattern, category, matchType, priority, mode) {
+  return ipcRenderer.invoke('rule-add', { pattern, category, matchType, priority, mode })
 }
 async function updateCategoryRule(id, updates) {
   return ipcRenderer.invoke('rule-update', { id, updates })
@@ -1494,14 +1757,21 @@ contextBridge.exposeInMainWorld('activeWindow', {
   },
   loadCategories: () => loadCategories(),
   loadAllCategories: () => loadAllCategories(),
+  loadAllModes: () => loadAllModes(),
+  loadCategoryDefaultModes: () => loadCategoryDefaultModes(),
   addCategory: (name, type, color, icon) => addCategory(name, type, color, icon),
   updateCategory: (name, updates) => updateCategory(name, updates),
   deleteCategory: (name) => deleteCategory(name),
   getCategoryRules: () => getCategoryRules(),
-  addCategoryRule: (pattern, category, matchType, priority) =>
-    addCategoryRule(pattern, category, matchType, priority),
+  addCategoryRule: (pattern, category, matchType, priority, mode) =>
+    addCategoryRule(pattern, category, matchType, priority, mode),
   updateCategoryRule: (id, updates) => updateCategoryRule(id, updates),
   deleteCategoryRule: (id) => deleteCategoryRule(id),
+  // Per-app work-mode (Level 2) overrides — set from the Activity-row mode picker
+  // or reviewed/cleared in Settings. getMode honours these before rule/scorer/default.
+  getModeOverrides: () => getModeOverrides(),
+  setModeOverride: (appIdentifier, mode, app) => setModeOverride(appIdentifier, mode, app),
+  removeModeOverride: (appIdentifier) => removeModeOverride(appIdentifier),
   refreshData: () => loadData(),
   updateAppCategory: (appIdentifier, category, selectedDate, appToUpdate) =>
     updateAppCategory(appIdentifier, category, selectedDate, appToUpdate),
@@ -1709,6 +1979,16 @@ ipcRenderer.on('categories-updated', (event, categories) => {
     categoryRules = rules
     console.log(`Reloaded ${rules.length} category rules after update`)
   })
+  // Reload mode fallbacks and clear the scorer cache, since rule/category edits can
+  // change a signature's resolved mode.
+  loadCategoryDefaultModes().then((map) => {
+    categoryDefaultModes = map
+  })
+  // Reload per-app mode overrides so a pin set in the UI applies without a restart.
+  loadModeOverrides().then((map) => {
+    modeOverrides = map
+  })
+  modeCache.clear()
 })
 
 // Listen for exclusion list updates from main process

@@ -15,12 +15,25 @@ import {
   processProductiveChartData,
   processCustomRangeChartData,
   getProductivityTotals,
+  getModeTotals,
   getDatesForView,
   processMostUsedApps,
   refreshCategoryMapping,
   getProductivity,
   formatTime
 } from '../../utils/dataProcessor'
+
+// The five work-modes in canonical display order, each mapped to its design-system
+// color token (theme-aware) so the donut and any per-mode chips stay consistent
+// with the rest of the dashboard. Order matches the donut arc order.
+const MODE_ORDER = ['Deep work', 'Creative', 'Collaboration', 'Break', 'Distraction']
+const MODE_TOKEN = {
+  'Deep work': 'var(--c-deep)',
+  Creative: 'var(--c-create)',
+  Collaboration: 'var(--c-comms)',
+  Break: 'var(--c-break)',
+  Distraction: 'var(--c-distract)'
+}
 
 // Format a millisecond/second total the same way the shipped dashboard does
 // (the stored app.time values are treated as seconds by the existing cards).
@@ -105,7 +118,7 @@ export default function ProductivityOverview() {
 
   // Summary totals for the effective window. Day/Week/Month use the shared
   // aggregator; Custom sums the per-day points we already computed for the chart.
-  const { productiveSeconds, neutralSeconds, distractingSeconds, totalSeconds } = useMemo(() => {
+  const { productiveSeconds, distractingSeconds, totalSeconds } = useMemo(() => {
     if (effectiveView === 'custom') {
       const t = customRangeData.reduce(
         (acc, p) => {
@@ -191,12 +204,36 @@ export default function ProductivityOverview() {
     return seen.size
   }, [rawData, windowDates])
 
-  // Donut segments — the productive / neutral / distracting split (numeric).
-  const donutSegments = [
-    { name: 'Productive', value: productiveSeconds, color: 'var(--c-deep)', timeStr: hm(productiveSeconds) },
-    { name: 'Neutral', value: neutralSeconds, color: 'var(--c-comms)', timeStr: hm(neutralSeconds) },
-    { name: 'Distracting', value: distractingSeconds, color: 'var(--c-distract)', timeStr: hm(distractingSeconds) }
-  ].filter((s) => s.value > 0)
+  // Work-mode totals for the current window. For a custom range we sum the
+  // per-day totals; otherwise getModeTotals handles the view window directly.
+  const modeTotals = useMemo(() => {
+    const empty = { 'Deep work': 0, Creative: 0, Collaboration: 0, Break: 0, Distraction: 0 }
+    if (effectiveView === 'custom') {
+      const acc = { ...empty }
+      for (const d of windowDates) {
+        const { byMode } = getModeTotals(rawData, d, 'day')
+        for (const m of MODE_ORDER) acc[m] += byMode[m] || 0
+      }
+      return acc
+    }
+    return getModeTotals(rawData, selectedDate, effectiveView).byMode
+    // windowDates already reflects the effective window; recompute on any change.
+  }, [effectiveView, rawData, selectedDate, windowDates])
+
+  // Mode donut segments in canonical order, colored by the design-system tokens.
+  const modeSegments = MODE_ORDER.map((name) => ({
+    name,
+    value: modeTotals[name] || 0,
+    color: MODE_TOKEN[name],
+    timeStr: hm(modeTotals[name] || 0)
+  })).filter((s) => s.value > 0)
+
+  // "Focus" share for the mode donut center = deep-focus modes (Deep work +
+  // Creative) as a share of all tracked mode time. Distinct from the top focus
+  // score (productive vs distracted); this answers "how much was deep work?".
+  const modeTotalSecs = MODE_ORDER.reduce((s, m) => s + (modeTotals[m] || 0), 0)
+  const deepFocusSecs = (modeTotals['Deep work'] || 0) + (modeTotals['Creative'] || 0)
+  const deepFocusShare = modeTotalSecs > 0 ? Math.round((deepFocusSecs / modeTotalSecs) * 100) : 0
 
   // Activity log — app list for the effective window. For a single day we reuse
   // processMostUsedApps; for multi-day windows we aggregate app time across all
@@ -485,10 +522,10 @@ export default function ProductivityOverview() {
       {/* Balance / trend / activity */}
       <section className="grid grid-cols-1 lg:grid-cols-[1fr_1.25fr_1.1fr] gap-4 items-stretch">
         <FocusBalanceDonut
-          segments={donutSegments}
-          centerBig={`${score}%`}
-          centerSub="productive"
-          subtitle={multiDay ? `${scopeLabel} · productive vs distracted` : 'Productive vs distracted'}
+          segments={modeSegments}
+          centerBig={`${deepFocusShare}%`}
+          centerSub="deep focus"
+          subtitle={multiDay ? `${scopeLabel} · how you worked` : 'How you worked'}
         />
         <FocusTrendBars
           days={trendDays.days}

@@ -17,6 +17,17 @@
 import React from 'react'
 import { formatTooltipValue, getTooltipTitle } from '../utils/selectionUtils'
 
+// The five work-modes in display order, each with its design-system color token
+// (theme-aware) and the productivity band it rolls up into. Drives the tooltip's
+// Level-2 drill-down so the mode split reconciles with the Focused/Distracted rows.
+const MODE_META = [
+  { name: 'Deep work', color: 'var(--c-deep)', band: 'productive' },
+  { name: 'Creative', color: 'var(--c-create)', band: 'productive' },
+  { name: 'Collaboration', color: 'var(--c-comms)', band: 'productive' },
+  { name: 'Break', color: 'var(--c-break)', band: 'neutral' },
+  { name: 'Distraction', color: 'var(--c-distract)', band: 'distracting' }
+]
+
 const CustomTooltip = ({ active, payload, label, aggregatedData, hasSelection, zoomLevel, zoomLevelDetail }) => {
   if (!active || !payload || payload.length === 0) return null
 
@@ -27,6 +38,15 @@ const CustomTooltip = ({ active, payload, label, aggregatedData, hasSelection, z
   const productiveSeconds = pointData.productive || 0
   const distractingSeconds = pointData.distracting || 0
   const totalSeconds = productiveSeconds + distractingSeconds
+
+  // Level-2 drill-down: the per-mode split accrued onto every chart point. Show
+  // only the modes with time, in canonical order. Deep-work/Creative/Collaboration
+  // sum to the Focused row; Distraction to the Distracted row (Break is neutral and
+  // not drawn on the chart, so it can appear here without matching a band).
+  const modeSplit = pointData.modes || {}
+  const modeRows = MODE_META.map((m) => ({ ...m, seconds: modeSplit[m.name] || 0 })).filter(
+    (m) => m.seconds > 0
+  )
 
   const productiveTime = formatTooltipValue(productiveSeconds)
   const distractingTime = formatTooltipValue(distractingSeconds)
@@ -70,6 +90,24 @@ const CustomTooltip = ({ active, payload, label, aggregatedData, hasSelection, z
             >
               {productivePercentage}%
             </span>
+          </div>
+        )}
+
+        {/* Level-2 work-mode drill-down for this point. */}
+        {modeRows.length > 0 && (
+          <div className="pt-2 mt-1.5 border-t border-white/15 space-y-1">
+            <div className="text-white/50 text-[11px] uppercase tracking-wide mb-1">By mode</div>
+            {modeRows.map((m) => (
+              <div key={m.name} className="flex items-center justify-between gap-4">
+                <div className="flex items-center gap-2">
+                  <div className="w-2 h-2 rounded-full" style={{ background: m.color }} />
+                  <span className="text-white/70 text-[13px]">{m.name}</span>
+                </div>
+                <span className="text-white text-[13px] font-medium">
+                  {formatTooltipValue(m.seconds)}
+                </span>
+              </div>
+            ))}
           </div>
         )}
       </div>

@@ -134,14 +134,15 @@ export function Sidebar({ productivityScore, dailyGoalProgress, weeklyGoalProgre
         <nav className="space-y-0.5">
           <NavItem href="/" icon={Command} label="Dashboard" active={pathname === '/'} collapsed={collapsed} />
           <NavItem
-            href="/activity"
+            href="/apps"
             icon={Activity}
-            label="Activities"
-            active={pathname === '/activity'}
+            label="Apps"
+            active={pathname === '/apps' || pathname === '/activity'}
             collapsed={collapsed}
           />
           <NavItem href="/focus" icon={Timer} label="Focus Timer" active={pathname === '/focus'} collapsed={collapsed} />
-          <NavItem href="/chat" icon={MessageSquare} label="AI Insights" active={pathname === '/chat'} collapsed={collapsed} />
+          {/* AI service disabled — AI Insights entry hidden. Restore this NavItem to re-enable. */}
+          {/* <NavItem href="/chat" icon={MessageSquare} label="AI Insights" active={pathname === '/chat'} collapsed={collapsed} /> */}
           <NavItem
             href="/settings"
             icon={Settings}

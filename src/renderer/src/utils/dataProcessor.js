@@ -11,9 +11,54 @@ let categoryColorMap = {}
 let categoryIconMap = {}
 let categoryList = [] // [{ name, type, color, icon }, ...]
 
+// Work-mode (Level 2) caches. These are ADDITIVE — the category/verdict caches
+// above are untouched, so the AreaChart and every getProductivity* consumer keep
+// working exactly as before. Modes are a finer level that rolls up into the verdict.
+let categoryModeMap = {} // category name -> default mode (from categories.default_mode)
+let modeRollupMap = {} // mode name -> 'productive' | 'distracted' | 'neutral'
+let modeColorMap = {} // mode name -> hex color
+let modeIconMap = {} // mode name -> lucide icon name
+let modeList = [] // [{ name, rollup, color, icon }, ...]
+
 // Sensible defaults when the DB has no color/icon for a category, or is offline.
 const DEFAULT_CATEGORY_COLOR = '#7a7a7a'
 const DEFAULT_CATEGORY_ICON = 'Package'
+
+// Fallbacks so the mode seam degrades gracefully when the DB is unreachable. These
+// mirror the schema seed (modes table + categories.default_mode) so behaviour is
+// identical offline. Break is the safe default mode (rolls up to neutral).
+const DEFAULT_MODE = 'Break'
+const DEFAULT_MODE_ROLLUP = 'neutral'
+const FALLBACK_MODE_ROLLUP = {
+  'Deep work': 'productive',
+  Creative: 'productive',
+  Collaboration: 'productive',
+  Break: 'neutral',
+  Distraction: 'distracted'
+}
+const FALLBACK_MODE_COLOR = {
+  'Deep work': '#00d8ff',
+  Creative: '#a855f7',
+  Collaboration: '#5ac26d',
+  Break: '#f59e0b',
+  Distraction: '#ff6384'
+}
+const FALLBACK_MODE_ICON = {
+  'Deep work': 'Brain',
+  Creative: 'Palette',
+  Collaboration: 'Users',
+  Break: 'Coffee',
+  Distraction: 'AlertTriangle'
+}
+const FALLBACK_CATEGORY_MODE = {
+  Code: 'Deep work',
+  Browsing: 'Deep work',
+  Communication: 'Collaboration',
+  Utilities: 'Break',
+  Entertainment: 'Distraction',
+  'Social Media': 'Distraction',
+  Miscellaneous: 'Break'
+}
 
 // Function to load category metadata from main process
 async function loadCategoryProductivityMapping() {
@@ -28,18 +73,26 @@ async function loadCategoryProductivityMapping() {
       const pMap = {}
       const cMap = {}
       const iMap = {}
+      const catModeMap = {}
       cats.forEach((c) => {
         if (!c || !c.name) return
         // Store productive/distracted; neutral is the default so we can omit it.
         if (c.type === 'productive' || c.type === 'distracted') pMap[c.name] = c.type
         if (c.color) cMap[c.name] = c.color
         if (c.icon) iMap[c.name] = c.icon
+        // Level-2 default mode for this category (may be absent on old rows).
+        if (c.default_mode) catModeMap[c.name] = c.default_mode
       })
       categoryProductivityMap = pMap
       categoryColorMap = cMap
       categoryIconMap = iMap
+      categoryModeMap = catModeMap
       categoryList = cats
       console.log('Category metadata loaded:', categoryList.length, 'categories')
+
+      // Load the work-mode (Level 2) metadata alongside categories. Additive: on
+      // failure the getMode* fallbacks kick in, so the verdict path is unaffected.
+      await loadModeMetadata()
       return
     }
 
@@ -58,6 +111,47 @@ async function loadCategoryProductivityMapping() {
     }
   } catch (error) {
     console.error('Error loading category metadata:', error)
+  }
+}
+
+// Load the work-mode (Level 2) metadata: the modes table (name/rollup/color/icon)
+// and the category -> default_mode map. Populates the module-level mode caches used
+// by getMode/getModeRollup/getModeColor/getModeIcon. Never throws — leaves the
+// caches empty on failure so the getMode* fallbacks take over.
+async function loadModeMetadata() {
+  try {
+    const [modes, defaultModes] = await Promise.all([
+      window.activeWindow?.loadAllModes ? window.activeWindow.loadAllModes() : [],
+      window.activeWindow?.loadCategoryDefaultModes
+        ? window.activeWindow.loadCategoryDefaultModes()
+        : {}
+    ])
+
+    if (Array.isArray(modes) && modes.length > 0) {
+      const rMap = {}
+      const mcMap = {}
+      const miMap = {}
+      modes.forEach((m) => {
+        if (!m || !m.name) return
+        if (m.rollup) rMap[m.name] = m.rollup
+        if (m.color) mcMap[m.name] = m.color
+        if (m.icon) miMap[m.name] = m.icon
+      })
+      modeRollupMap = rMap
+      modeColorMap = mcMap
+      modeIconMap = miMap
+      modeList = modes
+    }
+
+    // Merge category default-modes from the DB over what we already read from the
+    // categories payload (the dedicated endpoint is the authoritative source).
+    if (defaultModes && typeof defaultModes === 'object') {
+      categoryModeMap = { ...categoryModeMap, ...defaultModes }
+    }
+
+    console.log('Mode metadata loaded:', modeList.length, 'modes')
+  } catch (error) {
+    console.error('Error loading mode metadata:', error)
   }
 }
 
@@ -109,6 +203,52 @@ export const getProductivityType = (category) => {
   return categoryProductivityMap[category] || 'neutral'
 }
 
+// --- Work-mode (Level 2) seam ---
+// These are ADDITIVE lookups that sit beside the verdict seam above. In Phase 1
+// the mode of an app is derived from its category's default_mode; Phase 2 will
+// pass a richer signature through the scorer, but the getMode* API stays the same.
+
+// Resolve the work-mode for a category. Falls back to the DB-less default map and
+// finally to Break (a safe neutral) so this never returns undefined.
+export const getMode = (category) => {
+  return categoryModeMap[category] || FALLBACK_CATEGORY_MODE[category] || DEFAULT_MODE
+}
+
+// Roll a mode up to its Level-1 verdict ('productive' | 'distracted' | 'neutral').
+// This is the bridge that keeps the AreaChart's bands equal to the sum of their
+// modes — always drive band membership through this, never a hardcoded map.
+export const getModeRollup = (mode) => {
+  return modeRollupMap[mode] || FALLBACK_MODE_ROLLUP[mode] || DEFAULT_MODE_ROLLUP
+}
+
+// Convenience: category -> verdict via its mode. Equivalent to the category's own
+// type for the built-in seed, but lets mode overrides (Phase 2+) flow into the
+// verdict without a second mapping.
+export const getModeRollupForCategory = (category) => {
+  return getModeRollup(getMode(category))
+}
+
+// Mode presentation for the new donut/drill-down. DB-driven with seed fallbacks.
+export const getModeColor = (mode) => {
+  return modeColorMap[mode] || FALLBACK_MODE_COLOR[mode] || DEFAULT_CATEGORY_COLOR
+}
+
+export const getModeIcon = (mode) => {
+  return modeIconMap[mode] || FALLBACK_MODE_ICON[mode] || DEFAULT_CATEGORY_ICON
+}
+
+// The full list of modes [{ name, rollup, color, icon }] for legends/menus. Falls
+// back to the seed set (in canonical order) when the DB hasn't loaded yet.
+export const getModeList = () => {
+  if (Array.isArray(modeList) && modeList.length > 0) return modeList
+  return ['Deep work', 'Creative', 'Collaboration', 'Break', 'Distraction'].map((name) => ({
+    name,
+    rollup: FALLBACK_MODE_ROLLUP[name],
+    color: FALLBACK_MODE_COLOR[name],
+    icon: FALLBACK_MODE_ICON[name]
+  }))
+}
+
 // Extract domain name from URL or app identifier
 export const extractDomainName = (domain, fallbackName = '') => {
   if (!domain) return fallbackName
@@ -151,6 +291,9 @@ export function formatAppsData(rawData, date) {
       key: key,
       name: displayName, // Use original case for display
       category: value.category,
+      // Level-2 work-mode: prefer the stored per-row mode, else derive from category
+      // so old/unlabelled rows still show a sensible mode. Keep the first non-empty.
+      mode: value.mode || appMap.get(name)?.mode || getMode(value.category),
       domain: value.domain || appMap.get(name)?.domain || '',
       description: value.description || appMap.get(name)?.description || '',
       timeSpentSeconds: prevTime + value.time
@@ -171,6 +314,7 @@ export function formatAppsData(rawData, date) {
       key: app.key,
       name: app.name,
       category: app.category,
+      mode: app.mode || getMode(app.category),
       domain: app.domain || '',
       description: app.description || '',
       timeSpent: formatAppsTime(Math.floor(app.timeSpentSeconds / 1000)),
@@ -273,7 +417,9 @@ export const processUsageChartData = (jsonData, date, viewType = 'day') => {
 
 // Add an app's time to the correct productivity bucket of a chart data point.
 // Buckets mirror the three DB-driven labels so the chart, summary cards, and
-// tooltip all agree: productive / neutral / distracting.
+// tooltip all agree: productive / neutral / distracting. It ALSO accrues the
+// Level-2 work-mode split into `bucket.modes`, so every chart point carries a mode
+// breakdown for the tooltip drill-down — no change needed in the per-view builders.
 const accumulateProductivity = (bucket, app) => {
   if (!app.category || !app.time) return
 
@@ -288,9 +434,23 @@ const accumulateProductivity = (bucket, app) => {
     default:
       bucket.neutral += seconds
   }
+
+  // Level-2 mode accrual. Prefer the per-app stored mode; fall back to the
+  // category default so old/unlabelled data still splits sensibly.
+  if (bucket.modes) {
+    const mode = app.mode || getMode(app.category)
+    if (bucket.modes[mode] === undefined) bucket.modes[mode] = 0
+    bucket.modes[mode] += seconds
+  }
 }
 
-const emptyPoint = (day) => ({ day, productive: 0, neutral: 0, distracting: 0 })
+const emptyPoint = (day) => ({
+  day,
+  productive: 0,
+  neutral: 0,
+  distracting: 0,
+  modes: { 'Deep work': 0, Creative: 0, Collaboration: 0, Break: 0, Distraction: 0 }
+})
 
 // Format a Date as a LOCAL YYYY-MM-DD (not UTC). Using toISOString() here would
 // shift the day for non-UTC timezones (e.g. a local midnight rolls back a day),
@@ -356,6 +516,63 @@ export const getProductivityTotals = (jsonData, date, viewType = 'day') => {
     distractingSeconds,
     totalSeconds: productiveSeconds + neutralSeconds + distractingSeconds
   }
+}
+
+// Resolve an app record's work-mode for aggregation. Prefers the mode stored on
+// the record (Phase 2 writes it per app), falling back to the category's default
+// mode when absent (old rows, or data written before mode tracking). This is what
+// keeps historical data rendering correctly without a backfill.
+const modeForApp = (app) => {
+  if (app && app.mode) return app.mode
+  return getMode(app ? app.category : undefined)
+}
+
+// Aggregate SECONDS per work-mode across the date window for a view level, plus a
+// verdict rollup that is GUARANTEED to match getProductivityTotals' three buckets
+// (each mode's seconds land in its rollup bucket). Used by the mode donut and the
+// per-mode stat totals.
+//
+// Returns:
+//   { byMode: { 'Deep work': s, Creative: s, Collaboration: s, Break: s, Distraction: s },
+//     rollup: { productive: s, neutral: s, distracting: s },
+//     totalSeconds }
+export const getModeTotals = (jsonData, date, viewType = 'day') => {
+  const byMode = {
+    'Deep work': 0,
+    Creative: 0,
+    Collaboration: 0,
+    Break: 0,
+    Distraction: 0
+  }
+  if (jsonData) {
+    for (const d of getDatesForView(date, viewType)) {
+      const apps = jsonData[d]?.apps
+      if (!apps) continue
+      for (const app of Object.values(apps)) {
+        if (!app || !app.time) continue
+        const mode = modeForApp(app)
+        const seconds = app.time / 1000
+        if (byMode[mode] === undefined) byMode[mode] = 0
+        byMode[mode] += seconds
+      }
+    }
+  }
+
+  // Floor each mode and roll it up so the donut segments and the productive/
+  // neutral/distracting card totals reconcile to the same numbers.
+  const rollup = { productive: 0, neutral: 0, distracting: 0 }
+  let totalSeconds = 0
+  for (const [mode, secs] of Object.entries(byMode)) {
+    const floored = Math.floor(secs)
+    byMode[mode] = floored
+    totalSeconds += floored
+    const verdict = getModeRollup(mode)
+    if (verdict === 'productive') rollup.productive += floored
+    else if (verdict === 'distracted') rollup.distracting += floored
+    else rollup.neutral += floored
+  }
+
+  return { byMode, rollup, totalSeconds }
 }
 
 export const processProductiveChartData = (jsonData, date, viewType = 'day') => {

@@ -94,13 +94,15 @@ export default function GettingStartedPanel({ onNavigateTab }) {
       label: 'Connect your browser',
       hint: 'Install the extension to track sites, not just the browser app.'
     },
-    {
-      key: 'ai',
-      done: hasAiKey,
-      label: 'Set up AI insights (optional)',
-      hint: 'Add an OpenAI or Gemini key for AI summaries of your day.',
-      go: 'ai'
-    },
+    // AI service disabled — the "Set up AI insights" step is hidden so it doesn't
+    // dead-end at a removed tab. Restore this entry to re-enable.
+    // {
+    //   key: 'ai',
+    //   done: hasAiKey,
+    //   label: 'Set up AI insights (optional)',
+    //   hint: 'Add an OpenAI or Gemini key for AI summaries of your day.',
+    //   go: 'ai'
+    // },
     {
       key: 'categories',
       done: false,
