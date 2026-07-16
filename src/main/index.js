@@ -237,6 +237,205 @@ const focusSessionService = require('./database/focusSessionService')
 const PopupManager = require('./popupManager')
 const AIServiceManager = require('./aiServiceManager')
 const BrowserBridge = require('./browserBridge')
+// Span-model categorization (new architecture): immutable span log + query-time
+// resolution. See src/main/classification/. Bound lazily to the live connection.
+const { SpanService } = require('./classification/spanService')
+const { spansToAppUsageData } = require('./classification/appUsageAdapter')
+
+// One SpanService bound to the current DB connection. Rebuilt if the connection
+// changes (online/offline switch); getConnection() exposes run/all which SpanService needs.
+let _spanService = null
+let _spanServiceConn = null
+function getSpanService() {
+  const conn = hybridConnection.getConnection()
+  if (!conn) return null
+  if (_spanService && _spanServiceConn === conn) return _spanService
+  _spanService = new SpanService(conn)
+  _spanServiceConn = conn
+  return _spanService
+}
+
+// Build the legacy appUsageData shape from spans resolved over [startMs, endMs).
+// Shared by load-data and the aggregated-data handlers so they resolve identically.
+async function resolvedAppUsageData(startMs, endMs) {
+  const spanSvc = getSpanService()
+  if (!spanSvc) return {}
+  const resolved = await spanSvc.getResolvedSpans(startMs, endMs)
+  return spansToAppUsageData(resolved)
+}
+
+// Presence/idle engine (see docs/PRESENCE_AND_IDLE_ENGINE.md). Main owns the state
+// machine as the SINGLE writer of presence spans, driven by powerMonitor events + a
+// periodic idle poll. Bound to the live connection, same lazy pattern as getSpanService.
+const { PresenceService } = require('./classification/presenceService')
+const PRESENCE_HEARTBEAT_MS = 5000
+// How often we poll idle state to catch the active→idle transition. Finer than the idle
+// threshold so detection latency is bounded; backdating (§3) corrects the entry edge
+// regardless, so this cadence only affects how soon a span is *written*, not its bounds.
+const PRESENCE_POLL_MS = 30 * 1000
+let _presenceService = null
+let _presenceServiceConn = null
+let presenceHeartbeatInterval = null
+let presencePollInterval = null
+let presenceListenersBound = false
+
+function getPresenceService() {
+  const conn = hybridConnection.getConnection()
+  if (!conn) return null
+  if (_presenceService && _presenceServiceConn === conn) return _presenceService
+  _presenceService = new PresenceService(conn, { heartbeatIntervalMs: PRESENCE_HEARTBEAT_MS })
+  _presenceServiceConn = conn
+  return _presenceService
+}
+
+// Build the current OS observation for the state machine. `event` is the powerMonitor
+// signal that triggered this poll ('suspend'|'resume'|'lock'|'unlock'|undefined). For
+// suspend/lock the verdict is unambiguous; everything else re-reads the authoritative
+// idle state + seconds-since-input so the machine recomputes from scratch (idempotent).
+function readPresenceObservation(event) {
+  const obs = { event }
+  try {
+    obs.idleState = powerMonitor.getSystemIdleState(1) // 1s threshold — we apply our own
+    obs.idleSeconds = powerMonitor.getSystemIdleTime() // seconds since last input (§3)
+  } catch (e) {
+    // If the platform can't answer, leave them undefined; observationToType falls back
+    // to 'active' for non-suspend/lock events, which the next poll corrects.
+  }
+  return obs
+}
+
+// Minimum absence worth prompting about on return (§7/§9). Below this, the return
+// prompt is noise (a bathroom break); at/above it, asking converts the app's worst-
+// quality data (was that idle block a meeting?) into its best.
+const AWAY_PROMPT_MIN_MS = 5 * 60 * 1000
+
+// The single reconcile entry point. Every powerMonitor handler and the periodic poll
+// call this; running it twice for one real event is safe (idempotent by design, §6).
+// When the user returns from a long absence, fire the 'away-return' event so the
+// renderer can ask what it was — the answer becomes a span_annotation (a new fact).
+async function reconcilePresence(event) {
+  const svc = getPresenceService()
+  if (!svc) return
+  try {
+    const res = await svc.reconcile(readPresenceObservation(event), Date.now())
+    if (
+      res &&
+      res.returnedFromAbsence &&
+      res.closedDurationMs >= AWAY_PROMPT_MIN_MS &&
+      res.closedSpanId != null
+    ) {
+      const payload = {
+        spanId: res.closedSpanId,
+        type: res.closedType,
+        durationMs: res.closedDurationMs
+      }
+      BrowserWindow.getAllWindows().forEach((w) => {
+        if (!w.isDestroyed()) w.webContents.send('away-return', payload)
+      })
+    }
+  } catch (err) {
+    console.error(`Presence reconcile (${event || 'poll'}) failed:`, err)
+  }
+}
+
+// Register powerMonitor listeners exactly once. Each just triggers an idempotent
+// recompute — we deliberately do NOT hand-code the resume/unlock choreography (§9).
+function bindPresenceListeners() {
+  if (presenceListenersBound) return
+  presenceListenersBound = true
+  powerMonitor.on('suspend', () => { reconcilePresence('suspend') })
+  powerMonitor.on('resume', () => { reconcilePresence('resume') })
+  powerMonitor.on('lock-screen', () => { reconcilePresence('lock') })
+  powerMonitor.on('unlock-screen', () => { reconcilePresence('unlock') })
+}
+
+// Run once after the DB is ready: reconcile any period the app was NOT running into an
+// explicit `unknown` presence span, open the first live span from the state observed at
+// launch, then start the heartbeat (watermark + open-span flush) and the idle poll.
+// Writing a fresh heartbeat immediately AFTER reconcile is what makes a second startup
+// not re-attribute the same gap. Best-effort — a failure here must never block startup.
+async function startPresenceTracking() {
+  const svc = getPresenceService()
+  if (!svc) return
+  try {
+    const res = await svc.reconcileOnStartup(Date.now())
+    if (res.backfilled) {
+      console.log(
+        `🕳️  Backfilled ${Math.round(res.gapMs / 60000)}min the app was not running as an 'unknown' presence span`
+      )
+    }
+    // Seed the watermark right away so the next launch measures the gap from now.
+    await svc.heartbeat(Date.now())
+    // Open the first live span from whatever state the machine observes right now.
+    const obs = readPresenceObservation()
+    svc.startTracking(svc.observationToType(obs), Date.now())
+  } catch (error) {
+    console.error('Presence startup failed:', error)
+  }
+
+  bindPresenceListeners()
+
+  if (presenceHeartbeatInterval) clearInterval(presenceHeartbeatInterval)
+  presenceHeartbeatInterval = setInterval(() => {
+    const s = getPresenceService()
+    if (!s) return
+    // Heartbeat advances the watermark AND flushes the open span, so the on-disk log
+    // plus the (short) open span always tile the timeline even across a crash.
+    const now = Date.now()
+    s.heartbeat(now).catch((err) => console.error('Presence heartbeat failed:', err))
+    s.flushOpenSpan(now).catch((err) => console.error('Presence flush failed:', err))
+  }, PRESENCE_HEARTBEAT_MS)
+
+  if (presencePollInterval) clearInterval(presencePollInterval)
+  presencePollInterval = setInterval(() => { reconcilePresence() }, PRESENCE_POLL_MS)
+}
+
+// Stop just the presence timers (sync). Safe to call from the sync clearAppTimers path.
+function stopPresenceTimers() {
+  if (presenceHeartbeatInterval) {
+    clearInterval(presenceHeartbeatInterval)
+    presenceHeartbeatInterval = null
+  }
+  if (presencePollInterval) {
+    clearInterval(presencePollInterval)
+    presencePollInterval = null
+  }
+}
+
+// Stop the timers AND close the open span at `now` (clean shutdown). Must be awaited
+// BEFORE the DB disconnects so the final span is persisted. Closing on quit means the
+// next startup's reconcile sees a fresh watermark and correctly finds no hole — so we
+// never write a spurious `unknown` span for a clean quit.
+async function stopPresenceTracking() {
+  stopPresenceTimers()
+  const svc = getPresenceService()
+  if (svc) {
+    try { await svc.closeTracking(Date.now()) }
+    catch (err) { console.error('Presence closeTracking failed:', err) }
+  }
+}
+
+// Cached rule context for the live focus/popup resolve (C1). The tracking loop hits
+// resolve-live every tick, so we cache the rule/category/override snapshot and bust
+// it whenever rules change (invalidateRuleContext, called from broadcastCategoriesUpdated).
+let _ruleContext = null
+async function getRuleContext() {
+  if (_ruleContext) return _ruleContext
+  const spanSvc = getSpanService()
+  if (!spanSvc) return { rules: [], categories: {}, overrides: {} }
+  _ruleContext = await spanSvc.loadRuleContext()
+  return _ruleContext
+}
+function invalidateRuleContext() {
+  _ruleContext = null
+}
+
+// Start-of-day / end-of-day epoch ms for a 'YYYY-MM-DD' date string (local time).
+function dayRange(dateStr) {
+  const d = new Date(dateStr + 'T00:00:00')
+  const start = d.getTime()
+  return { start, end: start + 24 * 60 * 60 * 1000 }
+}
 // const backgroundSyncService = require('./database/backgroundSyncService') // Commented out for simplified architecture
 
 let mainWindow = null
@@ -405,6 +604,9 @@ function clearAppTimers() {
     clearInterval(timerInterval)
     timerInterval = null
   }
+  // Sync: just stop the timers here. The open presence span is closed+persisted in the
+  // async cleanupWithDb path (which awaits it before disconnecting the DB).
+  stopPresenceTimers()
 }
 
 function showMainWindow() {
@@ -503,6 +705,11 @@ async function initializeBackendServices() {
     await hybridConnection.connect()
     console.log('✅ SQLite database system initialized successfully')
 
+    // Presence/idle engine: reconcile any crash/power-cut gap and start the liveness
+    // heartbeat. Runs right after the DB is up so a hole is attributed before anything
+    // else touches presence data. Non-blocking on failure (handled inside).
+    await startPresenceTracking()
+
     // Initialize data aggregation service
     // Data aggregation functionality is now handled directly by app usage service
 
@@ -519,21 +726,10 @@ async function initializeBackendServices() {
     console.log('📋 The app will continue to run with reduced functionality.')
   }
 
-  // Enable auto-startup on first run (for fresh installs)
-  try {
-    const loginItemSettings = app.getLoginItemSettings()
-    if (!loginItemSettings.openAtLogin) {
-      app.setLoginItemSettings({
-        openAtLogin: true,
-        openAsHidden: false,
-        path: process.execPath,
-        args: []
-      })
-      console.log('✅ Auto-startup enabled for FocusBook')
-    }
-  } catch (error) {
-    console.error('❌ Failed to enable auto-startup:', error.message)
-  }
+  // Auto-startup is OPT-IN, not forced. We used to silently enable openAtLogin on
+  // first run, which added FocusBook to system startup without asking — a common
+  // trust complaint. The user now controls this from Settings → Startup (the
+  // get/set-auto-launch handlers); we no longer touch login items here.
 
   // --- AI service DISABLED ---
   // The local AI service (Chat/Insights) is currently disabled: the Python process
@@ -747,6 +943,9 @@ app.whenReady().then(async () => {
   // --- Category + rule CRUD (Settings "Categories Management") ---
   // Broadcast so any open window refreshes its DB-driven category cache.
   const broadcastCategoriesUpdated = () => {
+    // Any rule/category change invalidates the cached live-resolve context so the
+    // focus/popup decision picks up the edit on the next tick.
+    invalidateRuleContext()
     BrowserWindow.getAllWindows().forEach((w) => {
       w.webContents.send('categories-updated', null)
     })
@@ -934,26 +1133,198 @@ app.whenReady().then(async () => {
     getAutoUpdater().quitAndInstall()
   })
 
+  // SPAN MODEL — read path (Phase B). Build the legacy appUsageData shape from spans
+  // RESOLVED at query time (category comes from the current rules, never from a stored
+  // column), so editing a rule retroactively re-labels the dashboard with no migration.
+  // Default range: last 90 days (dashboards are day/week/month scoped; all-time isn't
+  // needed and keeps the resolve set bounded).
   ipcMain.handle('load-data', async () => {
     try {
       await hybridConnection.whenReady()
-      const appUsageService = hybridConnection.getAppUsageService()
       const categoriesService = hybridConnection.getCategoriesService()
-      const data = await appUsageService.getAppUsageData()
+      const now = Date.now()
+      const data = await resolvedAppUsageData(now - 90 * 24 * 60 * 60 * 1000, now + 24 * 60 * 60 * 1000)
       return await filterExcludedApps(data, categoriesService)
     } catch (error) {
-      console.error('Error loading data:', error)
+      console.error('Error loading data (span model):', error)
       return {}
     }
   })
 
-  ipcMain.handle('save-data', async (event, appUsageData) => {
+  // SPAN MODEL — write path (Phase A). One immutable span per tracked interval. No
+  // category/mode is computed or stored here; it is derived at read time.
+  ipcMain.handle('write-span', async (event, { raw, start, end, degraded }) => {
     try {
-      const appUsageService = hybridConnection.getAppUsageService()
-      return await appUsageService.bulkUpdateAppUsageData(appUsageData)
+      const spanSvc = getSpanService()
+      if (!spanSvc) return null
+      return await spanSvc.writeSpan(raw, start, end, !!degraded)
     } catch (error) {
-      console.error('Error saving data:', error)
-      return false
+      console.error('Error writing span:', error)
+      return null
+    }
+  })
+
+  // SPAN MODEL — live resolve (C1). The tracking loop's real-time "is this app
+  // distracting?" decision resolves a single raw observation against the CURRENT
+  // rules, so focus/popup uses the same classification source as the dashboards.
+  // Returns { category, productivity, winning_rule } — never throws.
+  ipcMain.handle('resolve-live', async (event, raw) => {
+    try {
+      const { normalizeKey } = require('./classification/normalizeKey')
+      const { resolve } = require('./classification/resolver')
+      const ctx = await getRuleContext()
+      const key = normalizeKey(raw || {})
+      return resolve(key, ctx.rules, ctx.categories, ctx.overrides)
+    } catch (error) {
+      console.error('Error in resolve-live:', error)
+      return { category: null, productivity: 'unrated', winning_rule: null }
+    }
+  })
+
+  // Uncategorized time, grouped by key, longest first — the self-service backlog.
+  ipcMain.handle('get-uncategorized', async (event, range) => {
+    try {
+      const spanSvc = getSpanService()
+      if (!spanSvc) return []
+      const now = Date.now()
+      const start = (range && range.start) || now - 7 * 24 * 60 * 60 * 1000
+      const end = (range && range.end) || now + 24 * 60 * 60 * 1000
+      return await spanSvc.getUncategorizedByKey(start, end)
+    } catch (error) {
+      console.error('Error loading uncategorized spans:', error)
+      return []
+    }
+  })
+
+  // --- PRESENCE MODEL — annotations (§7) ---
+  // Record the user's interpretation of an absence span (the answer to the return
+  // prompt). A new fact, not a correction — the presence_span is never rewritten.
+  ipcMain.handle('presence-annotate-span', async (event, { spanId, label }) => {
+    try {
+      const svc = getPresenceService()
+      if (!svc || !spanId || !label) return { success: false }
+      const res = await svc.annotateSpan(spanId, label, Date.now())
+      return { success: res.id != null, id: res.id }
+    } catch (error) {
+      console.error('presence-annotate-span:', error)
+      return { success: false }
+    }
+  })
+
+  // Long, unannotated absences in a window — backlog for the return prompt (e.g. after
+  // the app was closed over several away blocks). Defaults to the last 24h.
+  ipcMain.handle('presence-get-unannotated-away', async (event, range) => {
+    try {
+      const svc = getPresenceService()
+      if (!svc) return []
+      const now = Date.now()
+      const start = (range && range.start) || now - 24 * 60 * 60 * 1000
+      const end = (range && range.end) || now + 60 * 1000
+      return await svc.getUnannotatedAway(start, end, AWAY_PROMPT_MIN_MS)
+    } catch (error) {
+      console.error('presence-get-unannotated-away:', error)
+      return []
+    }
+  })
+
+  // Resolved presence spans (absence + joined user label) for a range — the seam a
+  // presence/timeline dashboard consumes. Defaults to the last 24h.
+  ipcMain.handle('presence-get-resolved', async (event, range) => {
+    try {
+      const svc = getPresenceService()
+      if (!svc) return []
+      const now = Date.now()
+      const start = (range && range.start) || now - 24 * 60 * 60 * 1000
+      const end = (range && range.end) || now + 60 * 1000
+      return await svc.getResolvedPresence(start, end)
+    } catch (error) {
+      console.error('presence-get-resolved:', error)
+      return []
+    }
+  })
+
+  // Legacy save-data is retired under the span model (spans are written per-interval
+  // via write-span). Kept as a no-op so any stale caller doesn't error during cutover.
+  ipcMain.handle('save-data', async () => {
+    return true
+  })
+
+  // --- SPAN MODEL — category/rule CRUD + correction (C2) ---
+  // All mutations invalidate the live-resolve cache (via getSpanService's context) and
+  // broadcast categories-updated so preloads + dashboards refresh. Because reads
+  // resolve live, corrections are retroactive with no history migration.
+  const afterRuleChange = () => {
+    invalidateRuleContext()
+    BrowserWindow.getAllWindows().forEach((w) => w.webContents.send('categories-updated', null))
+  }
+
+  ipcMain.handle('span-categories-get', async () => {
+    try { return await getSpanService()?.getCategories() ?? [] }
+    catch (e) { console.error('span-categories-get:', e); return [] }
+  })
+
+  ipcMain.handle('span-rules-get', async () => {
+    try { return await getSpanService()?.getRules() ?? [] }
+    catch (e) { console.error('span-rules-get:', e); return [] }
+  })
+
+  ipcMain.handle('span-category-add', async (event, { name, defaultProductivity }) => {
+    try { const r = await getSpanService()?.addCategory(name, defaultProductivity); afterRuleChange(); return r }
+    catch (e) { console.error('span-category-add:', e); return false }
+  })
+
+  ipcMain.handle('span-category-update', async (event, { id, updates }) => {
+    try { const r = await getSpanService()?.updateCategory(id, updates); afterRuleChange(); return r }
+    catch (e) { console.error('span-category-update:', e); return false }
+  })
+
+  ipcMain.handle('span-category-delete', async (event, { id }) => {
+    try { const r = await getSpanService()?.deleteCategory(id); afterRuleChange(); return r }
+    catch (e) { console.error('span-category-delete:', e); return false }
+  })
+
+  ipcMain.handle('span-rule-add', async (event, payload) => {
+    try { const r = await getSpanService()?.upsertRule(payload); afterRuleChange(); return r }
+    catch (e) { console.error('span-rule-add:', e); return { id: null, created: false } }
+  })
+
+  ipcMain.handle('span-rule-update', async (event, { id, updates }) => {
+    try { const r = await getSpanService()?.updateRule(id, updates); afterRuleChange(); return r }
+    catch (e) { console.error('span-rule-update:', e); return false }
+  })
+
+  ipcMain.handle('span-rule-delete', async (event, { id }) => {
+    try { const r = await getSpanService()?.deleteRule(id); afterRuleChange(); return r }
+    catch (e) { console.error('span-rule-delete:', e); return false }
+  })
+
+  // The correction primitive: "change this app/domain's category" -> upsert a user
+  // rule. `app` is the Activity/dashboard row ({ name, key, domain, ... }); we derive
+  // a matcher (domain rule for web rows, app rule for native) and re-point it. Instantly
+  // retroactive — no retagByPattern UPDATE sweep.
+  ipcMain.handle('span-correct-category', async (event, { app, categoryName }) => {
+    try {
+      const svc = getSpanService()
+      if (!svc || !categoryName) return { success: false, error: 'Missing service or category' }
+      let matcher_type
+      let matcher_value
+      if (app && app.domain) {
+        matcher_type = 'domain'
+        const { normalizeDomain } = require('./classification/normalizeKey')
+        matcher_value = normalizeDomain(app.domain)
+      } else {
+        matcher_type = 'app'
+        // Native rows are keyed by friendly name; match on the raw exe when available,
+        // else the friendly name. The row carries `key` (the tracker appKey).
+        matcher_value = String(app?.exe || app?.key || app?.name || '').toLowerCase()
+      }
+      if (!matcher_value) return { success: false, error: 'Could not derive a matcher' }
+      const res = await svc.upsertRule({ matcher_type, matcher_value, categoryName, is_user_rule: 1 })
+      afterRuleChange()
+      return { success: true, created: res.created, matcher_type, matcher_value }
+    } catch (e) {
+      console.error('span-correct-category:', e)
+      return { success: false, error: e.message }
     }
   })
 
@@ -1271,6 +1642,52 @@ ipcMain.handle('ai-service-reset-memory', async () => {
     }
   })
 
+  // --- Blocking / focus settings ---
+  // Persist the user's distraction-blocking preferences (global on/off switch,
+  // productive-time threshold before an auto session, auto-session length) into
+  // ui-state.json under `blocking`, then broadcast the change so the preload
+  // tracking loop applies it live without a restart. The preload is the enforcer;
+  // this handler is just the persist + notify path.
+  ipcMain.handle('get-blocking-settings', async () => {
+    try {
+      const p = uiStatePath()
+      if (!fs.existsSync(p)) return {}
+      const parsed = JSON.parse(fs.readFileSync(p, 'utf-8'))
+      return (parsed && typeof parsed === 'object' && parsed.blocking) || {}
+    } catch (error) {
+      console.error('Error reading blocking settings:', error)
+      return {}
+    }
+  })
+
+  ipcMain.handle('set-blocking-settings', async (event, patch) => {
+    try {
+      if (!patch || typeof patch !== 'object') {
+        return { success: false, error: 'Patch must be an object' }
+      }
+      const p = uiStatePath()
+      let current = {}
+      if (fs.existsSync(p)) {
+        try {
+          const parsed = JSON.parse(fs.readFileSync(p, 'utf-8'))
+          if (parsed && typeof parsed === 'object') current = parsed
+        } catch (parseError) {
+          console.warn('Could not parse ui-state.json, overwriting:', parseError.message)
+        }
+      }
+      const blocking = { ...(current.blocking || {}), ...patch }
+      const merged = { ...current, blocking }
+      fs.writeFileSync(p, JSON.stringify(merged, null, 2), 'utf-8')
+
+      // Notify the tracking loop (runs in the window's preload) so it takes effect now.
+      mainWindow?.webContents.send('blocking-settings-changed', blocking)
+      return { success: true, blocking }
+    } catch (error) {
+      console.error('Error saving blocking settings:', error)
+      return { success: false, error: error.message }
+    }
+  })
+
   // Resolve the bundled (read-only source) browser-extension folder. In dev it
   // lives at the project root; electron-builder copies it into resources/extension
   // for packaged apps (see electron-builder.yml `from: extension -> to: extension`).
@@ -1527,12 +1944,9 @@ ipcMain.handle('ai-service-reset-memory', async () => {
   ipcMain.handle('get-aggregated-data-by-date', async (event, date) => {
     try {
       await hybridConnection.whenReady()
-      const appUsageService = hybridConnection.getAppUsageService()
       const categoriesService = hybridConnection.getCategoriesService()
-      if (!appUsageService) {
-        throw new Error('App usage service not initialized')
-      }
-      const data = await appUsageService.getAppUsageData(date, date)
+      const { start, end } = dayRange(date)
+      const data = await resolvedAppUsageData(start, end)
       return await filterExcludedApps(data, categoriesService)
     } catch (error) {
       console.error('Error getting aggregated data by date:', error)
@@ -1543,12 +1957,9 @@ ipcMain.handle('ai-service-reset-memory', async () => {
   ipcMain.handle('get-all-aggregated-data', async () => {
     try {
       await hybridConnection.whenReady()
-      const appUsageService = hybridConnection.getAppUsageService()
       const categoriesService = hybridConnection.getCategoriesService()
-      if (!appUsageService) {
-        throw new Error('App usage service not initialized')
-      }
-      const data = await appUsageService.getAppUsageData()
+      const now = Date.now()
+      const data = await resolvedAppUsageData(now - 365 * 24 * 60 * 60 * 1000, now + 24 * 60 * 60 * 1000)
       return await filterExcludedApps(data, categoriesService)
     } catch (error) {
       console.error('Error getting all aggregated data:', error)
@@ -1780,6 +2191,76 @@ ipcMain.handle('ai-service-reset-memory', async () => {
     } catch (error) {
       console.error('Error clearing exclusion list:', error)
       return 0
+    }
+  })
+
+  // Delete the user's recorded activity. This is a REAL, irreversible wipe of the
+  // event logs (spans, presence, legacy usage, focus sessions) — the renderer must
+  // confirm with the user first. It deliberately PRESERVES the taxonomy the user
+  // configured: categories, classification rules, productivity overrides, custom
+  // mappings, exclusions and mode overrides all survive, so a wipe resets the
+  // history without throwing away the rules the user tuned.
+  //   scope 'history' — clear activity + presence, keep focus-session records.
+  //   scope 'all'     — also clear focus-session history (everything but taxonomy).
+  ipcMain.handle('delete-activity-data', async (event, scope = 'all') => {
+    const conn = hybridConnection.getConnection()
+    if (!conn) {
+      return { success: false, error: 'Database is not available.' }
+    }
+
+    // Only wipe tables that actually exist in this DB (span/presence tables are
+    // absent on very old databases), so a missing table never fails the whole op.
+    const existing = await conn.all(
+      "SELECT name FROM sqlite_master WHERE type='table'"
+    )
+    const tableSet = new Set(existing.map((r) => r.name))
+
+    // Activity/event-log tables. timestamps + span_annotation cascade from their
+    // parents, but we clear them explicitly so the op works even if FK cascade is off.
+    const historyTables = [
+      'timestamps',
+      'app_usage',
+      'span_annotation',
+      'presence_span',
+      'span',
+      'app_liveness'
+    ]
+    const focusTables = ['focus_session_interruptions', 'focus_sessions']
+    const targets = (scope === 'history' ? historyTables : [...historyTables, ...focusTables])
+      .filter((t) => tableSet.has(t))
+
+    try {
+      await conn.run('BEGIN')
+      let cleared = 0
+      for (const table of targets) {
+        const res = await conn.run(`DELETE FROM ${table}`)
+        cleared += res?.changes || 0
+      }
+      await conn.run('COMMIT')
+
+      // Reclaim disk and reset any in-memory presence/span services bound to the
+      // now-empty tables so the next tick starts clean.
+      try {
+        await conn.run('VACUUM')
+      } catch (vacuumError) {
+        console.warn('VACUUM after data wipe failed (non-fatal):', vacuumError.message)
+      }
+      _spanService = null
+      _presenceService = null
+
+      // Tell the UI its data changed so open views reload to the empty state.
+      mainWindow?.webContents.send('category-updated')
+
+      console.log(`Activity data wiped (scope=${scope}); ${cleared} rows removed`)
+      return { success: true, scope, rowsCleared: cleared }
+    } catch (error) {
+      try {
+        await conn.run('ROLLBACK')
+      } catch {
+        // ignore — nothing to roll back
+      }
+      console.error('Error deleting activity data:', error)
+      return { success: false, error: error.message }
     }
   })
 
@@ -2176,6 +2657,14 @@ async function cleanupWithDb() {
   isCleaningUp = true
 
   clearAppTimers()
+
+  // Close+persist the open presence span BEFORE the DB disconnects, so a clean quit
+  // leaves the timeline gapless up to now (and the next startup finds no hole).
+  try {
+    await stopPresenceTracking()
+  } catch (error) {
+    console.error('Error closing presence span during cleanup:', error)
+  }
 
   try {
     // Close database connection

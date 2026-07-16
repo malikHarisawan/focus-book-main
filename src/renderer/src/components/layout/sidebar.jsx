@@ -2,7 +2,7 @@
 
 import { useLocation } from 'react-router-dom'
 import { Link } from 'react-router-dom'
-import { Activity, Command, Hexagon, Settings, Timer, Play, Pause, MessageSquare } from 'lucide-react'
+import { Activity, Command, Hexagon, Settings, Timer, Play, Pause, Square, MessageSquare } from 'lucide-react'
 import { Button } from '../ui/button'
 import { Card, CardContent } from '..//ui/card'
 import { StatusItem } from '../Dashboard/status-item'
@@ -103,9 +103,22 @@ export function Sidebar({ productivityScore, dailyGoalProgress, weeklyGoalProgre
     }
   }
 
+  const stopFocusSession = async () => {
+    const sessionId = currentSession?._id || currentSession?.id
+    if (!sessionId || !window.electronAPI) return
+    try {
+      await window.electronAPI.stopFocusSession(sessionId)
+      setCurrentSession(null)
+      setTimeLeft(0)
+      await loadCurrentSession()
+    } catch (error) {
+      console.error('Error stopping focus session:', error)
+    }
+  }
+
   return (
-    <Card className="w-full min-w-0">
-      <CardContent className="p-3 min-w-0">
+    <Card className="w-full min-w-0 flex flex-col">
+      <CardContent className="p-3 min-w-0 flex flex-col flex-1">
         {/* Toggle Button - Top of Sidebar */}
         <div className="flex justify-end mb-3">
           <Button
@@ -126,7 +139,7 @@ export function Sidebar({ productivityScore, dailyGoalProgress, weeklyGoalProgre
           </div>
           {!collapsed && (
             <span className="font-display text-base font-semibold tracking-tight truncate min-w-0 text-fb-text">
-              Focus Book
+              FocusBook
             </span>
           )}
         </div>
@@ -152,9 +165,10 @@ export function Sidebar({ productivityScore, dailyGoalProgress, weeklyGoalProgre
           />
         </nav>
 
-        {/* Focus Session Status - Hide when collapsed */}
+        {/* Focus Session Status - Hide when collapsed.
+            mt-auto pushes this block to the bottom of the full-height sidebar. */}
         {!collapsed && (
-          <div className="mt-4 pt-4 border-t border-fb-border">
+          <div className="mt-auto pt-4 border-t border-fb-border">
             <div className="text-xs mb-2 uppercase tracking-wide font-semibold text-fb-muted">Focus Session</div>
             <div className="rounded-xl p-3 space-y-2 transition-all duration-200 bg-fb-surface2 border border-fb-border hover:border-fb-accent/40">
             {currentSession && (currentSession.status === 'active' || currentSession.status === 'paused') ? (
@@ -179,6 +193,15 @@ export function Sidebar({ productivityScore, dailyGoalProgress, weeklyGoalProgre
                 <div className="text-xs font-medium tracking-wide text-fb-muted">
                   {currentSession.type === 'focus' ? 'Time Remaining' : 'Break Time'}
                 </div>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  className="w-full mt-1 text-xs tracking-wide hover-lift text-cat-distract border-cat-distract/40 hover:bg-cat-distract/10 hover:text-cat-distract"
+                  onClick={stopFocusSession}
+                >
+                  <Square className="w-3.5 h-3.5 mr-1.5 flex-shrink-0" fill="currentColor" />
+                  <span className="truncate">Stop</span>
+                </Button>
               </>
             ) : (
               <>

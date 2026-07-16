@@ -26,6 +26,25 @@ export default defineConfig({
         }
       },
       {
+        // Like the preload does for its classification/ modules, the built main
+        // process keeps `require('./classification/...')` as an external require
+        // (externalizeDepsPlugin doesn't inline relative requires). So the pure
+        // span-model engine files must be physically emitted next to the built main,
+        // or main crashes on load with "Cannot find module './classification/...'".
+        name: 'copy-main-classification',
+        closeBundle() {
+          const srcDir = resolve('src/main/classification')
+          const outDir = resolve('out/main/classification')
+          if (existsSync(srcDir)) {
+            if (!existsSync(outDir)) mkdirSync(outDir, { recursive: true })
+            cpSync(srcDir, outDir, { recursive: true })
+            console.log('Copied main classification files to', outDir)
+          } else {
+            console.error(`Main classification source directory not found: ${srcDir}`)
+          }
+        }
+      },
+      {
         name: 'copy-main-files',
         closeBundle() {
           const srcMainDir = resolve('src/main')

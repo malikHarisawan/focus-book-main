@@ -1,67 +1,72 @@
 import { useEffect, useState, useCallback } from 'react'
-import { Plus, Trash2, Tag, Sparkles, Pencil, Check, X } from 'lucide-react'
-import { CategoryIcon } from '../../utils/categoryVisuals'
+import { Plus, Trash2, Tag, Sparkles, Pencil, Check, X, HelpCircle } from 'lucide-react'
 
-// Full category + rule management. Lets the user:
-//  - see all categories with their productivity type / color
-//  - create a category (name, type, color, icon) and delete one
-//  - see classification rules (pattern -> category) and add/delete them
-// Everything is DB-driven via the window.activeWindow category/rule CRUD IPC.
-const TYPES = [
+// Span-model category + rule management. Everything here mutates the NEW `category`
+// and `rule` tables (matcher_type/matcher_value/category_id). Because dashboards
+// resolve spans against these rules at read time, any edit here is retroactive with
+// no data migration — last month's numbers reflect the new rules instantly.
+//
+// Two axes, kept separate:
+//   - CATEGORY: taxonomy (name) + a default productivity (the judgment).
+//   - RULE: a matcher (app/domain/title/path) -> a category. Specificity is DERIVED
+//     from matcher_type (title_contains < app < domain < domain_path_prefix <
+//     domain_path_regex); most-specific-wins, so there is NO rule ordering to manage.
+
+const PRODUCTIVITY = [
   { value: 'productive', label: 'Productive' },
   { value: 'neutral', label: 'Neutral' },
-  { value: 'distracted', label: 'Distracting' }
+  { value: 'distracting', label: 'Distracting' }
 ]
 
-const typeLabel = (t) => (t === 'distracted' ? 'Distracting' : t === 'productive' ? 'Productive' : 'Neutral')
+// Matcher types, ordered least→most specific, with a short hint for the UI.
+const MATCHERS = [
+  { value: 'app', label: 'App', hint: 'the program/exe, e.g. code.exe' },
+  { value: 'domain', label: 'Domain', hint: 'a whole site, e.g. github.com' },
+  { value: 'domain_path_prefix', label: 'Domain + path', hint: 'e.g. github.com/notifications' },
+  { value: 'domain_path_regex', label: 'Domain + regex', hint: 'advanced: github.com/.*\\/pulls' },
+  { value: 'title_contains', label: 'Title contains', hint: 'text in the window/page title' }
+]
 
-// Sentinel <option> value meaning "no mode pin — use the category's default_mode".
-const NO_MODE = ''
+const prodLabel = (t) =>
+  t === 'distracting' ? 'Distracting' : t === 'productive' ? 'Productive' : 'Neutral'
+const matcherLabel = (t) => MATCHERS.find((m) => m.value === t)?.label || t
 
 export default function CategoryRulesPanel() {
-  const [categories, setCategories] = useState([])
-  const [rules, setRules] = useState([])
-  const [modes, setModes] = useState([])
-  const [modeOverrides, setModeOverrides] = useState({}) // { appIdentifier: modeName }
+  const [categories, setCategories] = useState([]) // [{ id, name, default_productivity }]
+  const [rules, setRules] = useState([]) // [{ id, matcher_type, matcher_value, category_id, category_name, is_user_rule }]
   const [loading, setLoading] = useState(true)
   const [status, setStatus] = useState('')
 
   // New-category form
   const [newCatName, setNewCatName] = useState('')
-  const [newCatType, setNewCatType] = useState('neutral')
-  const [newCatColor, setNewCatColor] = useState('#7a7a7a')
+  const [newCatProd, setNewCatProd] = useState('neutral')
 
   // New-rule form
-  const [newRulePattern, setNewRulePattern] = useState('')
+  const [newRuleValue, setNewRuleValue] = useState('')
   const [newRuleCategory, setNewRuleCategory] = useState('')
-  const [newRuleMatchType, setNewRuleMatchType] = useState('keyword')
-  const [newRuleMode, setNewRuleMode] = useState(NO_MODE)
+  const [newRuleMatcher, setNewRuleMatcher] = useState('app')
 
-  // Inline rule editing: the id of the rule being edited + its draft values.
+  // Inline rule editing
   const [editingRuleId, setEditingRuleId] = useState(null)
-  const [editDraft, setEditDraft] = useState({ pattern: '', category: '', match_type: 'keyword', mode: NO_MODE })
+  const [editDraft, setEditDraft] = useState({ matcher_value: '', category_name: '', matcher_type: 'app' })
 
   const api = window.activeWindow
 
   const load = useCallback(async () => {
-    if (!api?.loadAllCategories) {
+    if (!api?.spanGetCategories) {
       setLoading(false)
       return
     }
     try {
-      const [cats, rls, mds, overrides] = await Promise.all([
-        api.loadAllCategories(),
-        api.getCategoryRules ? api.getCategoryRules() : Promise.resolve([]),
-        api.loadAllModes ? api.loadAllModes() : Promise.resolve([]),
-        api.getModeOverrides ? api.getModeOverrides() : Promise.resolve({})
+      const [cats, rls] = await Promise.all([
+        api.spanGetCategories(),
+        api.spanGetRules ? api.spanGetRules() : Promise.resolve([])
       ])
       setCategories(Array.isArray(cats) ? cats : [])
       setRules(Array.isArray(rls) ? rls : [])
-      setModes(Array.isArray(mds) ? mds : [])
-      setModeOverrides(overrides && typeof overrides === 'object' ? overrides : {})
       if (!newRuleCategory && cats?.length) setNewRuleCategory(cats[0].name)
     } catch (e) {
-      console.error('Failed to load categories/rules:', e)
+      console.error('Failed to load span categories/rules:', e)
     } finally {
       setLoading(false)
     }
@@ -80,7 +85,7 @@ export default function CategoryRulesPanel() {
   const handleAddCategory = async () => {
     const name = newCatName.trim()
     if (!name) return
-    const ok = await api.addCategory(name, newCatType, newCatColor, undefined)
+    const ok = await api.spanAddCategory(name, newCatProd)
     if (ok) {
       flash(`Added category "${name}"`)
       setNewCatName('')
@@ -90,16 +95,22 @@ export default function CategoryRulesPanel() {
     }
   }
 
-  const handleDeleteCategory = async (name) => {
-    const ok = await api.deleteCategory(name)
+  const handleDeleteCategory = async (id, name) => {
+    // Deleting a category also drops its classification rules (FK cascade), so
+    // confirm before doing something the user can't undo from the UI.
+    const confirmed = window.confirm(
+      `Delete the "${name}" category? Any classification rules that point to it will also be removed. This can't be undone.`
+    )
+    if (!confirmed) return
+    const ok = await api.spanDeleteCategory(id)
     if (ok) {
       flash(`Deleted "${name}"`)
       await load()
     }
   }
 
-  const handleChangeType = async (name, type) => {
-    const ok = await api.updateCategory(name, { type })
+  const handleChangeProductivity = async (id, name, productivity) => {
+    const ok = await api.spanUpdateCategory(id, { default_productivity: productivity })
     if (ok) {
       flash(`Updated "${name}"`)
       await load()
@@ -107,36 +118,29 @@ export default function CategoryRulesPanel() {
   }
 
   const handleAddRule = async () => {
-    const pattern = newRulePattern.trim()
-    if (!pattern || !newRuleCategory) return
-    const ok = await api.addCategoryRule(
-      pattern,
-      newRuleCategory,
-      newRuleMatchType,
-      0,
-      newRuleMode || null
-    )
-    if (ok) {
-      flash(`Rule added: "${pattern}" → ${newRuleCategory}`)
-      setNewRulePattern('')
-      setNewRuleMode(NO_MODE)
+    const value = newRuleValue.trim()
+    if (!value || !newRuleCategory) return
+    const res = await api.spanAddRule({
+      matcher_type: newRuleMatcher,
+      matcher_value: value,
+      categoryName: newRuleCategory,
+      is_user_rule: 1
+    })
+    if (res && res.id) {
+      flash(`Rule ${res.created ? 'added' : 'updated'}: "${value}" → ${newRuleCategory}`)
+      setNewRuleValue('')
       await load()
     } else {
-      flash('That rule already exists')
+      flash('Could not add rule')
     }
   }
 
-  const handleDeleteOverride = async (appIdentifier) => {
-    if (!api.removeModeOverride) return
-    const ok = await api.removeModeOverride(appIdentifier)
-    if (ok) {
-      flash(`Removed mode pin for "${appIdentifier}"`)
-      await load()
-    }
-  }
-
-  const handleDeleteRule = async (id) => {
-    const ok = await api.deleteCategoryRule(id)
+  const handleDeleteRule = async (id, pattern) => {
+    const confirmed = window.confirm(
+      `Delete the rule for "${pattern}"? Matching activity will fall back to the built-in classification.`
+    )
+    if (!confirmed) return
+    const ok = await api.spanDeleteRule(id)
     if (ok) {
       flash('Rule deleted')
       await load()
@@ -146,27 +150,21 @@ export default function CategoryRulesPanel() {
   const startEditRule = (rule) => {
     setEditingRuleId(rule.id)
     setEditDraft({
-      pattern: rule.pattern,
-      category: rule.category,
-      match_type: rule.match_type,
-      mode: rule.mode || NO_MODE
+      matcher_value: rule.matcher_value,
+      category_name: rule.category_name,
+      matcher_type: rule.matcher_type
     })
   }
 
-  const cancelEditRule = () => {
-    setEditingRuleId(null)
-  }
+  const cancelEditRule = () => setEditingRuleId(null)
 
   const saveEditRule = async (id) => {
-    const pattern = editDraft.pattern.trim()
-    if (!pattern || !editDraft.category) return
-    const ok = await api.updateCategoryRule(id, {
-      pattern,
-      category: editDraft.category,
-      match_type: editDraft.match_type,
-      // Send null (not '') to clear a pin, so the DB stores NULL and getMode falls
-      // back to the category default.
-      mode: editDraft.mode || null
+    const value = editDraft.matcher_value.trim()
+    if (!value || !editDraft.category_name) return
+    const ok = await api.spanUpdateRule(id, {
+      matcher_type: editDraft.matcher_type,
+      matcher_value: value,
+      categoryName: editDraft.category_name
     })
     if (ok) {
       flash('Rule updated')
@@ -176,9 +174,6 @@ export default function CategoryRulesPanel() {
       flash('Could not update rule')
     }
   }
-
-  // Color for a mode chip, from the loaded modes list (falls back to a neutral grey).
-  const modeColor = (name) => modes.find((m) => m.name === name)?.color || '#7a7a7a'
 
   if (loading) {
     return <div className="text-sm text-slate-400 py-4">Loading categories…</div>
@@ -197,32 +192,31 @@ export default function CategoryRulesPanel() {
         <h4 className="text-md font-medium text-slate-800 dark:text-slate-300 mb-3 flex items-center gap-2">
           <Tag className="h-4 w-4" /> Categories
         </h4>
+        <p className="text-xs text-slate-500 dark:text-slate-400 mb-3">
+          A category is a kind of activity. Its <span className="font-medium">productivity</span>{' '}
+          (Productive / Neutral / Distracting) is the judgment applied to time in that category —
+          change it any time without redefining the category.
+        </p>
         <div className="space-y-2 mb-4">
           {categories.map((c) => (
             <div
-              key={c.name}
+              key={c.id}
               className="flex items-center gap-3 bg-slate-100 dark:bg-[#05070D] rounded-lg px-3 py-2"
             >
-              <span
-                className="inline-flex items-center justify-center h-6 w-6 rounded"
-                style={{ backgroundColor: `${c.color || '#7a7a7a'}22`, color: c.color || '#7a7a7a' }}
-              >
-                <CategoryIcon category={c.name} className="h-4 w-4" />
-              </span>
               <span className="text-sm text-slate-800 dark:text-slate-200 flex-1">{c.name}</span>
               <select
-                value={c.type}
-                onChange={(e) => handleChangeType(c.name, e.target.value)}
+                value={c.default_productivity}
+                onChange={(e) => handleChangeProductivity(c.id, c.name, e.target.value)}
                 className="text-xs bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded px-2 py-1 text-slate-700 dark:text-slate-300"
               >
-                {TYPES.map((t) => (
+                {PRODUCTIVITY.map((t) => (
                   <option key={t.value} value={t.value}>
                     {t.label}
                   </option>
                 ))}
               </select>
               <button
-                onClick={() => handleDeleteCategory(c.name)}
+                onClick={() => handleDeleteCategory(c.id, c.name)}
                 className="text-slate-400 hover:text-red-500"
                 title={`Delete ${c.name}`}
               >
@@ -241,23 +235,16 @@ export default function CategoryRulesPanel() {
             className="flex-1 min-w-[140px] text-sm bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded px-3 py-2 text-slate-800 dark:text-slate-200"
           />
           <select
-            value={newCatType}
-            onChange={(e) => setNewCatType(e.target.value)}
+            value={newCatProd}
+            onChange={(e) => setNewCatProd(e.target.value)}
             className="text-sm bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded px-2 py-2 text-slate-700 dark:text-slate-300"
           >
-            {TYPES.map((t) => (
+            {PRODUCTIVITY.map((t) => (
               <option key={t.value} value={t.value}>
                 {t.label}
               </option>
             ))}
           </select>
-          <input
-            type="color"
-            value={newCatColor}
-            onChange={(e) => setNewCatColor(e.target.value)}
-            className="h-9 w-10 rounded border border-slate-300 dark:border-slate-700 bg-transparent cursor-pointer"
-            title="Category color"
-          />
           <button
             onClick={handleAddCategory}
             className="inline-flex items-center gap-1 text-sm bg-slate-900 dark:bg-slate-200 text-white dark:text-slate-900 rounded px-3 py-2 hover:opacity-90"
@@ -272,155 +259,114 @@ export default function CategoryRulesPanel() {
         <h4 className="text-md font-medium text-slate-800 dark:text-slate-300 mb-1">
           Classification Rules
         </h4>
-        <p className="text-xs text-slate-500 dark:text-slate-400 mb-3">
-          When an app or website matches a pattern, it&apos;s put in that category. &quot;App&quot;
-          matches the program/exe; &quot;Keyword&quot; matches the window title or URL. Optionally
-          pin a <span className="font-medium">work-mode</span> to force how matching activity is
-          counted (Deep work, Creative, …), overriding the category&apos;s default.
+        <p className="text-xs text-slate-500 dark:text-slate-400 mb-3 flex items-start gap-1">
+          <HelpCircle className="h-3.5 w-3.5 mt-0.5 flex-none" />
+          <span>
+            A rule maps a matcher to a category. The <span className="font-medium">most specific</span>{' '}
+            matching rule wins (app &lt; domain &lt; domain+path &lt; regex), so rule order never
+            matters. Your rules always beat the built-ins.
+          </span>
         </p>
         <div className="space-y-1.5 mb-4 max-h-72 overflow-y-auto pr-1">
           {rules.map((r) =>
             editingRuleId === r.id ? (
-              // Edit mode: inline form to change pattern / category / match type.
               <div
                 key={r.id}
                 className="flex flex-wrap items-center gap-2 text-sm bg-slate-100 dark:bg-[#05070D] rounded px-3 py-1.5"
               >
+                <select
+                  value={editDraft.matcher_type}
+                  onChange={(e) => setEditDraft({ ...editDraft, matcher_type: e.target.value })}
+                  className="text-sm bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded px-2 py-1 text-slate-700 dark:text-slate-300"
+                >
+                  {MATCHERS.map((m) => (
+                    <option key={m.value} value={m.value}>
+                      {m.label}
+                    </option>
+                  ))}
+                </select>
                 <input
-                  value={editDraft.pattern}
-                  onChange={(e) => setEditDraft({ ...editDraft, pattern: e.target.value })}
+                  value={editDraft.matcher_value}
+                  onChange={(e) => setEditDraft({ ...editDraft, matcher_value: e.target.value })}
                   className="flex-1 min-w-[120px] text-sm bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded px-2 py-1 text-slate-800 dark:text-slate-200"
                 />
                 <span className="text-slate-400">→</span>
                 <select
-                  value={editDraft.category}
-                  onChange={(e) => setEditDraft({ ...editDraft, category: e.target.value })}
+                  value={editDraft.category_name}
+                  onChange={(e) => setEditDraft({ ...editDraft, category_name: e.target.value })}
                   className="text-sm bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded px-2 py-1 text-slate-700 dark:text-slate-300"
                 >
                   {categories.map((c) => (
-                    <option key={c.name} value={c.name}>
+                    <option key={c.id} value={c.name}>
                       {c.name}
                     </option>
                   ))}
                 </select>
-                <select
-                  value={editDraft.match_type}
-                  onChange={(e) => setEditDraft({ ...editDraft, match_type: e.target.value })}
-                  className="text-sm bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded px-2 py-1 text-slate-700 dark:text-slate-300"
-                >
-                  <option value="keyword">Keyword</option>
-                  <option value="app">App</option>
-                </select>
-                <select
-                  value={editDraft.mode}
-                  onChange={(e) => setEditDraft({ ...editDraft, mode: e.target.value })}
-                  title="Pin a work-mode (optional)"
-                  className="text-sm bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded px-2 py-1 text-slate-700 dark:text-slate-300"
-                >
-                  <option value={NO_MODE}>— mode: default —</option>
-                  {modes.map((m) => (
-                    <option key={m.name} value={m.name}>
-                      {m.name}
-                    </option>
-                  ))}
-                </select>
-                <button
-                  onClick={() => saveEditRule(r.id)}
-                  className="text-emerald-500 hover:text-emerald-600"
-                  title="Save"
-                >
+                <button onClick={() => saveEditRule(r.id)} className="text-emerald-500 hover:text-emerald-600" title="Save">
                   <Check className="h-4 w-4" />
                 </button>
-                <button
-                  onClick={cancelEditRule}
-                  className="text-slate-400 hover:text-slate-600"
-                  title="Cancel"
-                >
+                <button onClick={cancelEditRule} className="text-slate-400 hover:text-slate-600" title="Cancel">
                   <X className="h-4 w-4" />
                 </button>
               </div>
             ) : (
-              // Read-only view with Edit + Delete actions.
               <div
                 key={r.id}
                 className="flex items-center gap-2 text-sm bg-slate-100 dark:bg-[#05070D] rounded px-3 py-1.5"
               >
-                <code className="text-slate-700 dark:text-slate-300">{r.pattern}</code>
-                <span className="text-slate-400">→</span>
-                <span className="text-slate-800 dark:text-slate-200">{r.category}</span>
                 <span className="text-[10px] uppercase tracking-wide text-slate-400 border border-slate-300 dark:border-slate-700 rounded px-1">
-                  {r.match_type}
+                  {matcherLabel(r.matcher_type)}
                 </span>
-                {r.mode && (
-                  <span
-                    className="text-[10px] font-semibold rounded px-1.5 py-0.5 flex items-center gap-1"
-                    style={{ backgroundColor: `${modeColor(r.mode)}22`, color: modeColor(r.mode) }}
-                    title={`Pinned work-mode: ${r.mode}`}
-                  >
-                    <span className="w-1.5 h-1.5 rounded-full" style={{ background: modeColor(r.mode) }} />
-                    {r.mode}
+                <code className="text-slate-700 dark:text-slate-300">{r.matcher_value}</code>
+                <span className="text-slate-400">→</span>
+                <span className="text-slate-800 dark:text-slate-200">{r.category_name}</span>
+                {r.is_user_rule ? (
+                  <span className="text-[10px] font-semibold text-cyan-600 dark:text-cyan-400 border border-cyan-300 dark:border-cyan-700 rounded px-1">
+                    yours
                   </span>
-                )}
+                ) : null}
                 <span className="flex-1" />
-                <button
-                  onClick={() => startEditRule(r)}
-                  className="text-slate-400 hover:text-cyan-500"
-                  title="Edit rule"
-                >
+                <button onClick={() => startEditRule(r)} className="text-slate-400 hover:text-cyan-500" title="Edit rule">
                   <Pencil className="h-3.5 w-3.5" />
                 </button>
-                <button
-                  onClick={() => handleDeleteRule(r.id)}
-                  className="text-slate-400 hover:text-red-500"
-                  title="Delete rule"
-                >
+                <button onClick={() => handleDeleteRule(r.id, r.matcher_value)} className="text-slate-400 hover:text-red-500" title="Delete rule">
                   <Trash2 className="h-3.5 w-3.5" />
                 </button>
               </div>
             )
           )}
-          {rules.length === 0 && (
-            <div className="text-xs text-slate-400">No rules yet.</div>
-          )}
+          {rules.length === 0 && <div className="text-xs text-slate-400">No rules yet.</div>}
         </div>
 
         {/* Add rule */}
         <div className="flex flex-wrap items-center gap-2">
+          <select
+            value={newRuleMatcher}
+            onChange={(e) => setNewRuleMatcher(e.target.value)}
+            className="text-sm bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded px-2 py-2 text-slate-700 dark:text-slate-300"
+            title={MATCHERS.find((m) => m.value === newRuleMatcher)?.hint}
+          >
+            {MATCHERS.map((m) => (
+              <option key={m.value} value={m.value}>
+                {m.label}
+              </option>
+            ))}
+          </select>
           <input
-            value={newRulePattern}
-            onChange={(e) => setNewRulePattern(e.target.value)}
-            placeholder="Pattern (e.g. twitter, Code.exe)"
+            value={newRuleValue}
+            onChange={(e) => setNewRuleValue(e.target.value)}
+            placeholder={MATCHERS.find((m) => m.value === newRuleMatcher)?.hint || 'Pattern'}
             className="flex-1 min-w-[160px] text-sm bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded px-3 py-2 text-slate-800 dark:text-slate-200"
           />
+          <span className="text-slate-400">→</span>
           <select
             value={newRuleCategory}
             onChange={(e) => setNewRuleCategory(e.target.value)}
             className="text-sm bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded px-2 py-2 text-slate-700 dark:text-slate-300"
           >
             {categories.map((c) => (
-              <option key={c.name} value={c.name}>
-                {c.name} ({typeLabel(c.type)})
-              </option>
-            ))}
-          </select>
-          <select
-            value={newRuleMatchType}
-            onChange={(e) => setNewRuleMatchType(e.target.value)}
-            className="text-sm bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded px-2 py-2 text-slate-700 dark:text-slate-300"
-          >
-            <option value="keyword">Keyword</option>
-            <option value="app">App</option>
-          </select>
-          <select
-            value={newRuleMode}
-            onChange={(e) => setNewRuleMode(e.target.value)}
-            title="Pin a work-mode (optional)"
-            className="text-sm bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded px-2 py-2 text-slate-700 dark:text-slate-300"
-          >
-            <option value={NO_MODE}>— mode: default —</option>
-            {modes.map((m) => (
-              <option key={m.name} value={m.name}>
-                {m.name}
+              <option key={c.id} value={c.name}>
+                {c.name} ({prodLabel(c.default_productivity)})
               </option>
             ))}
           </select>
@@ -430,49 +376,6 @@ export default function CategoryRulesPanel() {
           >
             <Plus className="h-4 w-4" /> Add Rule
           </button>
-        </div>
-      </section>
-
-      {/* App mode overrides — pins set from the Activity page's mode picker. This is
-          a review/clear surface; the primary way to CREATE one is the Activity row. */}
-      <section>
-        <h4 className="text-md font-medium text-slate-800 dark:text-slate-300 mb-1">
-          App Mode Overrides
-        </h4>
-        <p className="text-xs text-slate-500 dark:text-slate-400 mb-3">
-          Per-app work-mode pins. Set one from the Applications list (each row&apos;s Mode
-          picker); remove it here to let the app fall back to automatic mode detection.
-        </p>
-        <div className="space-y-1.5">
-          {Object.entries(modeOverrides).length === 0 && (
-            <div className="text-xs text-slate-400">
-              No overrides yet. Pin a mode from the Applications page.
-            </div>
-          )}
-          {Object.entries(modeOverrides).map(([identifier, mode]) => (
-            <div
-              key={identifier}
-              className="flex items-center gap-2 text-sm bg-slate-100 dark:bg-[#05070D] rounded px-3 py-1.5"
-            >
-              <code className="text-slate-700 dark:text-slate-300 truncate max-w-[45%]">{identifier}</code>
-              <span className="text-slate-400">→</span>
-              <span
-                className="text-[11px] font-semibold rounded px-1.5 py-0.5 flex items-center gap-1"
-                style={{ backgroundColor: `${modeColor(mode)}22`, color: modeColor(mode) }}
-              >
-                <span className="w-1.5 h-1.5 rounded-full" style={{ background: modeColor(mode) }} />
-                {mode}
-              </span>
-              <span className="flex-1" />
-              <button
-                onClick={() => handleDeleteOverride(identifier)}
-                className="text-slate-400 hover:text-red-500"
-                title="Remove override"
-              >
-                <Trash2 className="h-3.5 w-3.5" />
-              </button>
-            </div>
-          ))}
         </div>
       </section>
     </div>

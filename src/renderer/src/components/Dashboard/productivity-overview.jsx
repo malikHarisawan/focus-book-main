@@ -1,5 +1,5 @@
 import { useEffect, useState, useMemo } from 'react'
-import { RefreshCw, Sun, Moon, Monitor, AlignLeft, AreaChart } from 'lucide-react'
+import { RefreshCw, Sun, Moon, Monitor, AlignLeft, AreaChart, ChevronLeft, ChevronRight, Sparkles } from 'lucide-react'
 import { Button } from '../ui/button'
 import ProductiveAreaChart from './ProductiveAreaChart'
 import DayTimeline from './DayTimeline'
@@ -369,6 +369,29 @@ export default function ProductivityOverview() {
         </div>
       </header>
 
+      {/* First-run / no-data guidance. Rather than showing a wall of zeroed cards and
+          blank charts with no context, tell the user tracking is running (today) or
+          that the selected window has no data (past dates). The charts below still
+          render with their own tailored empty states. */}
+      {totalSeconds === 0 && (
+        <section
+          className="flex items-start gap-3 rounded-xl border px-5 py-4"
+          style={{ borderColor: 'var(--fb-border)', background: 'var(--fb-surface2)' }}
+        >
+          <Sparkles className="h-5 w-5 mt-0.5 flex-none" style={{ color: 'var(--c-create)' }} />
+          <div className="text-sm">
+            <div className="font-semibold text-fb-text">
+              {isToday ? 'No activity tracked yet today' : 'No activity for this period'}
+            </div>
+            <div className="text-fb-muted mt-0.5">
+              {isToday
+                ? 'FocusBook tracks your apps automatically in the background — your focus breakdown will appear here as you work. Connect the browser extension in Settings → Integrations to track websites too.'
+                : 'Nothing was recorded for the selected date range. Pick another date, or come back after some tracked activity.'}
+            </div>
+          </div>
+        </section>
+      )}
+
       {/* Stat cards */}
       <section className="grid grid-cols-2 lg:grid-cols-4 gap-4">
         <StatCard
@@ -533,6 +556,13 @@ export default function ProductivityOverview() {
           onSelectDay={(day) => {
             handleDateChange(day)
           }}
+          // Page the 7-day window a week at a time. The window ends at the
+          // selected date, so shifting the selected date ±7 days moves it.
+          onShiftWeek={(dir) => handleDateChange(shiftDate(selectedDate, dir * 7))}
+          onGoToday={() => handleDateChange(new Date().toISOString().split('T')[0])}
+          // Disable "next" once the window already ends at (or past) today, so
+          // you can't page into the future, and hide the "today" shortcut then.
+          isCurrentWeek={isToday}
         />
         <ActivityLog apps={activityApps} scope={scopeLabel} />
       </section>

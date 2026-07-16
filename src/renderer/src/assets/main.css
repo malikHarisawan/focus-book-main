@@ -91,6 +91,36 @@
   --chart-orange: var(--c-distract);
 }
 
+/*
+ * Global compaction lever.
+ * `zoom` on the app root scales the ENTIRE UI uniformly — rem-based utilities
+ * AND hardcoded px values (fonts, card sizes, gaps, radii) alike — from one
+ * place, instead of touching every component. Chromium (Electron) supports
+ * `zoom` natively and, unlike transform:scale, it still reflows layout so
+ * scrollbars and hit-testing stay correct. Dial the value to taste:
+ *   1 = original size, 0.9 = 90%, 0.85 = compact.
+ */
+:root {
+  --fb-zoom: 0.85;
+}
+
+#root {
+  zoom: var(--fb-zoom);
+}
+
+/*
+ * Zoom-compensated full-viewport height.
+ * Chromium measures vh against the UNZOOMED viewport, then the #root zoom
+ * scales the box down — so a plain 100vh box only fills 85% of the window,
+ * leaving dead space at the bottom and clipping scroll containers early.
+ * This class gives an element a height of 100vh / zoom, which after the zoom
+ * renders as exactly one full window. Use it INSTEAD of h-screen on the
+ * app's top-level full-height layout element.
+ */
+.fb-screen-h {
+  height: calc(100vh / var(--fb-zoom));
+}
+
 /* Base styles — Manrope (UI) + Space Grotesk (display/headings) */
 @layer base {
   body {
@@ -232,6 +262,24 @@
     opacity: 1;
     transform: scale(1);
   }
+}
+
+/* Slide-up entrance for bottom-anchored toasts (UpdateNotification, AwayReturnPrompt).
+   The utility class was referenced by those components but never defined; this supplies
+   it so the toasts animate in instead of popping. */
+@keyframes slideUp {
+  from {
+    opacity: 0;
+    transform: translateY(16px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.animate-slide-up {
+  animation: slideUp 0.3s ease-out both;
 }
 
 /* Stagger delays for different elements */

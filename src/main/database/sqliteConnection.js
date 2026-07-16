@@ -284,6 +284,94 @@ class SQLiteConnection extends DatabaseAdapter {
         )
       }
 
+      // Learning category migration for existing DBs. The category row + new rules
+      // come from schema.sql's INSERT OR IGNORE (self-applies), but on an OLD DB the
+      // learning-oriented patterns still point at 'Browsing' and history rows carry
+      // 'Browsing'. Reassign the built-in learning rules to Learning and retag the
+      // matching app_usage rows so past study time moves to the new category. Guarded
+      // by app_metadata so this one-time reassignment never re-runs (and so it won't
+      // fight a user who later moves a rule back to Browsing on purpose).
+      const learnMigKey = 'learning_category_migrated'
+      const learnMigDone = await this.get('SELECT value FROM app_metadata WHERE key = ?', [
+        learnMigKey
+      ])
+      if (!learnMigDone) {
+        // Ensure the Learning category exists (covers DBs whose schema.sql seed ran
+        // before this category was added).
+        await this.run(
+          `INSERT OR IGNORE INTO categories (name, type, color, icon, default_mode)
+           VALUES ('Learning', 'productive', '#14b8a6', 'GraduationCap', 'Deep work')`
+        )
+        // Move the built-in learning rules that currently point at Browsing.
+        const learningPatterns = [
+          'udemy.com',
+          'vulms.vu.edu.pk',
+          'tutorial',
+          'course',
+          'lecture',
+          'study',
+          'learning',
+          'research'
+        ]
+        for (const pattern of learningPatterns) {
+          await this.run(
+            "UPDATE category_rules SET category = 'Learning' WHERE pattern = ? AND category = 'Browsing'",
+            [pattern]
+          )
+          // Retag history rows classified under Browsing whose app/title matches, so
+          // the change is retroactive (like the category-retag flow).
+          const like = `%${pattern.toLowerCase()}%`
+          await this.run(
+            `UPDATE app_usage SET category = 'Learning'
+             WHERE category = 'Browsing'
+               AND (LOWER(app_name) LIKE ? OR LOWER(description) LIKE ? OR LOWER(domain) LIKE ?)`,
+            [like, like, like]
+          )
+        }
+        await this.run(
+          'INSERT OR REPLACE INTO app_metadata (key, value) VALUES (?, ?)',
+          [learnMigKey, new Date().toISOString()]
+        )
+        console.log('✅ Learning category migration applied')
+      }
+
+      // Span-model: add key_app_name to a span table that predates the column (fresh
+      // DBs get it from CREATE TABLE in schema.sql; this covers early span-model DBs).
+      // Guarded by the table's existence so DBs without a span table are untouched.
+      const spanTable = await this.all(
+        "SELECT name FROM sqlite_master WHERE type='table' AND name='span'"
+      )
+      if (spanTable.length > 0) {
+        const spanInfo = await this.all('PRAGMA table_info(span)')
+        if (!spanInfo.some((col) => col.name === 'key_app_name')) {
+          console.log('Adding key_app_name column to span table...')
+          await this.run('ALTER TABLE span ADD COLUMN key_app_name TEXT')
+        }
+      }
+
+      // Fold the "Code Review" category into "Coding" on existing DBs (fresh DBs never
+      // seed it). Re-point every rule that targets Code Review to Coding, then delete
+      // the now-empty category. Because reads resolve live, affected spans re-resolve
+      // to Coding with no data migration. Idempotent: no-op once Code Review is gone.
+      const catTable = await this.all(
+        "SELECT name FROM sqlite_master WHERE type='table' AND name='category'"
+      )
+      if (catTable.length > 0) {
+        const cr = await this.all(`SELECT id FROM category WHERE name = 'Code Review'`)
+        if (cr.length > 0) {
+          const coding = await this.all(`SELECT id FROM category WHERE name = 'Coding'`)
+          if (coding.length > 0) {
+            console.log('Folding "Code Review" into "Coding"...')
+            await this.run(`UPDATE rule SET category_id = ? WHERE category_id = ?`, [
+              coding[0].id,
+              cr[0].id
+            ])
+            await this.run(`DELETE FROM category WHERE id = ?`, [cr[0].id])
+            console.log('✅ Removed "Code Review" (rules re-pointed to "Coding")')
+          }
+        }
+      }
+
       console.log('✅ Schema migrations completed successfully')
     } catch (error) {
       console.warn('Schema migration warning:', error.message)

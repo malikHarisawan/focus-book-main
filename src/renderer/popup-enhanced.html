@@ -575,7 +575,12 @@
                 this.handleNotDistraction()
                 break
               case 'Escape':
-                this.handleStayFocused()
+                // ESC is muscle-memory for "close this dialog" — it must NOT be
+                // wired to Stay Focused, which force-closes the app the user
+                // switched to (risking unsaved work). Treat ESC as a safe dismiss
+                // that just closes the popup; killing an app requires an explicit
+                // click / the '1' key on Stay Focused.
+                this.handleNotDistraction()
                 break
               case ' ':
                 e.preventDefault()

@@ -10,6 +10,15 @@
  *   centerBig, centerSub                         — text for the donut center
  */
 import { useState } from 'react'
+import { Info } from 'lucide-react'
+
+// Plain-language explanation of the five work-modes the donut breaks time into, so
+// the first thing a user sees on the dashboard isn't an unexplained "Deep work vs
+// Distraction" chart. Shown as a hover tooltip on the title's info glyph.
+const MODE_HELP =
+  'FocusBook groups your time into work-modes: Deep work (focused solo work like coding), ' +
+  'Creative (design/writing), Collaboration (chat, meetings, email), Break (idle/low-signal), ' +
+  'and Distraction (entertainment, social). The center shows how much was deep focus.'
 
 const R = 48
 const CIRC = 2 * Math.PI * R // ~301.59
@@ -40,7 +49,12 @@ export default function FocusBalanceDonut({ segments = [], centerBig, centerSub,
 
   return (
     <div className="rounded-[18px] border border-fb-border bg-fb-surface p-5 shadow-[var(--fb-shadow)] flex flex-col">
-      <div className="font-display text-base font-semibold text-fb-text">Focus balance</div>
+      <div className="flex items-center gap-1.5">
+        <span className="font-display text-base font-semibold text-fb-text">Focus balance</span>
+        <span title={MODE_HELP} className="text-fb-muted hover:text-fb-accent cursor-help">
+          <Info className="h-3.5 w-3.5" />
+        </span>
+      </div>
       {subtitle && <div className="text-[13px] text-fb-muted mt-1">{subtitle}</div>}
 
       <div className="relative w-[170px] h-[170px] mx-auto mt-4 mb-1">

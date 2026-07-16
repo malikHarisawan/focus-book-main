@@ -15,8 +15,9 @@ export function MainLayout({ children }) {
         <div className="gradient-overlay absolute inset-0" />
       </div>
 
-      {/* Content Layer */}
-      <div className="relative z-10 h-screen flex flex-col">
+      {/* Content Layer — fb-screen-h (not h-screen) so it fills the full window
+          despite the #root zoom, which shrinks a plain 100vh box (see main.css). */}
+      <div className="relative z-10 fb-screen-h flex flex-col">
         {/* Custom Title Bar - Sticky at top */}
         <div className="sticky top-0 z-50">
           <TitleBar />
@@ -39,14 +40,15 @@ export function MainLayout({ children }) {
 
         {/* Main content area - fills remaining height */}
         <div className="flex-1 flex min-h-0">
-        
+
           <div className={`
             flex flex-col flex-shrink-0
             transition-all duration-300 ease-in-out
             ${isCollapsed ? 'w-20' : 'w-60 xl:w-64'}
             overflow-y-auto custom-scrollbar
           `}>
-            <div className="sticky top-0 p-3">
+            {/* flex-1 so the sidebar card stretches to the full content height */}
+            <div className="flex-1 flex p-3 min-h-0">
               <Sidebar
                 collapsed={isCollapsed}
                 productivityScore={85}

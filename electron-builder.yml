@@ -35,6 +35,11 @@ asarUnpack:
   - resources/**
 win:
   executableName: FocusBook
+  # Embed the SAME logo as the system-tray icon into the .exe so the Windows
+  # taskbar button matches the tray. icon.ico is generated from icon.png by
+  # `node scripts/gen-ico.js`; without this explicit icon, electron-builder would
+  # fall back to the default Electron icon for the executable.
+  icon: icon.ico
   target:
     - target: nsis
       arch:
@@ -56,25 +61,12 @@ nsis:
   guid: 5b2f9c14-7e3a-4d68-9b21-0f4c6a8e2d7f
 buildVersion: 1.0.6
 compression: normal
-mac:
-  entitlementsInherit: build/entitlements.mac.plist
-  extendInfo:
-    - NSCameraUsageDescription: Application requests access to the device's camera.
-    - NSMicrophoneUsageDescription: Application requests access to the device's microphone.
-    - NSDocumentsFolderUsageDescription: Application requests access to the user's Documents folder.
-    - NSDownloadsFolderUsageDescription: Application requests access to the user's Downloads folder.
-  notarize: false
-dmg:
-  artifactName: ${name}-${version}.${ext}
-linux:
-  target:
-    - AppImage
-    - snap
-    - deb
-  maintainer: electronjs.org
-  category: Utility
-appImage:
-  artifactName: ${name}-${version}.${ext}
+# FocusBook is Windows-only: the activity-tracking core relies on Windows APIs
+# (PowerShell process resolution + electron-active-window), which collect nothing
+# on macOS/Linux. We deliberately do NOT ship mac (dmg)/linux (AppImage/snap/deb)
+# targets so users can't install an app that would silently record no data.
+# Restore the mac:/dmg:/linux: blocks here (and the build:mac/build:linux scripts)
+# only once cross-platform tracking exists.
 npmRebuild: false
 publish:
   provider: github

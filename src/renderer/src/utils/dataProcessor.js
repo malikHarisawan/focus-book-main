@@ -51,62 +51,87 @@ const FALLBACK_MODE_ICON = {
   Distraction: 'AlertTriangle'
 }
 const FALLBACK_CATEGORY_MODE = {
+  // Legacy category names (kept for any pre-cutover data).
   Code: 'Deep work',
+  Learning: 'Deep work',
   Browsing: 'Deep work',
   Communication: 'Collaboration',
   Utilities: 'Break',
   Entertainment: 'Distraction',
   'Social Media': 'Distraction',
-  Miscellaneous: 'Break'
+  Miscellaneous: 'Break',
+  // SPAN-MODEL taxonomy (the categories seeded in schema.sql). Maps each resolved
+  // category to a work-mode so the Focus-balance donut groups correctly under the
+  // new engine (the legacy categories table doesn't know these names).
+  Coding: 'Deep work',
+  Social: 'Distraction',
+  Uncategorized: 'Break'
 }
 
-// Function to load category metadata from main process
+// A stable color per span-model category, keyed by name. The new `category` table
+// has no color column, so the renderer owns the palette here (used by the Apps-page
+// dropdown dots, the category chips, and the time bars). Unknown names fall back to
+// DEFAULT_CATEGORY_COLOR via getCategoryColorFromDB.
+const SPAN_CATEGORY_COLORS = {
+  Coding: '#00d8ff',
+  Learning: '#14b8a6',
+  Communication: '#a855f7',
+  Browsing: '#b381c9',
+  Utilities: '#36a2eb',
+  Entertainment: '#ff6384',
+  Social: '#f97316',
+  Uncategorized: '#7a7a7a'
+}
+
+// Load category metadata from the SPAN-MODEL `category` table (the single source of
+// truth). This is what the Apps-page dropdown, productivity badges, and colors read,
+// so it matches exactly what corrections write. Falls back to the legacy tables only
+// if the span endpoint is unavailable.
 async function loadCategoryProductivityMapping() {
   try {
-    // Prefer the rich metadata source (name, type, color, icon).
     let cats = []
-    if (window.activeWindow?.loadAllCategories) {
-      cats = await window.activeWindow.loadAllCategories()
+    if (window.activeWindow?.spanGetCategories) {
+      cats = await window.activeWindow.spanGetCategories()
     }
 
     if (Array.isArray(cats) && cats.length > 0) {
       const pMap = {}
       const cMap = {}
-      const iMap = {}
-      const catModeMap = {}
       cats.forEach((c) => {
         if (!c || !c.name) return
-        // Store productive/distracted; neutral is the default so we can omit it.
-        if (c.type === 'productive' || c.type === 'distracted') pMap[c.name] = c.type
-        if (c.color) cMap[c.name] = c.color
-        if (c.icon) iMap[c.name] = c.icon
-        // Level-2 default mode for this category (may be absent on old rows).
-        if (c.default_mode) catModeMap[c.name] = c.default_mode
+        // New table uses default_productivity ('productive'|'neutral'|'distracting').
+        // Normalize 'distracting' -> 'distracted' so the existing getProductivity/
+        // getProductivityType consumers (which expect the legacy label) keep working.
+        const p = c.default_productivity
+        if (p === 'productive') pMap[c.name] = 'productive'
+        else if (p === 'distracting') pMap[c.name] = 'distracted'
+        if (SPAN_CATEGORY_COLORS[c.name]) cMap[c.name] = SPAN_CATEGORY_COLORS[c.name]
       })
       categoryProductivityMap = pMap
       categoryColorMap = cMap
-      categoryIconMap = iMap
-      categoryModeMap = catModeMap
-      categoryList = cats
-      console.log('Category metadata loaded:', categoryList.length, 'categories')
+      categoryIconMap = {}
+      // Mode is category-derived under the span model (FALLBACK_CATEGORY_MODE covers
+      // the new taxonomy), so no per-category default_mode is loaded from the DB.
+      categoryModeMap = {}
+      categoryList = cats.map((c) => ({
+        name: c.name,
+        type: c.default_productivity === 'distracting' ? 'distracted' : c.default_productivity,
+        color: SPAN_CATEGORY_COLORS[c.name] || DEFAULT_CATEGORY_COLOR
+      }))
+      console.log('Span category metadata loaded:', categoryList.length, 'categories')
 
-      // Load the work-mode (Level 2) metadata alongside categories. Additive: on
-      // failure the getMode* fallbacks kick in, so the verdict path is unaffected.
+      // Mode metadata (colors/rollup) for the donut still comes from the modes table.
       await loadModeMetadata()
       return
     }
 
-    // Fallback: the older [productive[], distracted[]] shape (no color/icon).
-    const categories = await window.activeWindow.loadCategories()
+    // Fallback: legacy [productive[], distracted[]] shape.
+    const categories = await window.activeWindow?.loadCategories?.()
     if (Array.isArray(categories)) {
       const [productive = [], distracted = []] = categories
       const map = {}
-      productive.forEach((name) => {
-        map[name] = 'productive'
-      })
-      distracted.forEach((name) => {
-        map[name] = 'distracted'
-      })
+      productive.forEach((name) => { map[name] = 'productive' })
+      distracted.forEach((name) => { map[name] = 'distracted' })
       categoryProductivityMap = map
     }
   } catch (error) {
@@ -203,6 +228,24 @@ export const getProductivityType = (category) => {
   return categoryProductivityMap[category] || 'neutral'
 }
 
+// SPAN MODEL: map a resolver productivity ('productive'|'neutral'|'distracting') to
+// the display label. Under the span model each app row carries the RESOLVED
+// productivity (rule-driven), so prefer it over re-deriving from the legacy category
+// table (which doesn't know the new category names). Note the resolver uses
+// 'distracting' where the legacy type is 'distracted' — both map to 'Distracting'.
+export const productivityLabel = (raw) => {
+  if (raw === 'productive') return 'Productive'
+  if (raw === 'distracting' || raw === 'distracted') return 'Distracting'
+  return 'Neutral'
+}
+
+// Resolve an app's display productivity: prefer the resolver value carried on the
+// row (span model), else fall back to deriving from the category (legacy).
+export const productivityForApp = (app) => {
+  if (app && app.productivity) return productivityLabel(app.productivity)
+  return getProductivity(app && app.category)
+}
+
 // --- Work-mode (Level 2) seam ---
 // These are ADDITIVE lookups that sit beside the verdict seam above. In Phase 1
 // the mode of an app is derived from its category's default_mode; Phase 2 will
@@ -291,11 +334,16 @@ export function formatAppsData(rawData, date) {
       key: key,
       name: displayName, // Use original case for display
       category: value.category,
-      // Level-2 work-mode: prefer the stored per-row mode, else derive from category
-      // so old/unlabelled rows still show a sensible mode. Keep the first non-empty.
-      mode: value.mode || appMap.get(name)?.mode || getMode(value.category),
+      // Resolver productivity (span model), carried through for the row badge.
+      productivity: value.productivity || appMap.get(name)?.productivity || null,
+      // Raw exe so a category correction builds an app-rule matching key_app.
+      exe: value.exe || appMap.get(name)?.exe || '',
       domain: value.domain || appMap.get(name)?.domain || '',
       description: value.description || appMap.get(name)?.description || '',
+      // True when any of this key's time was attributed from a title-guessed
+      // (degraded) browser span rather than a real URL — surfaced as an "estimated"
+      // badge so the user knows the total is approximate. OR'd across merged rows.
+      degraded: Boolean(value.degraded) || Boolean(appMap.get(name)?.degraded),
       timeSpentSeconds: prevTime + value.time
     })
   }
@@ -314,12 +362,16 @@ export function formatAppsData(rawData, date) {
       key: app.key,
       name: app.name,
       category: app.category,
-      mode: app.mode || getMode(app.category),
+      exe: app.exe || '',
       domain: app.domain || '',
       description: app.description || '',
       timeSpent: formatAppsTime(Math.floor(app.timeSpentSeconds / 1000)),
       timeSpentSeconds: Math.floor(app.timeSpentSeconds / 1000),
-      productivity: getProductivity(app.category),
+      // Prefer the resolver productivity carried on the row; fall back to category.
+      productivity: productivityForApp(app),
+      // Carried to the UI so browser rows whose time was title-guessed can be
+      // flagged as an estimate rather than presented as exact.
+      degraded: Boolean(app.degraded),
       trend: 'up' // static for now; could be dynamic with historical data
     })
   }
@@ -424,7 +476,9 @@ const accumulateProductivity = (bucket, app) => {
   if (!app.category || !app.time) return
 
   const seconds = app.time / 1000
-  switch (getProductivity(app.category)) {
+  // Prefer the resolver productivity carried on the row (span model); fall back to
+  // deriving from the category for any legacy-shaped data.
+  switch (productivityForApp(app)) {
     case 'Productive':
       bucket.productive += seconds
       break
@@ -435,10 +489,10 @@ const accumulateProductivity = (bucket, app) => {
       bucket.neutral += seconds
   }
 
-  // Level-2 mode accrual. Prefer the per-app stored mode; fall back to the
-  // category default so old/unlabelled data still splits sensibly.
+  // Level-2 mode accrual (kept for the mode donut/drill-down). Mode is category-
+  // derived under the span model.
   if (bucket.modes) {
-    const mode = app.mode || getMode(app.category)
+    const mode = getMode(app.category)
     if (bucket.modes[mode] === undefined) bucket.modes[mode] = 0
     bucket.modes[mode] += seconds
   }

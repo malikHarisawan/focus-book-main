@@ -126,6 +126,172 @@ CREATE TABLE IF NOT EXISTS timestamps (
     FOREIGN KEY (app_usage_id) REFERENCES app_usage(id) ON DELETE CASCADE
 );
 
+-- ============================================================================
+-- SPAN-MODEL CATEGORIZATION (new architecture; coexists with legacy app_usage)
+-- ============================================================================
+-- CORE PRINCIPLE — two kinds of truth, never conflated:
+--   `span`  records WHAT HAPPENED — an immutable event log. It stores the
+--           structured activity key (app/domain/path/title), NOT a category.
+--   `rule`  records WHAT WE CURRENTLY BELIEVE IT MEANS — mutable.
+-- Category + productivity are resolved at QUERY TIME by joining spans against the
+-- current rules (see src/main/classification/resolver.js). This is what makes
+-- re-categorization retroactive for free: edit a rule and every past span's
+-- category changes with zero UPDATE sweep. A span must NEVER store a resolved
+-- category/mode — that would bake a possibly-wrong interpretation into the log.
+--
+-- Scale is single-user local SQLite (~50k spans/year), so the query-time join is
+-- free; if it ever isn't, add a materialized cache DOWNSTREAM — never denormalize
+-- the log.
+
+-- Immutable event log. No category/mode column BY DESIGN.
+-- `key_app_name` is the friendly display name (Windows FileDescription, e.g. "Visual
+-- Studio Code" for code.exe) captured at write time. It is a FACT about what ran, not
+-- an interpretation, so storing it does NOT violate the no-denormalized-category rule.
+-- The dashboard uses it as the display key for app spans, so no name resolver is
+-- needed at read time. Nullable — falls back to key_app when unavailable.
+CREATE TABLE IF NOT EXISTS span (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    key_source TEXT NOT NULL CHECK (key_source IN ('app', 'web')),
+    key_app TEXT NOT NULL,           -- always present (web activity ran in an app); the raw exe
+    key_app_name TEXT,               -- friendly display name (FileDescription); falls back to key_app
+    key_domain TEXT,                 -- lowercased, 'www.' stripped; NULL for app spans
+    key_path TEXT,                   -- pathname (+ opt-in preserved query param); NULL for app spans
+    title TEXT,                      -- weak matching signal only
+    start DATETIME NOT NULL,
+    end DATETIME NOT NULL,
+    degraded_flag INTEGER NOT NULL DEFAULT 0, -- 1 when the key was captured degraded (no URL, etc.)
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+);
+
+-- Categories: taxonomy. `default_productivity` is the judgment applied when no
+-- per-user productivity_override exists. Kept separate from category identity so
+-- productivity can be re-judged without redefining the taxonomy.
+CREATE TABLE IF NOT EXISTS category (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    name TEXT NOT NULL UNIQUE,
+    default_productivity TEXT NOT NULL
+        CHECK (default_productivity IN ('productive', 'neutral', 'distracting')),
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+);
+
+-- Rules: pattern -> category. Specificity is DERIVED from matcher_type at resolve
+-- time (not a stored, user-editable column). is_user_rule breaks specificity ties
+-- in the user's favour. No `priority`/order column: resolution is most-specific-wins,
+-- not first-match, so rule ORDER is deliberately meaningless.
+CREATE TABLE IF NOT EXISTS rule (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    matcher_type TEXT NOT NULL CHECK (matcher_type IN
+        ('title_contains', 'app', 'domain', 'domain_path_prefix', 'domain_path_regex')),
+    matcher_value TEXT NOT NULL,
+    category_id INTEGER NOT NULL,
+    is_user_rule INTEGER NOT NULL DEFAULT 0,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (category_id) REFERENCES category(id) ON DELETE CASCADE
+);
+
+-- Per-user productivity override for a category. Single-user local app, so at most
+-- one row per category. Absence means "use category.default_productivity".
+CREATE TABLE IF NOT EXISTS productivity_override (
+    category_id INTEGER PRIMARY KEY,
+    productivity TEXT NOT NULL
+        CHECK (productivity IN ('productive', 'neutral', 'distracting')),
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (category_id) REFERENCES category(id) ON DELETE CASCADE
+);
+
+-- ============================================================================
+-- PRESENCE MODEL (was the user here?) — see docs/PRESENCE_AND_IDLE_ENGINE.md
+-- ============================================================================
+-- A SECOND immutable event log, sibling of `span`. Where `span` records WHAT ran,
+-- `presence_span` records WHETHER THE USER WAS PRESENT, as typed, gapless intervals.
+-- The gapless invariant: for any period the app was running, presence spans tile the
+-- timeline with no gaps and no overlaps — every second is exactly one type. Absence is
+-- NEVER a hole in the data; it is an explicit span. No interpretation is stored here
+-- (that lives in span_annotation, resolved at query time — same shape as span+rule).
+
+-- Immutable presence log. `type` is the FACT observed; `active` means input was seen,
+-- the four absence types record WHY the user was gone. Durations are ALWAYS end-start
+-- from the stored edge timestamps, never accumulated tick counts (timers stop on sleep).
+CREATE TABLE IF NOT EXISTS presence_span (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    type TEXT NOT NULL CHECK (type IN ('active', 'idle', 'locked', 'suspended', 'unknown')),
+    start DATETIME NOT NULL,   -- wall-clock ISO, for display
+    end DATETIME NOT NULL,     -- wall-clock ISO; duration = end - start
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+);
+
+-- Liveness watermark: a single row updated by a heartbeat every few seconds. On startup,
+-- if last_alive_at is meaningfully older than now, the app was NOT running for that gap
+-- (crash, power cut, force-kill) — that window is backfilled as an `unknown` presence
+-- span. This is what makes crash survival correct WITHOUT any shutdown event, and it
+-- prevents the "coded 11h straight overnight" bug (extending the last open span to now).
+CREATE TABLE IF NOT EXISTS app_liveness (
+    id INTEGER PRIMARY KEY CHECK (id = 1),   -- single-row table
+    last_alive_at DATETIME NOT NULL,
+    updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+);
+
+-- Span annotation: the user's INTERPRETATION of an absence ("that idle block was a
+-- meeting"). A new FACT, not a correction — the presence_span stays exactly as recorded
+-- ("no input 10:00-10:23" is true forever). Dashboards JOIN this in at query time, the
+-- same way rules resolve categories. Nothing in the log is ever rewritten.
+CREATE TABLE IF NOT EXISTS span_annotation (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    presence_span_id INTEGER NOT NULL,
+    user_label TEXT NOT NULL,        -- 'break' | 'working' | 'meeting' | free text
+    answered_at DATETIME NOT NULL,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (presence_span_id) REFERENCES presence_span(id) ON DELETE CASCADE
+);
+
+-- Seed span-model categories. Small, stable taxonomy with a default productivity per
+-- category (the judgment axis, independently overridable via productivity_override).
+INSERT OR IGNORE INTO category (name, default_productivity) VALUES
+    ('Coding',        'productive'),
+    ('Communication', 'neutral'),
+    ('Browsing',      'neutral'),
+    ('Utilities',     'neutral'),
+    ('Entertainment', 'distracting'),
+    ('Social',        'distracting'),
+    ('Uncategorized', 'neutral');
+
+-- Seed a HANDFUL of built-in rules (NOT the full library — that is a separate content
+-- task). Enough that common apps/domains resolve so a fresh DB isn't all-unrated.
+-- category_id is resolved by name so seed order is irrelevant. is_user_rule=0 (built-in);
+-- user rules beat these at equal specificity. Specificity is derived from matcher_type,
+-- so no priority/order column exists.
+INSERT OR IGNORE INTO rule (matcher_type, matcher_value, category_id, is_user_rule)
+    SELECT 'app', 'code.exe', id, 0 FROM category WHERE name='Coding';
+INSERT OR IGNORE INTO rule (matcher_type, matcher_value, category_id, is_user_rule)
+    SELECT 'app', 'windowsterminal.exe', id, 0 FROM category WHERE name='Coding';
+INSERT OR IGNORE INTO rule (matcher_type, matcher_value, category_id, is_user_rule)
+    SELECT 'domain', 'stackoverflow.com', id, 0 FROM category WHERE name='Coding';
+INSERT OR IGNORE INTO rule (matcher_type, matcher_value, category_id, is_user_rule)
+    SELECT 'domain', 'github.com', id, 0 FROM category WHERE name='Coding';
+INSERT OR IGNORE INTO rule (matcher_type, matcher_value, category_id, is_user_rule)
+    SELECT 'app', 'slack.exe', id, 0 FROM category WHERE name='Communication';
+INSERT OR IGNORE INTO rule (matcher_type, matcher_value, category_id, is_user_rule)
+    SELECT 'app', 'ms-teams.exe', id, 0 FROM category WHERE name='Communication';
+INSERT OR IGNORE INTO rule (matcher_type, matcher_value, category_id, is_user_rule)
+    SELECT 'domain', 'mail.google.com', id, 0 FROM category WHERE name='Communication';
+INSERT OR IGNORE INTO rule (matcher_type, matcher_value, category_id, is_user_rule)
+    SELECT 'domain', 'youtube.com', id, 0 FROM category WHERE name='Entertainment';
+INSERT OR IGNORE INTO rule (matcher_type, matcher_value, category_id, is_user_rule)
+    SELECT 'domain', 'netflix.com', id, 0 FROM category WHERE name='Entertainment';
+INSERT OR IGNORE INTO rule (matcher_type, matcher_value, category_id, is_user_rule)
+    SELECT 'app', 'spotify.exe', id, 0 FROM category WHERE name='Entertainment';
+INSERT OR IGNORE INTO rule (matcher_type, matcher_value, category_id, is_user_rule)
+    SELECT 'domain', 'reddit.com', id, 0 FROM category WHERE name='Social';
+INSERT OR IGNORE INTO rule (matcher_type, matcher_value, category_id, is_user_rule)
+    SELECT 'domain', 'x.com', id, 0 FROM category WHERE name='Social';
+INSERT OR IGNORE INTO rule (matcher_type, matcher_value, category_id, is_user_rule)
+    SELECT 'domain', 'facebook.com', id, 0 FROM category WHERE name='Social';
+INSERT OR IGNORE INTO rule (matcher_type, matcher_value, category_id, is_user_rule)
+    SELECT 'app', 'explorer.exe', id, 0 FROM category WHERE name='Utilities';
+
 -- Focus sessions table for focus session tracking
 CREATE TABLE IF NOT EXISTS focus_sessions (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -175,6 +341,20 @@ CREATE INDEX IF NOT EXISTS idx_focus_sessions_status ON focus_sessions(status);
 CREATE INDEX IF NOT EXISTS idx_focus_interruptions_session_id ON focus_session_interruptions(focus_session_id);
 CREATE INDEX IF NOT EXISTS idx_category_rules_match_type ON category_rules(match_type);
 
+-- Span-model indexes. Reads are time-ranged (dashboards ask "spans in [start,end]")
+-- and grouped by key when surfacing uncategorized time.
+CREATE INDEX IF NOT EXISTS idx_span_start ON span(start);
+CREATE INDEX IF NOT EXISTS idx_span_key_app ON span(key_app);
+CREATE INDEX IF NOT EXISTS idx_span_key_domain ON span(key_domain);
+CREATE INDEX IF NOT EXISTS idx_rule_matcher_type ON rule(matcher_type);
+CREATE INDEX IF NOT EXISTS idx_rule_category_id ON rule(category_id);
+
+-- Presence-model indexes. Reads are time-ranged and grouped by type (dashboards ask
+-- "how much locked/idle/unknown in [start,end]"); annotations are looked up by span.
+CREATE INDEX IF NOT EXISTS idx_presence_span_start ON presence_span(start);
+CREATE INDEX IF NOT EXISTS idx_presence_span_type ON presence_span(type);
+CREATE INDEX IF NOT EXISTS idx_span_annotation_span_id ON span_annotation(presence_span_id);
+
 -- Seed the five work-modes (Level 2). rollup maps each mode back to the existing
 -- Level-1 verdict so the AreaChart's productive/neutral/distracting bands are the
 -- exact sum of the modes underneath them. color/icon drive the mode donut/drill-down.
@@ -193,6 +373,7 @@ INSERT OR IGNORE INTO modes (name, rollup, color, icon) VALUES
 -- Entertainment/Social Media to Distraction, and low-signal buckets to Break.
 INSERT OR IGNORE INTO categories (name, type, color, icon, default_mode) VALUES
     ('Code', 'productive', '#00d8ff', 'Code', 'Deep work'),
+    ('Learning', 'productive', '#14b8a6', 'GraduationCap', 'Deep work'),
     ('Browsing', 'neutral', '#b381c9', 'Globe', 'Deep work'),
     ('Communication', 'neutral', '#5ac26d', 'MessageSquare', 'Collaboration'),
     ('Utilities', 'neutral', '#36a2eb', 'Wrench', 'Break'),
@@ -232,16 +413,21 @@ INSERT OR IGNORE INTO category_rules (pattern, category, match_type, priority) V
     ('gmail', 'Communication', 'keyword', 0),
     ('outlook', 'Communication', 'keyword', 0),
     ('slack', 'Communication', 'keyword', 0),
-    -- Browsing / learning (neutral)
-    ('udemy.com', 'Browsing', 'app', 10),
-    ('vulms.vu.edu.pk', 'Browsing', 'app', 10),
+    -- Learning (productive) -- pulled OUT of the old neutral Browsing bucket, so
+    -- courses/tutorials/study count as focused productive time on their own.
+    ('udemy.com', 'Learning', 'app', 10),
+    ('vulms.vu.edu.pk', 'Learning', 'app', 10),
+    ('coursera.org', 'Learning', 'app', 10),
+    ('khanacademy.org', 'Learning', 'app', 10),
+    ('edx.org', 'Learning', 'app', 10),
+    ('tutorial', 'Learning', 'keyword', 5),
+    ('course', 'Learning', 'keyword', 5),
+    ('lecture', 'Learning', 'keyword', 5),
+    ('study', 'Learning', 'keyword', 5),
+    ('learning', 'Learning', 'keyword', 5),
+    ('research', 'Learning', 'keyword', 5),
+    -- Browsing (neutral) -- general-purpose browsing left after learning split out
     ('chatgpt.com', 'Browsing', 'app', 10),
-    ('tutorial', 'Browsing', 'keyword', 0),
-    ('course', 'Browsing', 'keyword', 0),
-    ('research', 'Browsing', 'keyword', 0),
-    ('study', 'Browsing', 'keyword', 0),
-    ('learning', 'Browsing', 'keyword', 0),
-    ('lecture', 'Browsing', 'keyword', 0),
     ('linkedin', 'Browsing', 'keyword', 0),
     -- Utilities
     ('Notepad.exe', 'Utilities', 'app', 10),

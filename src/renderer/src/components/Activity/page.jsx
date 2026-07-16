@@ -2,7 +2,7 @@
 
 import { useEffect, useState, useMemo, useRef, useLayoutEffect } from 'react'
 import { createPortal } from 'react-dom'
-import { Search, Check, ChevronDown, RefreshCw } from 'lucide-react'
+import { Search, Check, ChevronDown, RefreshCw, Info } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
 import { useToast } from '../../hooks/use-toast'
 import {
@@ -10,9 +10,7 @@ import {
   getProductivityType,
   refreshCategoryMapping,
   getCategoryList,
-  getCategoryColorFromDB,
-  getModeList,
-  getModeColor
+  getCategoryColorFromDB
 } from '../../utils/dataProcessor'
 import { useDate } from '../../context/DateContext'
 import SmartDatePicker from '../shared/smart-date-picker'
@@ -55,14 +53,8 @@ export default function AppUsageTable() {
   // `overflow-hidden` (which was clipping the dropdown).
   const [openCat, setOpenCat] = useState(null)
   const [menuRect, setMenuRect] = useState(null)
-  // Mode menu: same portal pattern as the category menu, tracked separately so the
-  // two pickers never fight over one piece of state.
-  const [openMode, setOpenMode] = useState(null)
-  const [modeMenuRect, setModeMenuRect] = useState(null)
-  const modes = useMemo(() => getModeList(), [])
 
   const openCategoryMenu = (appId, e) => {
-    setOpenMode(null)
     if (openCat === appId) {
       setOpenCat(null)
       return
@@ -70,17 +62,6 @@ export default function AppUsageTable() {
     const rect = e.currentTarget.getBoundingClientRect()
     setMenuRect(rect)
     setOpenCat(appId)
-  }
-
-  const openModeMenu = (appId, e) => {
-    setOpenCat(null)
-    if (openMode === appId) {
-      setOpenMode(null)
-      return
-    }
-    const rect = e.currentTarget.getBoundingClientRect()
-    setModeMenuRect(rect)
-    setOpenMode(appId)
   }
 
   useEffect(() => {
@@ -132,39 +113,6 @@ export default function AppUsageTable() {
     }
   }
 
-  // Per-app work-mode override. Unlike a category change (which creates a rule and
-  // retags history), a mode override is a per-app pin the tracker's getMode honours
-  // on the next tick. Mode is derived, so we do NOT rewrite history rows — we update
-  // the visible rows optimistically and let future ticks apply the pin.
-  const handleModeChange = async (appId, newMode) => {
-    const app = apps.find((a) => a.id === appId)
-    if (!app) return
-    // Key the override to match the tracker's getMode lookup, which reads
-    // `sig.appKey || sig.domain || sig.exe` (appKey wins and is always set). The
-    // row's `key` IS that stored appKey — the friendly name for native apps, the
-    // URL for browser tabs — so keying off it guarantees getMode finds the pin on
-    // the next tick. Fall back to name only if the key is somehow missing.
-    const identifier = app.key || app.name
-    // Optimistic update.
-    setApps((prev) => prev.map((a) => (a.id === appId ? { ...a, mode: newMode } : a)))
-    setOpenMode(null)
-    try {
-      // Pass the row so the retag matches history the same way a category change
-      // does (browser rows retag the whole site by domain; native apps by name).
-      const ok = await window.activeWindow.setModeOverride(identifier, newMode, app)
-      if (!ok) throw new Error('Failed to set mode override')
-      toast({
-        title: 'Mode pinned',
-        description: `"${app.name}" is now counted as "${newMode}".`,
-        duration: 3500
-      })
-      await loadApps()
-    } catch (error) {
-      console.error('Failed to save mode change:', error)
-      await loadApps()
-      toast({ title: 'Error', description: 'Failed to save mode change.', variant: 'destructive' })
-    }
-  }
 
   // Totals by productivity (seconds).
   const totals = useMemo(() => {
@@ -296,12 +244,11 @@ export default function AppUsageTable() {
       {/* Table */}
       <section className="rounded-[18px] border border-fb-border bg-fb-surface shadow-[var(--fb-shadow)] overflow-hidden">
         {/* Column header */}
-        <div className="grid grid-cols-[2.2fr_1.5fr_1.3fr_1.2fr_0.9fr] gap-4 px-6 py-4 border-b border-fb-border items-center">
+        <div className="grid grid-cols-[2.4fr_1.7fr_1.4fr_1fr] gap-4 px-6 py-4 border-b border-fb-border items-center">
           <button onClick={() => toggleSort('name')} className="flex items-center gap-1.5 text-left text-[12.5px] font-semibold uppercase tracking-wide text-fb-muted">
             Application <span className="text-fb-accent text-[11px]">{arrow('name')}</span>
           </button>
           <div className="text-[12.5px] font-semibold uppercase tracking-wide text-fb-muted">Category</div>
-          <div className="text-[12.5px] font-semibold uppercase tracking-wide text-fb-muted">Mode</div>
           <button onClick={() => toggleSort('time')} className="flex items-center gap-1.5 text-left text-[12.5px] font-semibold uppercase tracking-wide text-fb-muted">
             Time spent <span className="text-fb-accent text-[11px]">{arrow('time')}</span>
           </button>
@@ -312,11 +259,10 @@ export default function AppUsageTable() {
         {rows.map((r) => {
           const pm = PROD[r.productivity] || PROD.Neutral
           const catColor = getCategoryColorFromDB(r.category)
-          const modeColor = getModeColor(r.mode)
           return (
             <div
               key={r.id}
-              className="grid grid-cols-[2.2fr_1.5fr_1.3fr_1.2fr_0.9fr] gap-4 px-6 py-3.5 items-center transition-colors hover:bg-fb-surface2"
+              className="grid grid-cols-[2.4fr_1.7fr_1.4fr_1fr] gap-4 px-6 py-3.5 items-center transition-colors hover:bg-fb-surface2"
               style={{ borderBottom: '1px solid var(--fb-rowline, var(--fb-border))' }}
             >
               {/* App */}
@@ -328,6 +274,15 @@ export default function AppUsageTable() {
                   {r.mono}
                 </div>
                 <span className="text-[14.5px] font-semibold truncate text-fb-text">{r.name}</span>
+                {r.degraded && (
+                  <span
+                    className="inline-flex items-center gap-1 flex-none text-[10.5px] font-semibold px-1.5 py-0.5 rounded-md text-amber-600 dark:text-amber-400 bg-amber-400/15"
+                    title="Estimated: this browsing time was matched from the window title, not a live tab URL. Connect the browser extension for exact site tracking."
+                  >
+                    <Info className="h-3 w-3" />
+                    Est.
+                  </span>
+                )}
               </div>
 
               {/* Category — opens a portal-rendered menu (see below) */}
@@ -339,19 +294,6 @@ export default function AppUsageTable() {
                 >
                   <span className="w-2 h-2 rounded-[3px]" style={{ background: catColor }} />
                   {r.category}
-                  <ChevronDown className="h-3 w-3 opacity-60" />
-                </button>
-              </div>
-
-              {/* Mode — same portal-menu pattern as Category, pins a per-app work-mode */}
-              <div onClick={(e) => e.stopPropagation()}>
-                <button
-                  onClick={(e) => openModeMenu(r.id, e)}
-                  className="inline-flex items-center gap-2 text-[12.5px] font-semibold px-2.5 py-1.5 rounded-lg border transition-all hover:border-fb-accent"
-                  style={{ borderColor: 'var(--fb-border)', color: modeColor }}
-                >
-                  <span className="w-2 h-2 rounded-full" style={{ background: modeColor }} />
-                  {r.mode}
                   <ChevronDown className="h-3 w-3 opacity-60" />
                 </button>
               </div>
@@ -398,21 +340,6 @@ export default function AppUsageTable() {
             navigate('/settings?tab=Categories Management')
           }}
           onClose={() => setOpenCat(null)}
-        />
-      )}
-
-      {/* Mode menu — mirrors the category menu; pins a per-app work-mode override. */}
-      {openMode != null && modeMenuRect && (
-        <ModeMenu
-          rect={modeMenuRect}
-          modes={modes}
-          current={apps.find((a) => a.id === openMode)?.mode}
-          onPick={(name) => handleModeChange(openMode, name)}
-          onManage={() => {
-            setOpenMode(null)
-            navigate('/settings?tab=Categories Management')
-          }}
-          onClose={() => setOpenMode(null)}
         />
       )}
     </div>
@@ -488,80 +415,6 @@ function CategoryMenu({ rect, categories, current, onPick, onManage, onClose }) 
           className="w-full text-left text-[12px] font-semibold text-fb-accent px-2.5 py-2 rounded-lg hover:bg-fb-surface2"
         >
           Manage all rules →
-        </button>
-      </div>
-    </div>,
-    document.body
-  )
-}
-
-// Fixed-positioned work-mode picker, structurally identical to CategoryMenu so the
-// two behave the same (flip near the viewport bottom, close on outside/scroll/Esc).
-function ModeMenu({ rect, modes, current, onPick, onManage, onClose }) {
-  const ref = useRef(null)
-  const [pos, setPos] = useState({ left: rect.left, top: rect.bottom + 6, flip: false })
-
-  useLayoutEffect(() => {
-    const el = ref.current
-    if (!el) return
-    const mh = el.offsetHeight
-    const mw = el.offsetWidth
-    const margin = 8
-    const spaceBelow = window.innerHeight - rect.bottom
-    const flip = spaceBelow < mh + margin && rect.top > mh + margin
-    let left = rect.left
-    if (left + mw > window.innerWidth - margin) left = window.innerWidth - mw - margin
-    if (left < margin) left = margin
-    const top = flip ? rect.top - mh - 6 : rect.bottom + 6
-    setPos({ left, top, flip })
-  }, [rect])
-
-  useEffect(() => {
-    const onDown = (e) => {
-      if (ref.current && !ref.current.contains(e.target)) onClose()
-    }
-    const onKey = (e) => e.key === 'Escape' && onClose()
-    document.addEventListener('mousedown', onDown)
-    document.addEventListener('keydown', onKey)
-    window.addEventListener('scroll', onClose, true)
-    return () => {
-      document.removeEventListener('mousedown', onDown)
-      document.removeEventListener('keydown', onKey)
-      window.removeEventListener('scroll', onClose, true)
-    }
-  }, [onClose])
-
-  return createPortal(
-    <div
-      ref={ref}
-      className="fixed z-[100] rounded-xl border border-fb-border bg-fb-surface shadow-xl p-1.5 min-w-[200px] max-h-[60vh] overflow-y-auto custom-scrollbar"
-      style={{ left: pos.left, top: pos.top }}
-      onClick={(e) => e.stopPropagation()}
-    >
-      <div className="text-[11px] font-bold uppercase tracking-wide text-fb-muted px-2.5 pt-2 pb-1.5">
-        Set work-mode
-      </div>
-      {modes.map((m) => {
-        const active = m.name === current
-        return (
-          <button
-            key={m.name}
-            onClick={() => onPick(m.name)}
-            className="w-full flex items-center gap-2.5 px-2.5 py-2 rounded-lg transition-colors hover:bg-fb-surface2"
-            style={{ background: active ? 'var(--fb-surface2)' : 'transparent' }}
-          >
-            <span className="w-2.5 h-2.5 rounded-full flex-none" style={{ background: getModeColor(m.name) }} />
-            <span className="text-[13.5px] font-medium flex-1 text-left text-fb-text">{m.name}</span>
-            {active && <Check className="h-3.5 w-3.5 text-fb-accent" />}
-          </button>
-        )
-      })}
-      <div className="border-t border-fb-border mt-1 pt-1">
-        <button
-          onClick={onManage}
-          className="w-full text-left text-[12px] font-semibold text-fb-accent px-2.5 py-2 rounded-lg hover:bg-fb-surface2"
-        >
-          Manage overrides →
         </button>
       </div>
     </div>,

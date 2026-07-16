@@ -7,6 +7,7 @@ import FocusPage from './components/Focus/page'
 // the /chat route below to re-enable.
 // import ChatPage from './components/Chat/page'
 import UpdateNotification from './components/UpdateNotification'
+import AwayReturnPrompt from './components/AwayReturnPrompt'
 import WelcomeModal from './components/Onboarding/WelcomeModal'
 import { DateProvider } from './context/DateContext'
 import { ThemeProvider } from './context/ThemeContext'
@@ -63,6 +64,7 @@ function App() {
             </Routes>
           </MainLayout>
           <UpdateNotification />
+          <AwayReturnPrompt />
           {onboarded === false && <WelcomeModal onComplete={completeOnboarding} />}
         </Router>
       </DateProvider>

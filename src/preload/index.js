@@ -138,6 +138,20 @@ async function resolveBrowserUrl(currentWindow) {
   }
 }
 
+// SPAN MODEL (C1): resolve a raw foreground observation against the current rules in
+// main, returning { category, productivity, winning_rule }. Used by the tracking loop
+// for the real-time focus/popup decision. Falls back to unrated (treated as focused)
+// on any error so the popup logic never wrongly fires from a transient failure.
+async function resolveLive(raw) {
+  try {
+    const result = await ipcRenderer.invoke('resolve-live', raw)
+    return result || { category: null, productivity: 'unrated', winning_rule: null }
+  } catch (error) {
+    console.error('Error in resolveLive:', error)
+    return { category: null, productivity: 'unrated', winning_rule: null }
+  }
+}
+
 
 // Initialize tracking data
 ;(async function initializeTracking() {
@@ -189,13 +203,55 @@ let productivityHistory = []
 let lastProductivityCheck = Date.now()
 let unproductiveStreakStart = null
 
-// Productivity configuration
+// Productivity configuration. MIN_PRODUCTIVE_DURATION and the auto-session length
+// are user-tunable via Settings → Focus & Blocking; the values below are the
+// shipping defaults, overwritten by applyBlockingSettings() once ui-state loads.
 const PRODUCTIVITY_CONFIG = {
-  MIN_PRODUCTIVE_DURATION: 30 * 1000, // 30 seconds of productive activity before session start (reduced for testing)
+  MIN_PRODUCTIVE_DURATION: 5 * 60 * 1000, // productive activity required before an auto focus session starts
   MAX_UNPRODUCTIVE_INTERRUPTION: 2 * 60 * 1000, // 2 minutes of unproductive activity before session pause
   PRODUCTIVITY_CHECK_INTERVAL: 15000, // 15 seconds (reduced from 30 seconds)
   HISTORY_WINDOW: 10 * 60 * 1000, // 10 minutes of history to maintain
 }
+
+// User-configurable blocking behavior, persisted in ui-state.json under `blocking`.
+// `enabled: false` is the global off-switch: no auto focus sessions are started and
+// no distraction popups fire. `sessionMs` is the auto-session length. Defaults here
+// match the shipping behavior and are replaced by the persisted values on load.
+const blockingSettings = {
+  enabled: true,
+  minProductiveMs: 5 * 60 * 1000,
+  sessionMs: 25 * 60 * 1000
+}
+
+function applyBlockingSettings(patch) {
+  if (!patch || typeof patch !== 'object') return
+  if (typeof patch.enabled === 'boolean') blockingSettings.enabled = patch.enabled
+  if (Number.isFinite(patch.minProductiveMs) && patch.minProductiveMs > 0) {
+    blockingSettings.minProductiveMs = patch.minProductiveMs
+    PRODUCTIVITY_CONFIG.MIN_PRODUCTIVE_DURATION = patch.minProductiveMs
+  }
+  if (Number.isFinite(patch.sessionMs) && patch.sessionMs > 0) {
+    blockingSettings.sessionMs = patch.sessionMs
+  }
+}
+
+// Pull persisted blocking settings from ui-state.json at startup so the tracking
+// loop honors the user's choices from the first tick. Failures fall back to defaults.
+;(async () => {
+  try {
+    const state = await ipcRenderer.invoke('get-ui-state')
+    if (state && state.blocking) applyBlockingSettings(state.blocking)
+  } catch (error) {
+    console.warn('Could not load blocking settings; using defaults:', error.message)
+  }
+})()
+
+// Live-update when the user changes blocking settings in the UI (no restart needed).
+ipcRenderer.on('blocking-settings-changed', (event, patch) => {
+  applyBlockingSettings(patch)
+  console.log('Blocking settings updated:', blockingSettings)
+})
+
 loadData()
 
 // Cache for process details (executable path + description) keyed by
@@ -379,7 +435,21 @@ async function getCurrentSessionStatus() {
   }
 }
 
+// Re-entrancy guard. updateAppUsage is async with several await points
+// (idle-state, getActiveWindow, resolveBrowserUrl, getProcessDetails) and is fired
+// from TWO timers (the 15s regular tick and the 5s app-switch check). Without this
+// guard a second invocation can start while the first is still awaiting, so BOTH
+// read the same stale `lastUpdateTime` and each emit a span from it — producing
+// overlapping spans that double-count the shared window. Serializing the function
+// so only one run is in flight at a time removes that class of overlap entirely.
+let isUpdatingAppUsage = false
+
 async function updateAppUsage() {
+  if (isUpdatingAppUsage) {
+    console.log('updateAppUsage already in progress, skipping this tick')
+    return
+  }
+  isUpdatingAppUsage = true
   try {
     const state = await getCurrentState(60) // Reduced from 120 seconds to 60 seconds
     if (state == 'idle' || state == 'locked' || state == 'unknown') {
@@ -455,19 +525,30 @@ async function updateAppUsage() {
       recordSwitchAndRate()
     }
 
-    let appIdentifier = isBrowserExe(currentWindow.windowClass)
-      ? getCategory(active_url || currentWindow.windowName || currentWindow.windowClass)
-      : getCategory(currentWindow.windowClass)
+    // SPAN MODEL (C1): resolve the current foreground context against the NEW rules
+    // (same source as the dashboards) to get its productivity. isFocused is now
+    // rule-driven ("not distracting") instead of a hardcoded Distracted_List.
+    const liveRaw = isBrowserExe(currentWindow.windowClass)
+      ? { source: 'web', app: currentWindow.windowClass, url: active_url || undefined, title: currentWindow.windowName || undefined }
+      : { source: 'app', app: currentWindow.windowClass, title: currentWindow.windowName || undefined }
+    const live = await resolveLive(liveRaw)
 
-    console.log('appIdentifier ==>> ', appIdentifier)
-    const isFocused = !Distracted_List.includes(appIdentifier)
+    // A stable per-app key for dismiss/popup tracking: the resolved category when we
+    // have one, else the app/domain, so dismissedApps keys stay consistent per app.
+    const appIdentifier =
+      live.category ||
+      (isBrowserExe(currentWindow.windowClass) ? active_domain || currentWindow.windowClass : currentWindow.windowClass)
+
+    console.log('appIdentifier ==>> ', appIdentifier, 'productivity:', live.productivity)
+    const isFocused = live.productivity !== 'distracting'
     let isDismissed = handleDismiss(appIdentifier)
 
     // Update productivity state tracking
     updateProductivityState(isFocused)
 
-    // Handle focus session logic with productivity validation
-    if (isFocused && shouldStartFocusSession() && !isFocusSessionActive) {
+    // Handle focus session logic with productivity validation. When blocking is
+    // disabled in Settings, we never auto-start a session (and therefore never pop).
+    if (blockingSettings.enabled && isFocused && shouldStartFocusSession() && !isFocusSessionActive) {
       console.log(`Starting focus session after ${getProductiveStreakDuration() / 1000}s of productive activity`)
       startFocusSession(isFocused)
     }
@@ -484,7 +565,11 @@ async function updateAppUsage() {
       } else {
         // User switched to unproductive activity
         console.log('isFocusSessionActive', isFocusSessionActive)
-        handlePopup(appIdentifier, currentWindow, isDismissed)
+        // Respect the global blocking off-switch: track the interruption but never
+        // surface the fullscreen popup when the user has turned blocking off.
+        if (blockingSettings.enabled) {
+          handlePopup(appIdentifier, currentWindow, isDismissed)
+        }
         
         // Check if we should pause the session due to extended unproductive activity
         if (shouldPauseFocusSession()) {
@@ -503,9 +588,13 @@ async function updateAppUsage() {
     previousWindowClass = currentAppClass
     previousWindowName = currentAppName
 
-    updateUsageData(currentWindow, hasAppSwitched)
+    // Awaited so the guard is held until the span is written and lastUpdateTime is
+    // advanced; releasing before this async work finished would reopen the overlap.
+    await updateUsageData(currentWindow, hasAppSwitched)
   } catch (error) {
     console.error('Error updating app usage:', error)
+  } finally {
+    isUpdatingAppUsage = false
   }
 }
 async function startFocusSession(isFocused) {
@@ -519,10 +608,11 @@ async function startFocusSession(isFocused) {
         return
       }
 
-      // Start an actual focus session via IPC
+      // Start an actual focus session via IPC. Duration honors the user's
+      // Settings → Focus & Blocking choice (defaults to 25 minutes).
       const sessionData = {
         type: 'focus',
-        duration: 25 * 60 * 1000, // 25 minutes in milliseconds
+        duration: blockingSettings.sessionMs,
         isAutoStarted: true,
         productivityStreakDuration: getProductiveStreakDuration()
       }
@@ -617,14 +707,21 @@ async function getActiveWindow() {
   }
 }
 
+// Windows lock/logon system processes that can briefly be the foreground window
+// during a lock/unlock transition — a window that appears BEFORE powerMonitor
+// reports 'locked'. Time attributed to these is not real usage (the user is at the
+// lock screen), so it must never produce a span. Matched case-insensitively.
+const SYSTEM_LOCK_EXES = new Set(['lockapp.exe', 'logonui.exe'])
+
 function isValidWindow(currentWindow) {
   if (!currentWindow || !currentWindow.windowClass) {
     return false
   }
-
-  let isidle = getCategory(currentWindow.windowClass)
-
-  if (isidle === 'Idle') {
+  // Reject the lock screen itself. Idle/lock is otherwise handled upstream via
+  // powerMonitor (the 'idle-state' IPC gate in updateAppUsage), but there is a small
+  // window at the lock transition where the lock-screen exe is foreground before
+  // powerMonitor flips to 'locked' — this closes that leak.
+  if (SYSTEM_LOCK_EXES.has(String(currentWindow.windowClass).toLowerCase())) {
     return false
   }
   return true
@@ -696,33 +793,70 @@ async function updateUsageData(currentWindow, hasAppSwitched) {
       const appDescription = await getProcessDetails(lastActiveApp.windowPid, appClass)
       //  const appDescription = processInfo ? processInfo.description : appClass;
 
-      if (isBrowserExe(appClass)) {
-        // active_url / active_browser_source are set in the detection logic above
-        updateChromeTime(
-          formattedDate,
-          lastActiveApp.windowName,
-          appDescription.description,
-          active_url,
-          recordTime,
-          formattedHour,
-          hasAppSwitched,
-          active_browser_source
-        )
-      } else {
-        updateAppTime(
-          formattedDate,
-          appClass,
-          appDescription.description,
-          recordTime,
-          formattedHour,
-          hasAppSwitched
-        )
-      }
+      // SPAN MODEL (Phase A): write ONE immutable span for this interval. No category
+      // or mode is computed here — resolution happens at read time in main. The span
+      // records only WHAT HAPPENED: the structured key + the interval + a friendly
+      // display name (FileDescription) for the dashboard.
+      await emitSpan({
+        appClass,
+        description: appDescription.description,
+        windowName: lastActiveApp.windowName,
+        start: lastUpdateTime,
+        end: currentTime,
+        durationMs: recordTime
+      })
     }
   }
 
   lastActiveApp = currentWindow
   lastUpdateTime = currentTime
+}
+
+// End of the most recently emitted span (epoch ms). Used as a monotonic floor so no
+// span can ever begin before the previous one ended — a defense-in-depth guarantee
+// that the immutable log holds non-overlapping intervals regardless of clock skew,
+// missed idle resets, or interleaved callers.
+let lastSpanEnd = 0
+
+// Build a normalized span observation from a tracked interval and persist it via the
+// main-process SpanService (write-span IPC). Fire-and-forget with error catch — a
+// failed span write must never break the tracking loop.
+async function emitSpan({ appClass, description, windowName, start, durationMs }) {
+  try {
+    // Clamp the start forward to the previous span's end so intervals never overlap.
+    // Duration is preserved (we shift, not shrink) — the tracker already capped it.
+    const safeStart = Math.max(start, lastSpanEnd)
+    // end = start + the CAPPED duration the tracker decided to record (recordTime),
+    // not raw wall-clock, so gap-capping is preserved in the span's length.
+    const end = safeStart + durationMs
+    start = safeStart
+    lastSpanEnd = end
+
+    const isBrowser = isBrowserExe(appClass)
+
+    let raw
+    if (isBrowser) {
+      raw = {
+        source: 'web',
+        app: appClass,
+        appName: resolveDisplayName(description, appClass),
+        url: active_url || undefined,
+        title: windowName || description || undefined
+      }
+    } else {
+      raw = {
+        source: 'app',
+        app: appClass,
+        appName: resolveDisplayName(description, appClass),
+        title: description || windowName || undefined
+      }
+    }
+
+    const degraded = isBrowser && (active_browser_source === 'degraded' || active_browser_source === 'private')
+    await ipcRenderer.invoke('write-span', { raw, start, end, degraded })
+  } catch (error) {
+    console.error('emitSpan failed:', error)
+  }
 }
 
 function updateAppTime(
@@ -1622,9 +1756,10 @@ async function saveData() {
   }
 }
 async function getAppUsageStats(date) {
-  if (Object.keys(appUsageData).length === 0) {
-    await loadData()
-  }
+  // Under the span model, data comes from spans RESOLVED at read time (cheap), so
+  // always refetch rather than serve a stale in-memory cache. This makes new spans
+  // and rule edits show up on the next dashboard read without a manual refresh.
+  await loadData()
 
   if (date && appUsageData[date]) {
     return {
@@ -1708,6 +1843,15 @@ contextBridge.exposeInMainWorld('electronAPI', {
   // Auto-startup API
   getAutoLaunchStatus: () => ipcRenderer.invoke('get-auto-launch-status'),
   setAutoLaunch: (enabled) => ipcRenderer.invoke('set-auto-launch', enabled),
+  // Focus & blocking settings API. get returns the persisted `blocking` object
+  // (may be {} if never set); set merges a patch, persists it, and live-applies it
+  // to the tracking loop.
+  getBlockingSettings: () => ipcRenderer.invoke('get-blocking-settings'),
+  setBlockingSettings: (patch) => ipcRenderer.invoke('set-blocking-settings', patch),
+  // Delete recorded activity. scope 'history' keeps focus-session records; 'all'
+  // clears them too. Never touches categories/rules/settings. Irreversible — the
+  // renderer confirms with the user before calling.
+  deleteActivityData: (scope) => ipcRenderer.invoke('delete-activity-data', scope),
   // Exclusion List API
   getExclusionList: () => ipcRenderer.invoke('get-exclusion-list'),
   addToExclusionList: (identifier, type) => ipcRenderer.invoke('add-to-exclusion-list', identifier, type),
@@ -1720,6 +1864,18 @@ contextBridge.exposeInMainWorld('electronAPI', {
   installUpdate: () => ipcRenderer.invoke('install-update'),
   onUpdateAvailable: (callback) => ipcRenderer.on('update-available', (event, info) => callback(info)),
   onUpdateDownloaded: (callback) => ipcRenderer.on('update-downloaded', (event, info) => callback(info)),
+  // Presence / return-prompt API (see docs/PRESENCE_AND_IDLE_ENGINE.md §7). The main
+  // process fires 'away-return' when the user comes back from a long absence; the
+  // renderer asks what it was and stores the answer as a span_annotation (a new fact).
+  onAwayReturn: (callback) => {
+    const handler = (event, info) => callback(info)
+    ipcRenderer.on('away-return', handler)
+    return () => ipcRenderer.removeListener('away-return', handler)
+  },
+  annotatePresenceSpan: (spanId, label) =>
+    ipcRenderer.invoke('presence-annotate-span', { spanId, label }),
+  getUnannotatedAway: (range) => ipcRenderer.invoke('presence-get-unannotated-away', range),
+  getResolvedPresence: (range) => ipcRenderer.invoke('presence-get-resolved', range),
 })
 
 contextBridge.exposeInMainWorld('activeWindow', {
@@ -1768,16 +1924,20 @@ contextBridge.exposeInMainWorld('activeWindow', {
   updateCategoryRule: (id, updates) => updateCategoryRule(id, updates),
   deleteCategoryRule: (id) => deleteCategoryRule(id),
   // Per-app work-mode (Level 2) overrides — set from the Activity-row mode picker
-  // or reviewed/cleared in Settings. getMode honours these before rule/scorer/default.
-  getModeOverrides: () => getModeOverrides(),
-  setModeOverride: (appIdentifier, mode, app) => setModeOverride(appIdentifier, mode, app),
-  removeModeOverride: (appIdentifier) => removeModeOverride(appIdentifier),
   refreshData: () => loadData(),
-  updateAppCategory: (appIdentifier, category, selectedDate, appToUpdate) =>
-    updateAppCategory(appIdentifier, category, selectedDate, appToUpdate),
-  // Rule-based recategorization: creates/updates a classification rule and
-  // retags history so the change persists and applies to past + future data.
-  retagAppCategory: (app, category) => retagAppCategory(app, category)
+  // SPAN MODEL correction: a category change upserts a user rule (retroactive by
+  // construction — dashboards resolve spans live).
+  retagAppCategory: (app, category) => retagAppCategory(app, category),
+  // SPAN MODEL category/rule management (Settings panel) + uncategorized backlog.
+  spanGetCategories: () => spanGetCategories(),
+  spanGetRules: () => spanGetRules(),
+  spanAddCategory: (name, defaultProductivity) => spanAddCategory(name, defaultProductivity),
+  spanUpdateCategory: (id, updates) => spanUpdateCategory(id, updates),
+  spanDeleteCategory: (id) => spanDeleteCategory(id),
+  spanAddRule: (payload) => spanAddRule(payload),
+  spanUpdateRule: (id, updates) => spanUpdateRule(id, updates),
+  spanDeleteRule: (id) => spanDeleteRule(id),
+  getUncategorized: (range) => getUncategorized(range)
 })
 
 function getFormattedStats(date) {
@@ -1805,13 +1965,20 @@ ipcRenderer.on('cooldown', () => {
   handlecooldown()
 })
 
-ipcRenderer.on('dismiss', (event, appName) => {
+ipcRenderer.on('dismiss', async (event, appName) => {
   if (appName) {
     startDismisstime = Date.now()
-    let appCat = getCategory(appName)
-
-    if (Distracted_List.includes(appCat)) {
-      dismissedApps[appCat] = true
+    // Resolve the dismissed app against the current rules so the dismiss key matches
+    // the `appIdentifier` (resolved category) the tracking loop checks in handleDismiss.
+    // Only distracting apps are dismissable (matches the old Distracted_List gate).
+    const isUrl = /^https?:\/\//i.test(String(appName))
+    const raw = isUrl
+      ? { source: 'web', app: 'chrome.exe', url: appName }
+      : { source: 'app', app: appName, title: appName }
+    const live = await resolveLive(raw)
+    if (live.productivity === 'distracting') {
+      const key = live.category || appName
+      dismissedApps[key] = true
       console.log('dismissedapps', dismissedApps)
     }
   }
@@ -1842,38 +2009,39 @@ function toRuleDomain(rawDomain) {
 // Dashboard table ({ name, domain, description, ... }). Browser rows (with a
 // domain) create a keyword rule on the host so ALL that site's URLs are
 // retagged; native apps create an app rule on the app name.
+// SPAN MODEL (C2): a category correction upserts a USER RULE. Because dashboards
+// resolve spans live, the change is instantly retroactive — no history UPDATE sweep,
+// no saveData flush, no in-memory-snapshot juggling. The main-side handler derives the
+// matcher (domain for web rows, app for native) and re-points it.
 async function retagAppCategory(app, category) {
   try {
     if (!app || !category) return { success: false, error: 'Missing app or category' }
-    const domain = app.domain ? toRuleDomain(app.domain) : ''
-    const matchType = domain ? 'domain' : 'app'
-    const pattern = domain || app.name || app.description
-    if (!pattern) return { success: false, error: 'Could not derive a rule pattern' }
-
-    // Flush any in-memory tracking (up to ~60s worth, between saveData ticks) to
-    // the DB FIRST, so the retag covers today's not-yet-persisted rows and the
-    // reload below doesn't discard them.
-    await saveData()
-
-    const result = await ipcRenderer.invoke('retag-app-category', { matchType, pattern, category })
-
-    // Refresh local caches so this preload's live tracking uses the new rule
-    // immediately (the categories-updated broadcast also does this, but do it
-    // here too so there's no window where the next tick re-derives the old one).
-    categoryRules = await loadCategoryRules()
-
-    // The retag updated the DB, but getAppUsageStats() serves the in-memory
-    // appUsageData snapshot. Without reloading it, the UI's post-change refresh
-    // would re-read the STALE in-memory copy and the category would flicker back
-    // to its old value. Reload the snapshot from the (now-retagged) DB so the
-    // view shows the change.
+    const result = await ipcRenderer.invoke('span-correct-category', { app, categoryName: category })
+    // Reload the resolved snapshot so the view reflects the new rule immediately.
     await loadData()
-    return { ...result, pattern, matchType }
+    return result
   } catch (error) {
     console.error('Error in retagAppCategory:', error)
     return { success: false, error: error.message }
   }
 }
+
+// --- SPAN MODEL category/rule CRUD wrappers (Settings panel) ---
+async function spanGetCategories() { return ipcRenderer.invoke('span-categories-get') }
+async function spanGetRules() { return ipcRenderer.invoke('span-rules-get') }
+async function spanAddCategory(name, defaultProductivity) {
+  return ipcRenderer.invoke('span-category-add', { name, defaultProductivity })
+}
+async function spanUpdateCategory(id, updates) {
+  return ipcRenderer.invoke('span-category-update', { id, updates })
+}
+async function spanDeleteCategory(id) { return ipcRenderer.invoke('span-category-delete', { id }) }
+async function spanAddRule(payload) { return ipcRenderer.invoke('span-rule-add', payload) }
+async function spanUpdateRule(id, updates) {
+  return ipcRenderer.invoke('span-rule-update', { id, updates })
+}
+async function spanDeleteRule(id) { return ipcRenderer.invoke('span-rule-delete', { id }) }
+async function getUncategorized(range) { return ipcRenderer.invoke('get-uncategorized', range) }
 
 async function updateAppCategory(appIdentifier, category, selectedDate, appKey) {
   try {
