@@ -2,10 +2,9 @@
 
 import { useLocation } from 'react-router-dom'
 import { Link } from 'react-router-dom'
-import { Activity, Command, Hexagon, Settings, Timer, Play, Pause, Square, MessageSquare } from 'lucide-react'
+import { Activity, Command, Hexagon, Settings, Timer, Play, Square } from 'lucide-react'
 import { Button } from '../ui/button'
 import { Card, CardContent } from '..//ui/card'
-import { StatusItem } from '../Dashboard/status-item'
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '../ui/tooltip'
 import { useEffect, useState } from 'react'
 import { useTheme } from '../../context/ThemeContext'

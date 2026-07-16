@@ -176,11 +176,11 @@ export default function CategoryRulesPanel() {
   }
 
   if (loading) {
-    return <div className="text-sm text-slate-400 py-4">Loading categories…</div>
+    return <div className="text-sm text-fb-muted py-4">Loading categories…</div>
   }
 
   return (
-    <div className="space-y-8 pt-6 border-t border-slate-200 dark:border-slate-700/30">
+    <div className="space-y-8 pt-6 border-t border-fb-border">
       {status && (
         <div className="text-sm text-emerald-600 dark:text-emerald-400 flex items-center gap-1">
           <Sparkles className="h-3.5 w-3.5" /> {status}
@@ -189,10 +189,10 @@ export default function CategoryRulesPanel() {
 
       {/* Categories */}
       <section>
-        <h4 className="text-md font-medium text-slate-800 dark:text-slate-300 mb-3 flex items-center gap-2">
+        <h4 className="text-md font-medium text-fb-text mb-3 flex items-center gap-2">
           <Tag className="h-4 w-4" /> Categories
         </h4>
-        <p className="text-xs text-slate-500 dark:text-slate-400 mb-3">
+        <p className="text-xs text-fb-muted mb-3">
           A category is a kind of activity. Its <span className="font-medium">productivity</span>{' '}
           (Productive / Neutral / Distracting) is the judgment applied to time in that category —
           change it any time without redefining the category.
@@ -201,13 +201,13 @@ export default function CategoryRulesPanel() {
           {categories.map((c) => (
             <div
               key={c.id}
-              className="flex items-center gap-3 bg-slate-100 dark:bg-[#05070D] rounded-lg px-3 py-2"
+              className="flex items-center gap-3 bg-fb-surface2 border border-fb-border rounded-lg px-3 py-2"
             >
-              <span className="text-sm text-slate-800 dark:text-slate-200 flex-1">{c.name}</span>
+              <span className="text-sm text-fb-text flex-1">{c.name}</span>
               <select
                 value={c.default_productivity}
                 onChange={(e) => handleChangeProductivity(c.id, c.name, e.target.value)}
-                className="text-xs bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded px-2 py-1 text-slate-700 dark:text-slate-300"
+                className="text-xs bg-fb-surface border border-fb-border rounded-lg px-2 py-1 text-fb-text"
               >
                 {PRODUCTIVITY.map((t) => (
                   <option key={t.value} value={t.value}>
@@ -217,7 +217,7 @@ export default function CategoryRulesPanel() {
               </select>
               <button
                 onClick={() => handleDeleteCategory(c.id, c.name)}
-                className="text-slate-400 hover:text-red-500"
+                className="text-fb-muted hover:text-cat-distract"
                 title={`Delete ${c.name}`}
               >
                 <Trash2 className="h-4 w-4" />
@@ -232,12 +232,12 @@ export default function CategoryRulesPanel() {
             value={newCatName}
             onChange={(e) => setNewCatName(e.target.value)}
             placeholder="New category name"
-            className="flex-1 min-w-[140px] text-sm bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded px-3 py-2 text-slate-800 dark:text-slate-200"
+            className="flex-1 min-w-[140px] text-sm bg-fb-surface border border-fb-border rounded-lg px-3 py-2 text-fb-text"
           />
           <select
             value={newCatProd}
             onChange={(e) => setNewCatProd(e.target.value)}
-            className="text-sm bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded px-2 py-2 text-slate-700 dark:text-slate-300"
+            className="text-sm bg-fb-surface border border-fb-border rounded-lg px-2 py-2 text-fb-text"
           >
             {PRODUCTIVITY.map((t) => (
               <option key={t.value} value={t.value}>
@@ -247,7 +247,7 @@ export default function CategoryRulesPanel() {
           </select>
           <button
             onClick={handleAddCategory}
-            className="inline-flex items-center gap-1 text-sm bg-slate-900 dark:bg-slate-200 text-white dark:text-slate-900 rounded px-3 py-2 hover:opacity-90"
+            className="inline-flex items-center gap-1 text-sm bg-fb-accent text-white rounded-lg px-3 py-2 hover:brightness-110 transition-all"
           >
             <Plus className="h-4 w-4" /> Add
           </button>
@@ -256,10 +256,10 @@ export default function CategoryRulesPanel() {
 
       {/* Rules */}
       <section>
-        <h4 className="text-md font-medium text-slate-800 dark:text-slate-300 mb-1">
+        <h4 className="text-md font-medium text-fb-text mb-1">
           Classification Rules
         </h4>
-        <p className="text-xs text-slate-500 dark:text-slate-400 mb-3 flex items-start gap-1">
+        <p className="text-xs text-fb-muted mb-3 flex items-start gap-1">
           <HelpCircle className="h-3.5 w-3.5 mt-0.5 flex-none" />
           <span>
             A rule maps a matcher to a category. The <span className="font-medium">most specific</span>{' '}
@@ -272,12 +272,12 @@ export default function CategoryRulesPanel() {
             editingRuleId === r.id ? (
               <div
                 key={r.id}
-                className="flex flex-wrap items-center gap-2 text-sm bg-slate-100 dark:bg-[#05070D] rounded px-3 py-1.5"
+                className="flex flex-wrap items-center gap-2 text-sm bg-fb-surface2 border border-fb-border rounded-lg px-3 py-1.5"
               >
                 <select
                   value={editDraft.matcher_type}
                   onChange={(e) => setEditDraft({ ...editDraft, matcher_type: e.target.value })}
-                  className="text-sm bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded px-2 py-1 text-slate-700 dark:text-slate-300"
+                  className="text-sm bg-fb-surface border border-fb-border rounded-lg px-2 py-1 text-fb-text"
                 >
                   {MATCHERS.map((m) => (
                     <option key={m.value} value={m.value}>
@@ -288,13 +288,13 @@ export default function CategoryRulesPanel() {
                 <input
                   value={editDraft.matcher_value}
                   onChange={(e) => setEditDraft({ ...editDraft, matcher_value: e.target.value })}
-                  className="flex-1 min-w-[120px] text-sm bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded px-2 py-1 text-slate-800 dark:text-slate-200"
+                  className="flex-1 min-w-[120px] text-sm bg-fb-surface border border-fb-border rounded-lg px-2 py-1 text-fb-text"
                 />
-                <span className="text-slate-400">→</span>
+                <span className="text-fb-muted">→</span>
                 <select
                   value={editDraft.category_name}
                   onChange={(e) => setEditDraft({ ...editDraft, category_name: e.target.value })}
-                  className="text-sm bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded px-2 py-1 text-slate-700 dark:text-slate-300"
+                  className="text-sm bg-fb-surface border border-fb-border rounded-lg px-2 py-1 text-fb-text"
                 >
                   {categories.map((c) => (
                     <option key={c.id} value={c.name}>
@@ -305,37 +305,37 @@ export default function CategoryRulesPanel() {
                 <button onClick={() => saveEditRule(r.id)} className="text-emerald-500 hover:text-emerald-600" title="Save">
                   <Check className="h-4 w-4" />
                 </button>
-                <button onClick={cancelEditRule} className="text-slate-400 hover:text-slate-600" title="Cancel">
+                <button onClick={cancelEditRule} className="text-fb-muted hover:text-fb-text" title="Cancel">
                   <X className="h-4 w-4" />
                 </button>
               </div>
             ) : (
               <div
                 key={r.id}
-                className="flex items-center gap-2 text-sm bg-slate-100 dark:bg-[#05070D] rounded px-3 py-1.5"
+                className="flex items-center gap-2 text-sm bg-fb-surface2 border border-fb-border rounded-lg px-3 py-1.5"
               >
-                <span className="text-[10px] uppercase tracking-wide text-slate-400 border border-slate-300 dark:border-slate-700 rounded px-1">
+                <span className="text-[10px] uppercase tracking-wide text-fb-muted border border-fb-border rounded px-1">
                   {matcherLabel(r.matcher_type)}
                 </span>
-                <code className="text-slate-700 dark:text-slate-300">{r.matcher_value}</code>
-                <span className="text-slate-400">→</span>
-                <span className="text-slate-800 dark:text-slate-200">{r.category_name}</span>
+                <code className="text-fb-text">{r.matcher_value}</code>
+                <span className="text-fb-muted">→</span>
+                <span className="text-fb-text">{r.category_name}</span>
                 {r.is_user_rule ? (
-                  <span className="text-[10px] font-semibold text-cyan-600 dark:text-cyan-400 border border-cyan-300 dark:border-cyan-700 rounded px-1">
+                  <span className="text-[10px] font-semibold text-fb-accent border border-fb-accent/40 rounded px-1">
                     yours
                   </span>
                 ) : null}
                 <span className="flex-1" />
-                <button onClick={() => startEditRule(r)} className="text-slate-400 hover:text-cyan-500" title="Edit rule">
+                <button onClick={() => startEditRule(r)} className="text-fb-muted hover:text-fb-accent" title="Edit rule">
                   <Pencil className="h-3.5 w-3.5" />
                 </button>
-                <button onClick={() => handleDeleteRule(r.id, r.matcher_value)} className="text-slate-400 hover:text-red-500" title="Delete rule">
+                <button onClick={() => handleDeleteRule(r.id, r.matcher_value)} className="text-fb-muted hover:text-cat-distract" title="Delete rule">
                   <Trash2 className="h-3.5 w-3.5" />
                 </button>
               </div>
             )
           )}
-          {rules.length === 0 && <div className="text-xs text-slate-400">No rules yet.</div>}
+          {rules.length === 0 && <div className="text-xs text-fb-muted">No rules yet.</div>}
         </div>
 
         {/* Add rule */}
@@ -343,7 +343,7 @@ export default function CategoryRulesPanel() {
           <select
             value={newRuleMatcher}
             onChange={(e) => setNewRuleMatcher(e.target.value)}
-            className="text-sm bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded px-2 py-2 text-slate-700 dark:text-slate-300"
+            className="text-sm bg-fb-surface border border-fb-border rounded-lg px-2 py-2 text-fb-text"
             title={MATCHERS.find((m) => m.value === newRuleMatcher)?.hint}
           >
             {MATCHERS.map((m) => (
@@ -356,13 +356,13 @@ export default function CategoryRulesPanel() {
             value={newRuleValue}
             onChange={(e) => setNewRuleValue(e.target.value)}
             placeholder={MATCHERS.find((m) => m.value === newRuleMatcher)?.hint || 'Pattern'}
-            className="flex-1 min-w-[160px] text-sm bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded px-3 py-2 text-slate-800 dark:text-slate-200"
+            className="flex-1 min-w-[160px] text-sm bg-fb-surface border border-fb-border rounded-lg px-3 py-2 text-fb-text"
           />
-          <span className="text-slate-400">→</span>
+          <span className="text-fb-muted">→</span>
           <select
             value={newRuleCategory}
             onChange={(e) => setNewRuleCategory(e.target.value)}
-            className="text-sm bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded px-2 py-2 text-slate-700 dark:text-slate-300"
+            className="text-sm bg-fb-surface border border-fb-border rounded-lg px-2 py-2 text-fb-text"
           >
             {categories.map((c) => (
               <option key={c.id} value={c.name}>
@@ -372,7 +372,7 @@ export default function CategoryRulesPanel() {
           </select>
           <button
             onClick={handleAddRule}
-            className="inline-flex items-center gap-1 text-sm bg-slate-900 dark:bg-slate-200 text-white dark:text-slate-900 rounded px-3 py-2 hover:opacity-90"
+            className="inline-flex items-center gap-1 text-sm bg-fb-accent text-white rounded-lg px-3 py-2 hover:brightness-110 transition-all"
           >
             <Plus className="h-4 w-4" /> Add Rule
           </button>

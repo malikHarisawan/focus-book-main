@@ -1,5 +1,5 @@
 import { useEffect, useState, useMemo } from 'react'
-import { RefreshCw, Sun, Moon, Monitor, AlignLeft, AreaChart, ChevronLeft, ChevronRight, Sparkles } from 'lucide-react'
+import { RefreshCw, Sun, Moon, Monitor, AlignLeft, AreaChart, Sparkles } from 'lucide-react'
 import { Button } from '../ui/button'
 import ProductiveAreaChart from './ProductiveAreaChart'
 import DayTimeline from './DayTimeline'

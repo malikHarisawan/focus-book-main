@@ -2249,7 +2249,10 @@ ipcMain.handle('ai-service-reset-memory', async () => {
       _presenceService = null
 
       // Tell the UI its data changed so open views reload to the empty state.
-      mainWindow?.webContents.send('category-updated')
+      // `app-category-updated` is the channel the renderer's onCategoryUpdated()
+      // listens on (Activity + dashboard reload). An empty payload is fine — the
+      // listeners just re-fetch.
+      mainWindow?.webContents.send('app-category-updated', {})
 
       console.log(`Activity data wiped (scope=${scope}); ${cleared} rows removed`)
       return { success: true, scope, rowsCleared: cleared }

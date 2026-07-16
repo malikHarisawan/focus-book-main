@@ -55,14 +55,14 @@ export default function BrowserBridgePanel() {
   const maskedToken = status?.token ? '•'.repeat(Math.min(status.token.length, 40)) : ''
 
   return (
-    <div className="bg-slate-50 dark:bg-[#05070D] border border-slate-300 dark:border-slate-700/30 rounded-lg p-4">
+    <div className="bg-fb-surface2 border border-fb-border rounded-xl p-4">
       <div className="flex items-center justify-between mb-3">
-        <h4 className="text-md font-medium text-slate-800 dark:text-slate-300">Browser Extension</h4>
+        <h4 className="text-md font-medium text-fb-text">Browser Extension</h4>
         <span
           className={`text-xs px-2 py-0.5 rounded-full ${
             liveConnections.length > 0
-              ? 'bg-green-500/15 text-green-600 dark:text-green-400'
-              : 'bg-slate-300/40 dark:bg-slate-700/40 text-slate-500 dark:text-slate-400'
+              ? 'bg-cat-create/15 text-cat-create'
+              : 'bg-fb-track text-fb-muted'
           }`}
         >
           {liveConnections.length > 0
@@ -73,7 +73,7 @@ export default function BrowserBridgePanel() {
         </span>
       </div>
 
-      <p className="text-sm text-slate-500 dark:text-slate-400 mb-3">
+      <p className="text-sm text-fb-muted mb-3">
         Reports the active browser tab from Chrome, Brave, or Edge over a local, token-authenticated
         connection — replacing the Python-based URL lookup. Paste the token below into the
         extension&rsquo;s options page.
@@ -82,19 +82,19 @@ export default function BrowserBridgePanel() {
       <div className="mb-4 flex flex-wrap items-center gap-2">
         <button
           onClick={openExtensionFolder}
-          className="inline-flex items-center gap-1.5 rounded-md bg-cyan-600 hover:bg-cyan-700 text-white px-3 py-1.5 text-sm transition-colors"
+          className="inline-flex items-center gap-1.5 rounded-lg bg-fb-accent hover:brightness-110 text-white px-3 py-1.5 text-sm transition-all"
         >
           <FolderOpen className="h-4 w-4" />
           Open extension folder
         </button>
-        <span className="text-xs text-slate-400">
+        <span className="text-xs text-fb-muted">
           Step-by-step install is under Settings → Getting Started.
         </span>
       </div>
       {folderMsg && (
         <p
           className={`mb-3 break-all text-xs ${
-            folderMsg.ok ? 'text-emerald-600 dark:text-emerald-400' : 'text-red-500'
+            folderMsg.ok ? 'text-emerald-600 dark:text-emerald-400' : 'text-cat-distract'
           }`}
         >
           {folderMsg.text}
@@ -103,7 +103,7 @@ export default function BrowserBridgePanel() {
 
       <div className="space-y-4">
         <div>
-          <label className="block text-sm font-medium text-slate-700 dark:text-slate-400 mb-1">
+          <label className="block text-sm font-medium text-fb-muted mb-1">
             Pairing Token
           </label>
           <div className="flex">
@@ -111,34 +111,34 @@ export default function BrowserBridgePanel() {
               type="text"
               value={showToken ? status?.token || '' : maskedToken}
               readOnly
-              className="flex-1 bg-slate-50 dark:bg-[#05070D] border border-slate-300 dark:border-slate-700/30 rounded-l-md px-3 py-2 font-mono text-sm text-slate-900 dark:text-slate-200 focus:outline-none"
+              className="flex-1 bg-fb-surface border border-fb-border rounded-l-lg px-3 py-2 font-mono text-sm text-fb-text focus:outline-none"
             />
             <button
               onClick={() => setShowToken((v) => !v)}
-              className="bg-slate-300 hover:bg-slate-400 dark:bg-slate-700 dark:hover:bg-slate-600 text-slate-800 dark:text-slate-300 px-4 py-2 transition-colors"
+              className="bg-fb-surface border-y border-fb-border text-fb-text hover:bg-fb-surface2 px-4 py-2 transition-colors"
             >
               {showToken ? 'Hide' : 'Show'}
             </button>
             <button
               onClick={copyToken}
-              className="bg-cyan-600 hover:bg-cyan-700 text-white px-4 py-2 rounded-r-md transition-colors"
+              className="bg-fb-accent hover:brightness-110 text-white px-4 py-2 rounded-r-lg transition-all"
             >
               {copied ? 'Copied' : 'Copy'}
             </button>
           </div>
           {status?.port && (
-            <p className="text-xs text-slate-400 mt-1">Listening on 127.0.0.1:{status.port}</p>
+            <p className="text-xs text-fb-muted mt-1">Listening on 127.0.0.1:{status.port}</p>
           )}
         </div>
 
         {liveConnections.length > 0 && (
           <div>
-            <div className="text-sm font-medium text-slate-700 dark:text-slate-400 mb-1">
+            <div className="text-sm font-medium text-fb-muted mb-1">
               Connected Browsers
             </div>
             <ul className="space-y-1">
               {liveConnections.map((c) => (
-                <li key={`${c.browser}:${c.profileId}`} className="text-xs text-slate-500 dark:text-slate-400">
+                <li key={`${c.browser}:${c.profileId}`} className="text-xs text-fb-muted">
                   {c.browser} · {c.windows} window{c.windows === 1 ? '' : 's'}
                 </li>
               ))}

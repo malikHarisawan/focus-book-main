@@ -16,8 +16,6 @@ let categoryList = [] // [{ name, type, color, icon }, ...]
 // working exactly as before. Modes are a finer level that rolls up into the verdict.
 let categoryModeMap = {} // category name -> default mode (from categories.default_mode)
 let modeRollupMap = {} // mode name -> 'productive' | 'distracted' | 'neutral'
-let modeColorMap = {} // mode name -> hex color
-let modeIconMap = {} // mode name -> lucide icon name
 let modeList = [] // [{ name, rollup, color, icon }, ...]
 
 // Sensible defaults when the DB has no color/icon for a category, or is offline.
@@ -35,20 +33,6 @@ const FALLBACK_MODE_ROLLUP = {
   Collaboration: 'productive',
   Break: 'neutral',
   Distraction: 'distracted'
-}
-const FALLBACK_MODE_COLOR = {
-  'Deep work': '#00d8ff',
-  Creative: '#a855f7',
-  Collaboration: '#5ac26d',
-  Break: '#f59e0b',
-  Distraction: '#ff6384'
-}
-const FALLBACK_MODE_ICON = {
-  'Deep work': 'Brain',
-  Creative: 'Palette',
-  Collaboration: 'Users',
-  Break: 'Coffee',
-  Distraction: 'AlertTriangle'
 }
 const FALLBACK_CATEGORY_MODE = {
   // Legacy category names (kept for any pre-cutover data).
@@ -141,8 +125,8 @@ async function loadCategoryProductivityMapping() {
 
 // Load the work-mode (Level 2) metadata: the modes table (name/rollup/color/icon)
 // and the category -> default_mode map. Populates the module-level mode caches used
-// by getMode/getModeRollup/getModeColor/getModeIcon. Never throws — leaves the
-// caches empty on failure so the getMode* fallbacks take over.
+// by getMode/getModeRollup. Never throws — leaves the caches empty on failure so the
+// getMode* fallbacks take over.
 async function loadModeMetadata() {
   try {
     const [modes, defaultModes] = await Promise.all([
@@ -154,17 +138,11 @@ async function loadModeMetadata() {
 
     if (Array.isArray(modes) && modes.length > 0) {
       const rMap = {}
-      const mcMap = {}
-      const miMap = {}
       modes.forEach((m) => {
         if (!m || !m.name) return
         if (m.rollup) rMap[m.name] = m.rollup
-        if (m.color) mcMap[m.name] = m.color
-        if (m.icon) miMap[m.name] = m.icon
       })
       modeRollupMap = rMap
-      modeColorMap = mcMap
-      modeIconMap = miMap
       modeList = modes
     }
 
@@ -264,62 +242,6 @@ export const getModeRollup = (mode) => {
   return modeRollupMap[mode] || FALLBACK_MODE_ROLLUP[mode] || DEFAULT_MODE_ROLLUP
 }
 
-// Convenience: category -> verdict via its mode. Equivalent to the category's own
-// type for the built-in seed, but lets mode overrides (Phase 2+) flow into the
-// verdict without a second mapping.
-export const getModeRollupForCategory = (category) => {
-  return getModeRollup(getMode(category))
-}
-
-// Mode presentation for the new donut/drill-down. DB-driven with seed fallbacks.
-export const getModeColor = (mode) => {
-  return modeColorMap[mode] || FALLBACK_MODE_COLOR[mode] || DEFAULT_CATEGORY_COLOR
-}
-
-export const getModeIcon = (mode) => {
-  return modeIconMap[mode] || FALLBACK_MODE_ICON[mode] || DEFAULT_CATEGORY_ICON
-}
-
-// The full list of modes [{ name, rollup, color, icon }] for legends/menus. Falls
-// back to the seed set (in canonical order) when the DB hasn't loaded yet.
-export const getModeList = () => {
-  if (Array.isArray(modeList) && modeList.length > 0) return modeList
-  return ['Deep work', 'Creative', 'Collaboration', 'Break', 'Distraction'].map((name) => ({
-    name,
-    rollup: FALLBACK_MODE_ROLLUP[name],
-    color: FALLBACK_MODE_COLOR[name],
-    icon: FALLBACK_MODE_ICON[name]
-  }))
-}
-
-// Extract domain name from URL or app identifier
-export const extractDomainName = (domain, fallbackName = '') => {
-  if (!domain) return fallbackName
-
-  try {
-    // Handle special browser protocols
-    if (domain.startsWith('chrome://') || domain.startsWith('edge://') || domain.startsWith('brave://')) {
-      return domain.split('://')[1].split('/')[0] || domain
-    }
-
-    // Remove protocol
-    let d = domain.replace(/^https?:\/\//i, '').replace(/^ftp:\/\//i, '')
-
-    // Remove www prefix
-    d = d.replace(/^www\./i, '')
-
-    // Remove path, query, and hash
-    d = d.split('/')[0].split('?')[0].split('#')[0]
-
-    // Remove port if present
-    d = d.split(':')[0]
-
-    return d || fallbackName
-  } catch (e) {
-    return fallbackName
-  }
-}
-
 export function formatAppsData(rawData, date) {
   const appMap = new Map()
 
@@ -377,94 +299,6 @@ export function formatAppsData(rawData, date) {
   }
 
   return result
-}
-
-export const processUsageChartData = (jsonData, date, viewType = 'day') => {
-  if (viewType === 'day') {
-    if (!jsonData || !jsonData[date]) {
-      return []
-    }
-
-    console.log('data in the utility function ', jsonData)
-    const hourlyData = []
-
-    // Cover the full 24-hour day (12AM–11PM) so activity outside the old
-    // 9AM–9PM window is no longer silently dropped.
-    for (let i = 0; i < 24; i++) {
-      hourlyData.push({
-        name: i === 0 ? '12AM' : i === 12 ? '12PM' : i < 12 ? `${i}AM` : `${i - 12}PM`,
-        Code: 0,
-        Browsing: 0,
-        Communication: 0,
-        Utilities: 0,
-        Entertainment: 0,
-        Miscellaneous: 0
-      })
-    }
-
-    for (const [hourKey, hourData] of Object.entries(jsonData[date])) {
-      if (hourKey === 'apps') continue
-
-      const hour = parseInt(hourKey.split(':')[0])
-      if (isNaN(hour) || hour < 0 || hour >= 24) continue
-
-      const index = hour
-      if (index < 0 || index >= hourlyData.length) continue
-
-      for (const app of Object.values(hourData)) {
-        if (app.category) {
-          if (hourlyData[index][app.category] !== undefined) {
-            hourlyData[index][app.category] += app.time / 1000
-          } else {
-            hourlyData[index][app.category] = app.time / 1000
-          }
-        }
-      }
-    }
-
-    return hourlyData
-  } else {
-    // if (!jsonData || !jsonData[date]) {
-    //   return [];
-    // }
-
-    const weekData = []
-    const dateObj = new Date(date)
-    const dayNames = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']
-
-    for (let i = 0; i < 7; i++) {
-      const currentDate = new Date(dateObj)
-      currentDate.setDate(dateObj.getDate() - dateObj.getDay() + i)
-
-      const formattedDate = currentDate.toISOString().split('T')[0]
-
-      const dayData = {
-        name: dayNames[i],
-        Code: 0,
-        Browsing: 0,
-        Communication: 0,
-        Utilities: 0,
-        Entertainment: 0,
-        Miscellaneous: 0
-      }
-
-      if (jsonData[formattedDate] && jsonData[formattedDate].apps) {
-        for (const app of Object.values(jsonData[formattedDate].apps)) {
-          if (app.category) {
-            if (dayData[app.category] !== undefined) {
-              dayData[app.category] += app.time / 1000
-            } else {
-              dayData[app.category] = app.time / 1000
-            }
-          }
-        }
-      }
-
-      weekData.push(dayData)
-    }
-    console.log('week', weekData)
-    return weekData
-  }
 }
 
 // Add an app's time to the correct productivity bucket of a chart data point.
@@ -842,95 +676,6 @@ export const processMostUsedApps = (jsonData, date) => {
         category: app.category,
         productivity: app.productivity
       }))
-}
-
-const isProductiveCategory = (category) => {
-  return categoryProductivityMap[category] === 'productive'
-}
-
-export const getTotalFocusTime = (jsonData, date, processedChartData, view) => {
-  let totalTime = 0
-
-  if (view === 'day') {
-    if (!jsonData || !jsonData[date] || !jsonData[date].apps) {
-      return '0'
-    }
-    for (const app of Object.values(jsonData[date].apps)) {
-      if (isProductiveCategory(app.category)) {
-        totalTime += app.time
-      }
-    }
-    return formatTime(totalTime)
-  } else {
-    for (const day of processedChartData) {
-      for (const key in day) {
-        if (key !== 'name') {
-          console.log(day[key])
-          totalTime += day[key]
-        }
-      }
-    }
-    const average = formatTime((totalTime * 1000) / processedChartData.length)
-    console.log('average', processedChartData.length)
-    return average
-  }
-}
-
-export const getTotalScreenTime = (jsonData, date, processedChartData, view) => {
-  let totalTime = 0
-
-  if (view === 'day') {
-    if (!jsonData || !jsonData[date] || !jsonData[date].apps) {
-      return '0h 0m'
-    }
-    for (const app of Object.values(jsonData[date].apps)) {
-      totalTime += app.time
-    }
-    console.log('totaltime ', formatTime(totalTime))
-    return formatTime(totalTime)
-  } else {
-    for (const day of processedChartData) {
-      for (const key in day) {
-        if (key !== 'name') {
-          console.log(day[key])
-          totalTime += day[key]
-        }
-      }
-    }
-    const average = formatTime((totalTime * 1000) / processedChartData.length)
-    console.log('average', processedChartData.length)
-    return average
-  }
-}
-
-export const getCategoryBreakdown = (jsonData, date) => {
-  if (!jsonData || !jsonData[date] || !jsonData[date].apps) {
-    return []
-  }
-
-  const categories = {
-    Code: { time: 0, color: 'text-green-400' },
-    Browsing: { time: 0, color: 'text-purple-400' },
-    Communication: { time: 0, color: 'text-blue-500' },
-    Utilities: { time: 0, color: 'text-sky-400' },
-    Entertainment: { time: 0, color: 'text-rose-400' },
-    Miscellaneous: { time: 0, color: 'text-gray-500' }
-  }
-
-  for (const app of Object.values(jsonData[date].apps)) {
-    if (app.category && categories[app.category]) {
-      categories[app.category].time += app.time
-    }
-  }
-
-  return Object.entries(categories)
-    .filter(([_, data]) => data.time > 60000)
-    .sort((a, b) => b[1].time - a[1].time)
-    .map(([name, data]) => ({
-      name: name,
-      time: formatTime(data.time),
-      color: data.color
-    }))
 }
 
 /**

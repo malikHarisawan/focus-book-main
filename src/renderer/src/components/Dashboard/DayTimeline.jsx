@@ -350,9 +350,6 @@ export default function DayTimeline({ rawData, date }) {
     return expandBlockToApps(modeBlocks[expandedIdx])
   }, [expandedIdx, modeBlocks])
 
-  const density = useMemo(() => switchDensity(segments, START, END), [segments, START, END])
-  const maxSwitches = density.reduce((m, d) => Math.max(m, d.switches), 0)
-
   // Reset expansion if the block list shrinks below the expanded index.
   useEffect(() => {
     if (expandedIdx != null && expandedIdx >= modeBlocks.length) setExpandedIdx(null)
@@ -543,29 +540,6 @@ export default function DayTimeline({ rawData, date }) {
             />
           ))}
         </div>
-
-        {/* Switch-density strip — fragmentation as its own channel. Each 1-min bin is
-            shaded by how many app switches started in it: dark = fragmented, pale =
-            flow. This is the context-switch metric in the right channel, not clutter. */}
-        {maxSwitches > 0 && (
-          <div className="relative h-[10px] mt-1.5 rounded-md overflow-hidden" style={{ background: 'var(--fb-track)' }}>
-            {density.map((d, i) =>
-              d.switches > 0 ? (
-                <span
-                  key={i}
-                  className="absolute top-0 bottom-0"
-                  style={{
-                    left: `${pctOf(d.min)}%`,
-                    width: `${(1 / SPAN) * 100}%`,
-                    background: 'var(--c-distract)',
-                    opacity: 0.18 + 0.82 * (d.switches / maxSwitches)
-                  }}
-                  title={`${d.switches} switch${d.switches > 1 ? 'es' : ''}`}
-                />
-              ) : null
-            )}
-          </div>
-        )}
 
         {/* Hour ticks */}
         <div className="relative h-[18px] mt-2">

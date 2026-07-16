@@ -213,7 +213,7 @@ export default function SettingsPage() {
     <button
       onClick={onClick}
       className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
-        on ? 'bg-cyan-500' : 'bg-slate-300 dark:bg-slate-700'
+        on ? 'bg-fb-accent' : 'bg-fb-track'
       }`}
     >
       <span
@@ -226,18 +226,18 @@ export default function SettingsPage() {
 
   return (
     <div className="grid gap-4">
-      <div className="bg-white dark:bg-[#0B1220] border border-[#E8EDF1] dark:border-[#1E293B] backdrop-blur-sm rounded-lg overflow-hidden">
-        <div className="border-b border-[#E8EDF1] dark:border-[#1E293B] pb-2 p-4">
-          <h2 className="text-[#232360] dark:text-white flex items-center text-lg font-semibold">
-            <Settings className="mr-2 h-5 w-5 text-[#5051F9]" />
+      <div className="bg-fb-surface border border-fb-border rounded-[18px] shadow-[var(--fb-shadow)] overflow-hidden">
+        <div className="border-b border-fb-border pb-2 p-4">
+          <h2 className="text-fb-text flex items-center font-display text-lg font-semibold">
+            <Settings className="mr-2 h-5 w-5 text-fb-accent" />
             Settings
           </h2>
-          <p className="text-[#768396] text-sm mt-0.5">Configure your productivity dashboard preferences</p>
+          <p className="text-fb-muted text-sm mt-0.5">Configure your productivity dashboard preferences</p>
         </div>
 
         <div className="grid grid-cols-12 min-h-[600px]">
           {/* Settings Navigation */}
-          <div className="col-span-12 md:col-span-3 border-r border-[#E8EDF1] dark:border-[#1E293B]">
+          <div className="col-span-12 md:col-span-3 border-r border-fb-border">
             <nav className="p-3">
               <ul className="space-y-0.5">
                 {[
@@ -252,10 +252,10 @@ export default function SettingsPage() {
                   <li key={item.id}>
                     <button
                       onClick={() => setActiveTab(item.id)}
-                      className={`w-full text-left px-4 py-3 rounded-md flex items-center transition-colors ${
+                      className={`w-full text-left px-4 py-3 rounded-lg flex items-center transition-colors ${
                         activeTab === item.id
-                          ? 'bg-cyan-500/10 text-cyan-600 dark:text-cyan-400 border-l-2 border-cyan-500'
-                          : 'text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-700 hover:text-slate-900 dark:hover:text-slate-200'
+                          ? 'bg-fb-accentsoft text-fb-accent border-l-2 border-fb-accent'
+                          : 'text-fb-muted hover:bg-fb-surface2 hover:text-fb-text'
                       }`}
                     >
                       <item.icon className="h-4 w-4 mr-3" />
@@ -275,28 +275,28 @@ export default function SettingsPage() {
             {/* Appearance Settings — theme + accent colors (fully wired to ThemeContext) */}
             {activeTab === 'appearance' && (
               <div className="space-y-6 animate-fadeIn">
-                <h3 className="text-lg font-medium text-[#232360] dark:text-white border-b border-[#E8EDF1] dark:border-[#1E293B] pb-2">
+                <h3 className="font-display text-lg font-medium text-fb-text border-b border-fb-border pb-2">
                   Appearance
                 </h3>
 
                 <div className="space-y-4">
                   <div>
-                    <h4 className="text-md font-medium text-[#232360] dark:text-white mb-3">Theme</h4>
+                    <h4 className="text-md font-medium text-fb-text mb-3">Theme</h4>
                     <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                       <button
                         onClick={() => setThemeMode('dark')}
                         className={`p-4 rounded-xl border-2 ${
                           theme === 'dark'
-                            ? 'border-[#5051F9] bg-[#5051F9]/10 dark:bg-[#5051F9]/20 ring-1 ring-[#5051F9]/50'
-                            : 'border-[#E8EDF1] dark:border-[#1E293B] bg-white dark:bg-[#0B1220] hover:bg-[#F4F7FE] dark:hover:bg-[#1E293B]'
+                            ? 'border-fb-accent bg-fb-accentsoft ring-1 ring-fb-accent/50'
+                            : 'border-fb-border bg-fb-surface2 hover:border-fb-accent'
                         } transition-all`}
                       >
                         <div className="flex justify-center mb-2">
-                          <Moon className="h-8 w-8 text-[#5051F9]" />
+                          <Moon className="h-8 w-8 text-fb-accent" />
                         </div>
                         <div className="text-center">
-                          <div className="font-medium text-[#232360] dark:text-white">Dark</div>
-                          <div className="text-xs text-[#768396]">Default dark theme</div>
+                          <div className="font-medium text-fb-text">Dark</div>
+                          <div className="text-xs text-fb-muted">Default dark theme</div>
                         </div>
                       </button>
 
@@ -304,16 +304,16 @@ export default function SettingsPage() {
                         onClick={() => setThemeMode('light')}
                         className={`p-4 rounded-xl border-2 ${
                           theme === 'light'
-                            ? 'border-[#5051F9] bg-[#5051F9]/10 ring-1 ring-[#5051F9]/50'
-                            : 'border-[#E8EDF1] dark:border-[#1E293B] bg-white dark:bg-[#0B1220] hover:bg-[#F4F7FE] dark:hover:bg-[#1E293B]'
+                            ? 'border-fb-accent bg-fb-accentsoft ring-1 ring-fb-accent/50'
+                            : 'border-fb-border bg-fb-surface2 hover:border-fb-accent'
                         } transition-all`}
                       >
                         <div className="flex justify-center mb-2">
-                          <Sun className="h-8 w-8 text-[#FF6B6B]" />
+                          <Sun className="h-8 w-8 text-cat-break" />
                         </div>
                         <div className="text-center">
-                          <div className="font-medium text-[#232360] dark:text-white">Light</div>
-                          <div className="text-xs text-[#768396]">Bright mode</div>
+                          <div className="font-medium text-fb-text">Light</div>
+                          <div className="text-xs text-fb-muted">Bright mode</div>
                         </div>
                       </button>
 
@@ -321,27 +321,27 @@ export default function SettingsPage() {
                         onClick={() => setThemeMode('system')}
                         className={`p-4 rounded-xl border-2 ${
                           theme === 'system'
-                            ? 'border-[#22D3EE] bg-[#22D3EE]/10 ring-1 ring-[#22D3EE]/50'
-                            : 'border-[#E8EDF1] dark:border-[#1E293B] bg-white dark:bg-[#0B1220] hover:bg-[#F4F7FE] dark:hover:bg-[#1E293B]'
+                            ? 'border-fb-accent bg-fb-accentsoft ring-1 ring-fb-accent/50'
+                            : 'border-fb-border bg-fb-surface2 hover:border-fb-accent'
                         } transition-all`}
                       >
                         <div className="flex justify-center mb-2">
-                          <div className="h-8 w-8 rounded-full bg-gradient-to-r from-[#F4F7FE] to-[#05070D] flex items-center justify-center">
-                            <Settings className="h-5 w-5 text-[#232360] dark:text-white" />
+                          <div className="h-8 w-8 rounded-full bg-gradient-to-r from-fb-bg to-fb-tip flex items-center justify-center">
+                            <Settings className="h-5 w-5 text-fb-text" />
                           </div>
                         </div>
                         <div className="text-center">
-                          <div className="font-medium text-[#232360] dark:text-white">System</div>
-                          <div className="text-xs text-[#768396]">Follow system</div>
+                          <div className="font-medium text-fb-text">System</div>
+                          <div className="text-xs text-fb-muted">Follow system</div>
                         </div>
                       </button>
                     </div>
                   </div>
 
                   {/* Primary Accent Color */}
-                  <div className="pt-4 border-t border-[#E8EDF1] dark:border-[#1E293B]">
-                    <h4 className="text-md font-medium text-[#232360] dark:text-white mb-2">Primary Accent Color</h4>
-                    <p className="text-sm text-[#768396] mb-3">Used for buttons, active states, and primary elements</p>
+                  <div className="pt-4 border-t border-fb-border">
+                    <h4 className="text-md font-medium text-fb-text mb-2">Primary Accent Color</h4>
+                    <p className="text-sm text-fb-muted mb-3">Used for buttons, active states, and primary elements</p>
                     <div className="flex flex-wrap gap-3">
                       {Object.entries(colorSchemes.primary).map(([key, value]) => (
                         <button
@@ -349,7 +349,7 @@ export default function SettingsPage() {
                           onClick={() => setPrimaryAccent(key)}
                           className={`relative w-12 h-12 rounded-xl transition-all ${
                             primaryColor === key
-                              ? 'ring-2 ring-offset-2 ring-offset-white dark:ring-offset-[#05070D] ring-[#2B3674] dark:ring-white scale-110'
+                              ? 'ring-2 ring-offset-2 ring-offset-fb-surface ring-fb-text scale-110'
                               : 'hover:scale-105'
                           }`}
                           style={{ backgroundColor: theme === 'dark' ? value.dark : value.light }}
@@ -365,9 +365,9 @@ export default function SettingsPage() {
                   </div>
 
                   {/* Secondary Accent Color */}
-                  <div className="pt-4 border-t border-[#E2E8F0] dark:border-[#1E293B]">
-                    <h4 className="text-md font-medium text-[#2B3674] dark:text-white mb-2">Secondary Accent Color</h4>
-                    <p className="text-sm text-[#A3AED0] mb-3">Used for charts, graphs, and secondary elements</p>
+                  <div className="pt-4 border-t border-fb-border">
+                    <h4 className="text-md font-medium text-fb-text mb-2">Secondary Accent Color</h4>
+                    <p className="text-sm text-fb-muted mb-3">Used for charts, graphs, and secondary elements</p>
                     <div className="flex flex-wrap gap-3">
                       {Object.entries(colorSchemes.secondary).map(([key, value]) => (
                         <button
@@ -375,7 +375,7 @@ export default function SettingsPage() {
                           onClick={() => setSecondaryAccent(key)}
                           className={`relative w-12 h-12 rounded-xl transition-all ${
                             secondaryColor === key
-                              ? 'ring-2 ring-offset-2 ring-offset-white dark:ring-offset-[#05070D] ring-[#2B3674] dark:ring-white scale-110'
+                              ? 'ring-2 ring-offset-2 ring-offset-fb-surface ring-fb-text scale-110'
                               : 'hover:scale-105'
                           }`}
                           style={{ backgroundColor: theme === 'dark' ? value.dark : value.light }}
@@ -396,15 +396,15 @@ export default function SettingsPage() {
             {/* Focus & Blocking — real, persisted controls for the distraction popup. */}
             {activeTab === 'focus' && (
               <div className="space-y-6 animate-fadeIn">
-                <h3 className="text-lg font-medium text-slate-900 dark:text-slate-200 border-b border-slate-200 dark:border-slate-700/30 pb-2">
+                <h3 className="font-display text-lg font-medium text-fb-text border-b border-fb-border pb-2">
                   Focus &amp; Blocking
                 </h3>
 
-                <div className="bg-slate-50 dark:bg-[#05070D] border border-slate-300 dark:border-slate-700/30 rounded-lg p-4">
+                <div className="bg-fb-surface2 border border-fb-border rounded-xl p-4">
                   <div className="flex items-center justify-between">
                     <div>
-                      <div className="text-slate-800 dark:text-slate-200 font-medium">Distraction blocking</div>
-                      <div className="text-sm text-slate-500 dark:text-slate-400 max-w-md">
+                      <div className="text-fb-text font-medium">Distraction blocking</div>
+                      <div className="text-sm text-fb-muted max-w-md">
                         When on, FocusBook auto-starts a focus session after a stretch of productive
                         work and shows a fullscreen prompt if you switch to a distracting app. Turn it
                         off to track your time without any interruptions.
@@ -415,14 +415,14 @@ export default function SettingsPage() {
                 </div>
 
                 <div
-                  className={`bg-slate-50 dark:bg-[#05070D] border border-slate-300 dark:border-slate-700/30 rounded-lg p-4 space-y-4 transition-opacity ${
+                  className={`bg-fb-surface2 border border-fb-border rounded-xl p-4 space-y-4 transition-opacity ${
                     blockingEnabled ? '' : 'opacity-50 pointer-events-none'
                   }`}
                 >
-                  <h4 className="text-md font-medium text-slate-800 dark:text-slate-300">Timing</h4>
+                  <h4 className="text-md font-medium text-fb-text">Timing</h4>
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                     <div>
-                      <label className="block text-sm font-medium text-slate-700 dark:text-slate-400 mb-1">
+                      <label className="block text-sm font-medium text-fb-muted mb-1">
                         Productive minutes before a session starts
                       </label>
                       <input
@@ -432,11 +432,11 @@ export default function SettingsPage() {
                         value={minProductiveMin}
                         onChange={(e) => setMinProductiveMin(e.target.value)}
                         onBlur={commitThresholds}
-                        className="w-full bg-white dark:bg-[#03050A] border border-slate-300 dark:border-slate-700/30 rounded-md px-3 py-2 text-slate-900 dark:text-slate-200 focus:outline-none focus:ring-1 focus:ring-cyan-500"
+                        className="w-full bg-fb-surface border border-fb-border rounded-lg px-3 py-2 text-fb-text focus:outline-none focus:ring-1 focus:ring-fb-accent"
                       />
                     </div>
                     <div>
-                      <label className="block text-sm font-medium text-slate-700 dark:text-slate-400 mb-1">
+                      <label className="block text-sm font-medium text-fb-muted mb-1">
                         Focus session length (minutes)
                       </label>
                       <input
@@ -446,11 +446,11 @@ export default function SettingsPage() {
                         value={sessionMin}
                         onChange={(e) => setSessionMin(e.target.value)}
                         onBlur={commitThresholds}
-                        className="w-full bg-white dark:bg-[#03050A] border border-slate-300 dark:border-slate-700/30 rounded-md px-3 py-2 text-slate-900 dark:text-slate-200 focus:outline-none focus:ring-1 focus:ring-cyan-500"
+                        className="w-full bg-fb-surface border border-fb-border rounded-lg px-3 py-2 text-fb-text focus:outline-none focus:ring-1 focus:ring-fb-accent"
                       />
                     </div>
                   </div>
-                  <p className="text-xs text-slate-500 dark:text-slate-500">
+                  <p className="text-xs text-fb-muted">
                     Changes apply immediately — no restart needed.
                   </p>
                 </div>
@@ -460,7 +460,7 @@ export default function SettingsPage() {
                     className={`text-sm ${
                       blockingStatus.ok
                         ? 'text-emerald-600 dark:text-emerald-400'
-                        : 'text-rose-500 dark:text-rose-400'
+                        : 'text-cat-distract'
                     }`}
                   >
                     {blockingStatus.message}
@@ -472,7 +472,7 @@ export default function SettingsPage() {
             {/* Categories Management */}
             {activeTab === 'Categories Management' && (
               <div className="space-y-6 animate-fadeIn">
-                <h3 className="text-lg font-medium text-slate-900 dark:text-slate-200 border-b border-slate-200 dark:border-slate-700/30 pb-2">
+                <h3 className="font-display text-lg font-medium text-fb-text border-b border-fb-border pb-2">
                   Manage Categories
                 </h3>
                 <CategoryRulesPanel />
@@ -482,41 +482,41 @@ export default function SettingsPage() {
             {/* Data Management — Export (real) + real, confirmed data deletion. */}
             {activeTab === 'data' && (
               <div className="space-y-6 animate-fadeIn">
-                <h3 className="text-lg font-medium text-slate-900 dark:text-slate-200 border-b border-slate-200 dark:border-slate-700/30 pb-2">
+                <h3 className="font-display text-lg font-medium text-fb-text border-b border-fb-border pb-2">
                   Data Management
                 </h3>
 
                 <div className="space-y-6">
-                  <div className="bg-slate-50 dark:bg-[#05070D] border border-slate-300 dark:border-slate-700/30 rounded-lg p-4">
-                    <h4 className="text-md font-medium text-slate-800 dark:text-slate-300 mb-2 flex items-center">
-                      <Download className="h-4 w-4 mr-2 text-cyan-500" />
+                  <div className="bg-fb-surface2 border border-fb-border rounded-xl p-4">
+                    <h4 className="text-md font-medium text-fb-text mb-2 flex items-center">
+                      <Download className="h-4 w-4 mr-2 text-fb-accent" />
                       Export Data
                     </h4>
-                    <p className="text-sm text-slate-500 dark:text-slate-400 mb-3">
+                    <p className="text-sm text-fb-muted mb-3">
                       Download your productivity data. Everything stays on your machine.
                     </p>
 
                     <div className="flex flex-wrap items-end gap-3 mb-4">
                       <div className="flex flex-col">
-                        <label className="text-xs text-slate-500 dark:text-slate-400 mb-1">From</label>
+                        <label className="text-xs text-fb-muted mb-1">From</label>
                         <input
                           type="date"
                           value={exportFrom}
                           max={exportTo || undefined}
                           onChange={(e) => setExportFrom(e.target.value)}
                           style={{ colorScheme: resolvedTheme === 'dark' ? 'dark' : 'light' }}
-                          className="text-sm bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded px-2 py-1.5 text-slate-800 dark:text-slate-200"
+                          className="text-sm bg-fb-surface border border-fb-border rounded-lg px-2 py-1.5 text-fb-text focus:outline-none focus:border-fb-accent"
                         />
                       </div>
                       <div className="flex flex-col">
-                        <label className="text-xs text-slate-500 dark:text-slate-400 mb-1">To</label>
+                        <label className="text-xs text-fb-muted mb-1">To</label>
                         <input
                           type="date"
                           value={exportTo}
                           min={exportFrom || undefined}
                           onChange={(e) => setExportTo(e.target.value)}
                           style={{ colorScheme: resolvedTheme === 'dark' ? 'dark' : 'light' }}
-                          className="text-sm bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded px-2 py-1.5 text-slate-800 dark:text-slate-200"
+                          className="text-sm bg-fb-surface border border-fb-border rounded-lg px-2 py-1.5 text-fb-text focus:outline-none focus:border-fb-accent"
                         />
                       </div>
                       {(exportFrom || exportTo) && (
@@ -525,12 +525,12 @@ export default function SettingsPage() {
                             setExportFrom('')
                             setExportTo('')
                           }}
-                          className="text-xs text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200 underline pb-2"
+                          className="text-xs text-fb-muted hover:text-fb-text underline pb-2"
                         >
                           Clear
                         </button>
                       )}
-                      <span className="text-xs text-slate-400 pb-2">
+                      <span className="text-xs text-fb-muted pb-2">
                         {exportFrom || exportTo ? 'Exporting selected range' : 'Exporting all history'}
                       </span>
                     </div>
@@ -544,11 +544,11 @@ export default function SettingsPage() {
                           key={item.format}
                           onClick={() => handleExport(item.format)}
                           disabled={isExporting}
-                          className="flex flex-col items-center justify-center p-4 bg-slate-100 dark:bg-[#05070D] hover:bg-slate-200 dark:hover:bg-slate-700 border border-slate-300 dark:border-slate-700/30 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                          className="flex flex-col items-center justify-center p-4 bg-fb-surface hover:bg-fb-surface2 hover:border-fb-accent border border-fb-border rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                         >
                           <div className="text-2xl mb-2">{item.icon}</div>
-                          <div className="font-medium text-slate-800 dark:text-slate-200">{item.format}</div>
-                          <div className="text-xs text-slate-400">{item.desc}</div>
+                          <div className="font-medium text-fb-text">{item.format}</div>
+                          <div className="text-xs text-fb-muted">{item.desc}</div>
                         </button>
                       ))}
                     </div>
@@ -557,7 +557,7 @@ export default function SettingsPage() {
                         className={`text-sm mt-3 ${
                           exportStatus.ok
                             ? 'text-emerald-600 dark:text-emerald-400'
-                            : 'text-rose-500 dark:text-rose-400'
+                            : 'text-cat-distract'
                         }`}
                       >
                         {exportStatus.message}
@@ -566,12 +566,12 @@ export default function SettingsPage() {
                   </div>
 
                   {/* Delete Data — real, irreversible. Categories and rules are preserved. */}
-                  <div className="bg-slate-50 dark:bg-[#05070D] border border-slate-300 dark:border-slate-700/30 rounded-lg p-4">
-                    <h4 className="text-md font-medium text-slate-800 dark:text-slate-300 mb-2 flex items-center">
-                      <Trash2 className="h-4 w-4 mr-2 text-rose-500" />
+                  <div className="bg-fb-surface2 border border-fb-border rounded-xl p-4">
+                    <h4 className="text-md font-medium text-fb-text mb-2 flex items-center">
+                      <Trash2 className="h-4 w-4 mr-2 text-cat-distract" />
                       Delete Data
                     </h4>
-                    <p className="text-sm text-slate-500 dark:text-slate-400 mb-3">
+                    <p className="text-sm text-fb-muted mb-3">
                       Permanently delete your recorded activity. Your categories and classification
                       rules are kept — only the history is removed. This cannot be undone.
                     </p>
@@ -582,10 +582,10 @@ export default function SettingsPage() {
                           setDeleteStatus(null)
                           setConfirmDelete('history')
                         }}
-                        className="w-full flex justify-between items-center p-3 bg-slate-100 dark:bg-[#05070D] hover:bg-slate-200 dark:hover:bg-slate-700 border border-slate-300 dark:border-slate-700/30 rounded-lg transition-colors"
+                        className="w-full flex justify-between items-center p-3 bg-fb-surface hover:bg-fb-surface2 hover:border-fb-accent border border-fb-border rounded-lg transition-colors"
                       >
-                        <span className="text-slate-700 dark:text-slate-300">Clear activity history</span>
-                        <span className="text-xs bg-slate-200 dark:bg-slate-700 text-slate-700 dark:text-slate-300 px-2 py-1 rounded">
+                        <span className="text-fb-text">Clear activity history</span>
+                        <span className="text-xs bg-fb-track text-fb-muted px-2 py-1 rounded">
                           Keeps focus sessions
                         </span>
                       </button>
@@ -595,10 +595,10 @@ export default function SettingsPage() {
                           setDeleteStatus(null)
                           setConfirmDelete('all')
                         }}
-                        className="w-full flex justify-between items-center p-3 bg-rose-900/20 hover:bg-rose-900/30 border border-rose-900/50 rounded-lg transition-colors"
+                        className="w-full flex justify-between items-center p-3 bg-cat-distract/10 hover:bg-cat-distract/20 border border-cat-distract/40 rounded-lg transition-colors"
                       >
-                        <span className="text-rose-500 dark:text-rose-400">Delete all activity data</span>
-                        <span className="text-xs bg-rose-900/50 text-rose-300 px-2 py-1 rounded">Permanent</span>
+                        <span className="text-cat-distract font-medium">Delete all activity data</span>
+                        <span className="text-xs bg-cat-distract/20 text-cat-distract px-2 py-1 rounded">Permanent</span>
                       </button>
                     </div>
 
@@ -607,7 +607,7 @@ export default function SettingsPage() {
                         className={`text-sm mt-3 ${
                           deleteStatus.ok
                             ? 'text-emerald-600 dark:text-emerald-400'
-                            : 'text-rose-500 dark:text-rose-400'
+                            : 'text-cat-distract'
                         }`}
                       >
                         {deleteStatus.message}
@@ -621,7 +621,7 @@ export default function SettingsPage() {
             {/* Integrations — the real browser-extension bridge only. */}
             {activeTab === 'integrations' && (
               <div className="space-y-6 animate-fadeIn">
-                <h3 className="text-lg font-medium text-slate-900 dark:text-slate-200 border-b border-slate-200 dark:border-slate-700/30 pb-2">
+                <h3 className="font-display text-lg font-medium text-fb-text border-b border-fb-border pb-2">
                   Integrations
                 </h3>
                 <BrowserBridgePanel />
@@ -631,15 +631,15 @@ export default function SettingsPage() {
             {/* Startup — real launch-on-login toggle. */}
             {activeTab === 'startup' && (
               <div className="space-y-6 animate-fadeIn">
-                <h3 className="text-lg font-medium text-slate-900 dark:text-slate-200 border-b border-slate-200 dark:border-slate-700/30 pb-2">
+                <h3 className="font-display text-lg font-medium text-fb-text border-b border-fb-border pb-2">
                   Startup
                 </h3>
 
-                <div className="bg-slate-50 dark:bg-[#05070D] border border-slate-300 dark:border-slate-700/30 rounded-lg p-4">
+                <div className="bg-fb-surface2 border border-fb-border rounded-xl p-4">
                   <div className="flex items-center justify-between">
                     <div>
-                      <div className="text-slate-800 dark:text-slate-200 font-medium">Launch FocusBook at login</div>
-                      <div className="text-sm text-slate-500 dark:text-slate-400 max-w-md">
+                      <div className="text-fb-text font-medium">Launch FocusBook at login</div>
+                      <div className="text-sm text-fb-muted max-w-md">
                         Start FocusBook automatically when you sign in to Windows so tracking begins
                         without you opening it. Off by default.
                       </div>
@@ -651,7 +651,7 @@ export default function SettingsPage() {
                       className={`text-sm mt-3 ${
                         autoLaunchStatus.ok
                           ? 'text-emerald-600 dark:text-emerald-400'
-                          : 'text-rose-500 dark:text-rose-400'
+                          : 'text-cat-distract'
                       }`}
                     >
                       {autoLaunchStatus.message}
@@ -671,18 +671,18 @@ export default function SettingsPage() {
           onClick={() => !isDeleting && setConfirmDelete(null)}
         >
           <div
-            className="w-full max-w-md rounded-lg border border-slate-300 dark:border-slate-700 bg-white dark:bg-[#0B1220] p-6 shadow-xl"
+            className="w-full max-w-md rounded-[18px] border border-fb-border bg-fb-surface p-6 shadow-[var(--fb-shadow)]"
             onClick={(e) => e.stopPropagation()}
           >
             <div className="flex items-start gap-3">
-              <div className="mt-0.5 rounded-full bg-rose-100 dark:bg-rose-900/40 p-2">
-                <AlertTriangle className="h-5 w-5 text-rose-500" />
+              <div className="mt-0.5 rounded-full bg-cat-distract/15 p-2">
+                <AlertTriangle className="h-5 w-5 text-cat-distract" />
               </div>
               <div>
-                <h4 className="text-base font-semibold text-slate-900 dark:text-white">
+                <h4 className="font-display text-base font-semibold text-fb-text">
                   {confirmDelete === 'all' ? 'Delete all activity data?' : 'Clear activity history?'}
                 </h4>
-                <p className="mt-1 text-sm text-slate-600 dark:text-slate-400">
+                <p className="mt-1 text-sm text-fb-muted">
                   {confirmDelete === 'all'
                     ? 'This permanently deletes all recorded activity and focus-session history. Your categories and classification rules are kept. This cannot be undone.'
                     : 'This permanently deletes your recorded activity. Focus-session records, categories, and rules are kept. This cannot be undone.'}
@@ -694,14 +694,14 @@ export default function SettingsPage() {
               <button
                 onClick={() => setConfirmDelete(null)}
                 disabled={isDeleting}
-                className="px-4 py-2 rounded-md text-sm text-slate-700 dark:text-slate-300 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 transition-colors disabled:opacity-50"
+                className="px-4 py-2 rounded-lg text-sm text-fb-text bg-fb-surface2 border border-fb-border hover:border-fb-accent transition-colors disabled:opacity-50"
               >
                 Cancel
               </button>
               <button
                 onClick={runDelete}
                 disabled={isDeleting}
-                className="px-4 py-2 rounded-md text-sm text-white bg-rose-600 hover:bg-rose-700 transition-colors disabled:opacity-50"
+                className="px-4 py-2 rounded-lg text-sm text-white bg-cat-distract hover:brightness-110 transition-all disabled:opacity-50"
               >
                 {isDeleting ? 'Deleting…' : confirmDelete === 'all' ? 'Delete everything' : 'Clear history'}
               </button>

@@ -130,16 +130,8 @@ export default defineConfig({
             mkdirSync(outDir, { recursive: true })
           }
 
-          // Copy popup.html
-          const popupFile = resolve(srcDir, 'popup.html')
-          const popupTarget = resolve(outDir, 'popup.html')
-
-          if (existsSync(popupFile)) {
-            copyFileSync(popupFile, popupTarget)
-            console.log(`Copied ${popupFile} to ${popupTarget}`)
-          }
-
-          // Copy popup-enhanced.html
+          // Copy popup-enhanced.html (the only popup the main process loads;
+          // the legacy popup.html was removed as dead code).
           const enhancedPopupFile = resolve(srcDir, 'popup-enhanced.html')
           const enhancedPopupTarget = resolve(outDir, 'popup-enhanced.html')
 
