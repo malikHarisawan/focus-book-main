@@ -10,7 +10,6 @@ import {
   Target,
   AlertCircle,
   CheckCircle,
-  MinusCircle,
   XCircle
 } from 'lucide-react'
 
@@ -38,9 +37,8 @@ export default function SummaryTab({ summary, date }) {
     )
   }
 
-  // Get category data
+  // Get category data. BINARY model: Productive vs Distracting only (no Neutral band).
   const productiveCategory = categories.find(c => c.type === 'Productive') || { apps: [], time: '0s', percentage: 0 }
-  const neutralCategory = categories.find(c => c.type === 'Neutral') || { apps: [], time: '0s', percentage: 0 }
   const distractingCategory = categories.find(c => c.type === 'Distracting') || { apps: [], time: '0s', percentage: 0 }
 
   return (
@@ -155,43 +153,6 @@ export default function SummaryTab({ summary, date }) {
                 </TableHeader>
                 <TableBody>
                   {productiveCategory.apps.map((app, idx) => (
-                    <TableRow key={idx} className="border-border/30">
-                      <TableCell className="font-medium text-foreground">{app.name}</TableCell>
-                      <TableCell className="text-right font-mono text-primary">{app.time}</TableCell>
-                      <TableCell className="text-right text-muted-foreground">{app.percentage}%</TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-            </CardContent>
-          </Card>
-        )}
-
-        {/* Neutral Activities */}
-        {neutralCategory.apps.length > 0 && (
-          <Card className="border-blue-500/20">
-            <CardHeader className="pb-3 bg-blue-50/50 dark:bg-blue-950/10">
-              <CardTitle className="text-base font-semibold flex items-center justify-between">
-                <span className="flex items-center text-blue-700 dark:text-blue-500">
-                  <MinusCircle className="h-5 w-5 mr-2" />
-                  Neutral Activities
-                </span>
-                <Badge variant="outline" className="border-blue-500/50 text-blue-700 dark:text-blue-500">
-                  {neutralCategory.time} ({neutralCategory.percentage}%)
-                </Badge>
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="pt-4">
-              <Table>
-                <TableHeader>
-                  <TableRow className="hover:bg-transparent border-border/30">
-                    <TableHead className="text-muted-foreground">Application</TableHead>
-                    <TableHead className="text-right text-muted-foreground">Time Spent</TableHead>
-                    <TableHead className="text-right text-muted-foreground">% of Category</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {neutralCategory.apps.map((app, idx) => (
                     <TableRow key={idx} className="border-border/30">
                       <TableCell className="font-medium text-foreground">{app.name}</TableCell>
                       <TableCell className="text-right font-mono text-primary">{app.time}</TableCell>

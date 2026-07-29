@@ -241,6 +241,13 @@ const BrowserBridge = require('./browserBridge')
 // resolution. See src/main/classification/. Bound lazily to the live connection.
 const { SpanService } = require('./classification/spanService')
 const { spansToAppUsageData } = require('./classification/appUsageAdapter')
+// Presence→usage adapters are temporarily unused: labelled away-time is no longer merged
+// into the dashboards (see resolvedAppUsageData for why). Re-enable this import together
+// with the merge call once away-spans are duration-capped.
+// const {
+//   presenceToAppUsageData,
+//   mergePresenceIntoUsage
+// } = require('./classification/presenceUsageAdapter')
 
 // One SpanService bound to the current DB connection. Rebuilt if the connection
 // changes (online/offline switch); getConnection() exposes run/all which SpanService needs.
@@ -257,11 +264,36 @@ function getSpanService() {
 
 // Build the legacy appUsageData shape from spans resolved over [startMs, endMs).
 // Shared by load-data and the aggregated-data handlers so they resolve identically.
+// Also folds in LABELLED away-time (the return-prompt answers): a "Working"/"Meeting"
+// absence lands as productive time, "Break" as neutral, under synthetic "… (away)" rows.
+// Unlabelled absences are intentionally NOT included — away-time counts only once the
+// user has said what it was (see presenceUsageAdapter for the mapping).
 async function resolvedAppUsageData(startMs, endMs) {
   const spanSvc = getSpanService()
   if (!spanSvc) return {}
   const resolved = await spanSvc.getResolvedSpans(startMs, endMs)
-  return spansToAppUsageData(resolved)
+  const usage = spansToAppUsageData(resolved)
+
+  // NOTE: labelled away-time is intentionally NOT merged into the dashboards right now.
+  // A single presence span can be many hours long (e.g. an overnight idle/locked block),
+  // and the return-prompt let such a block be labelled "working"/"meeting" — which then
+  // credited 15–17h of focus in one day and inflated the trend/score by ~10x (see the
+  // 2026-07-16 case). Until the presence engine caps how much a single away-span can
+  // contribute (and/or stops prompting for very long gaps), the totals count ONLY real
+  // app-usage spans. The presence log + annotations remain in the DB untouched; re-enable
+  // the merge below once away-spans are bounded.
+  //
+  // try {
+  //   const presenceSvc = getPresenceService()
+  //   if (presenceSvc) {
+  //     const presence = await presenceSvc.getResolvedPresence(startMs, endMs)
+  //     mergePresenceIntoUsage(usage, presenceToAppUsageData(presence))
+  //   }
+  // } catch (error) {
+  //   console.error('Failed to merge labelled presence into usage:', error)
+  // }
+
+  return usage
 }
 
 // Presence/idle engine (see docs/PRESENCE_AND_IDLE_ENGINE.md). Main owns the state
@@ -457,7 +489,7 @@ let browserBridge = new BrowserBridge(app.getPath('userData'))
 // Window sizing. Default opens comfortably for the dashboard; the minimum is
 // smaller so it can shrink (sidebar collapses) without the layout breaking.
 const DEFAULT_WINDOW = { width: 1280, height: 800 }
-const MIN_WINDOW = { width: 860, height: 600 }
+const MIN_WINDOW = { width: 680, height: 560 }
 const WINDOW_STATE_FILE = path.join(app.getPath('userData'), 'window-state.json')
 
 // Load the last-saved window bounds, if any. Returns null when absent/invalid.
@@ -1331,8 +1363,19 @@ app.whenReady().then(async () => {
   ipcMain.handle('idle-state', async (event, idleThreshold) => {
     try {
       let state = powerMonitor.getSystemIdleState(idleThreshold)
+      // Seconds since the last input event. The tracking loop uses this to recover
+      // the "trailing edge": when idle is detected, real activity actually stopped
+      // `idleSeconds` ago, so the interval up to (now - idleSeconds) is genuine work
+      // that must be flushed before we stop counting. Returned alongside the state so
+      // the preload can flush without a second IPC round-trip.
+      let idleSeconds = 0
+      try {
+        idleSeconds = powerMonitor.getSystemIdleTime()
+      } catch {
+        idleSeconds = 0
+      }
       console.log(
-        `[${new Date().toLocaleTimeString()}] System state: ${state} (threshold: ${idleThreshold}s)`
+        `[${new Date().toLocaleTimeString()}] System state: ${state} (threshold: ${idleThreshold}s, idleSeconds: ${idleSeconds})`
       )
 
       // Additional check for system sleep/wake
@@ -1359,6 +1402,21 @@ app.whenReady().then(async () => {
     } catch (error) {
       console.error('Error getting system idle state:', error)
       return 'unknown'
+    }
+  })
+
+  // Seconds since the last input event. Called by the tracking loop ONLY at the
+  // active->idle transition (once per idle block, not per tick) to recover the
+  // trailing edge of real activity: work actually stopped `idleSeconds` ago, so the
+  // interval up to (now - idleSeconds) is genuine and must be flushed before we stop
+  // counting. Kept separate from `idle-state` so existing callers keep their simple
+  // string return shape.
+  ipcMain.handle('idle-seconds', async () => {
+    try {
+      return powerMonitor.getSystemIdleTime()
+    } catch (error) {
+      console.error('Error getting system idle time:', error)
+      return 0
     }
   })
 

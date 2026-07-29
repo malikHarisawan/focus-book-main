@@ -11,6 +11,7 @@ import SmartDatePicker from '../shared/smart-date-picker'
 import AppUsageDetails from './AppUsageDetails'
 import { useDate } from '../../context/DateContext'
 import { useTheme } from '../../context/ThemeContext'
+import { todayLocal } from '../../utils/dateUtils'
 import {
   processProductiveChartData,
   processCustomRangeChartData,
@@ -45,12 +46,19 @@ const monogram = (name = '') => {
   return (clean.slice(0, 2) || name.slice(0, 2) || '?').toUpperCase()
 }
 
-// Shift a YYYY-MM-DD string by n days.
+// Shift a YYYY-MM-DD string by n days. Parses and serializes in UTC so the
+// arithmetic never crosses a DST/timezone boundary — matches how selectedDate
+// is produced app-wide (new Date().toISOString()).
 const shiftDate = (dateStr, n) => {
-  const d = new Date(dateStr + 'T00:00:00')
-  d.setDate(d.getDate() + n)
+  const d = new Date(dateStr + 'T00:00:00Z')
+  d.setUTCDate(d.getUTCDate() + n)
   return d.toISOString().split('T')[0]
 }
+
+// Sunday (week start) of the calendar week containing dateStr. getUTCDay(): 0 = Sun.
+// Uses UTC to stay consistent with shiftDate so the week starts on Sunday.
+const startOfWeek = (dateStr) =>
+  shiftDate(dateStr, -new Date(dateStr + 'T00:00:00Z').getUTCDay())
 
 export default function ProductivityOverview() {
   const [rawData, setRawData] = useState(null)
@@ -67,9 +75,14 @@ export default function ProductivityOverview() {
   // Area-view granularity: 'day' | 'week' | 'month' | 'custom'.
   const [areaGran, setAreaGran] = useState('day')
   // Custom range endpoints (YYYY-MM-DD). Default: last 14 days ending today.
-  const today = new Date().toISOString().split('T')[0]
+  const today = todayLocal()
   const [customStart, setCustomStart] = useState(shiftDate(today, -13))
   const [customEnd, setCustomEnd] = useState(today)
+  // Focus-trend week anchor: which calendar week the trend card is *browsing*.
+  // Kept SEPARATE from selectedDate so paging the trend (prev/next) only re-renders
+  // the trend bars — it must NOT navigate the whole dashboard. Only clicking a
+  // specific bar changes selectedDate. Any date inside the week works as the anchor.
+  const [trendWeekDate, setTrendWeekDate] = useState(selectedDate)
 
   useEffect(() => {
     loadAndProcessData()
@@ -116,32 +129,6 @@ export default function ProductivityOverview() {
   )
   const customSpanDays = customRangeData.length
 
-  // Summary totals for the effective window. Day/Week/Month use the shared
-  // aggregator; Custom sums the per-day points we already computed for the chart.
-  const { productiveSeconds, distractingSeconds, totalSeconds } = useMemo(() => {
-    if (effectiveView === 'custom') {
-      const t = customRangeData.reduce(
-        (acc, p) => {
-          acc.productive += p.productive
-          acc.neutral += p.neutral
-          acc.distracting += p.distracting
-          return acc
-        },
-        { productive: 0, neutral: 0, distracting: 0 }
-      )
-      const productiveSeconds = Math.floor(t.productive)
-      const neutralSeconds = Math.floor(t.neutral)
-      const distractingSeconds = Math.floor(t.distracting)
-      return {
-        productiveSeconds,
-        neutralSeconds,
-        distractingSeconds,
-        totalSeconds: productiveSeconds + neutralSeconds + distractingSeconds
-      }
-    }
-    return getProductivityTotals(rawData, selectedDate, effectiveView)
-  }, [effectiveView, customRangeData, rawData, selectedDate])
-
   const multiDay = effectiveView !== 'day'
   // Number of days the current window spans — used for daily-average math.
   const windowDays =
@@ -160,12 +147,6 @@ export default function ProductivityOverview() {
         : effectiveView === 'custom'
           ? `${customRangeData.length} days`
           : 'Today'
-
-  // Focus score = productive share of (productive + distracting) time.
-  const score =
-    productiveSeconds + distractingSeconds > 0
-      ? Math.round((productiveSeconds / (productiveSeconds + distractingSeconds)) * 100)
-      : 0
 
   // The YYYY-MM-DD dates covered by the effective window.
   const windowDates = useMemo(() => {
@@ -186,6 +167,35 @@ export default function ProductivityOverview() {
     }
     return getDatesForView(selectedDate, effectiveView)
   }, [effectiveView, customStart, customEnd, selectedDate])
+
+  // Summary totals for the effective window, derived from getModeTotals' rollup so
+  // EVERY on-screen number traces to one floored source. getModeTotals floors each
+  // work-mode independently and rolls each into exactly one verdict bucket, so:
+  //   Focus time (productive) + Distractions (distracting) == Total tracked, and
+  //   both reconcile with the donut's per-mode segments (which are the same floored
+  //   buckets). Using getProductivityTotals here instead floors the SUMMED totals,
+  //   which can drift from the per-mode floors by a minute — the "homeless minute".
+  // Declared AFTER windowDates because it reads it (const has no hoisting — reading it
+  // above its declaration hits the temporal dead zone and white-screens the render).
+  const { productiveSeconds, distractingSeconds, totalSeconds } = useMemo(() => {
+    const acc = { productive: 0, distracting: 0 }
+    for (const d of windowDates) {
+      const { rollup } = getModeTotals(rawData, d, 'day')
+      acc.productive += rollup.productive
+      acc.distracting += rollup.distracting
+    }
+    return {
+      productiveSeconds: acc.productive,
+      distractingSeconds: acc.distracting,
+      totalSeconds: acc.productive + acc.distracting
+    }
+  }, [windowDates, rawData])
+
+  // Focus score = productive share of (productive + distracting) time.
+  const score =
+    productiveSeconds + distractingSeconds > 0
+      ? Math.round((productiveSeconds / (productiveSeconds + distractingSeconds)) * 100)
+      : 0
 
   // Distraction "sessions" — count of distinct distracting apps with tracked
   // time across the effective window.
@@ -269,16 +279,34 @@ export default function ProductivityOverview() {
     }))
   }, [rawData, selectedDate, multiDay, windowDates])
 
-  // 7-day focus trend ending at the selected date.
+  // Focus trend for the calendar week (Sunday → Saturday) containing the
+  // selected date. Defaults to the current week with today selected.
+  // Keep the trend's browsed week aligned with selectedDate when the date is
+  // changed from ELSEWHERE (date picker, "today"), so the trend shows the week
+  // that contains the active day. Paging the trend itself moves only trendWeekDate
+  // and leaves selectedDate alone, so this doesn't fight the prev/next buttons.
+  useEffect(() => {
+    if (startOfWeek(trendWeekDate) !== startOfWeek(selectedDate)) {
+      setTrendWeekDate(selectedDate)
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedDate])
+
   const trendDays = useMemo(() => {
+    const weekStart = startOfWeek(trendWeekDate)
     const out = []
     let weekTotal = 0
-    for (let i = 6; i >= 0; i--) {
-      const day = shiftDate(selectedDate, -i)
+    for (let i = 0; i < 7; i++) {
+      const day = shiftDate(weekStart, i)
       const t = getProductivityTotals(rawData, day, 'day')
       const focus = t.productiveSeconds
       weekTotal += focus
-      const label = new Date(day + 'T00:00:00').toLocaleDateString('en-US', { weekday: 'short' })
+      // Format in UTC to match the UTC-based day string, so the weekday label
+      // lines up with the column (Sun … Sat).
+      const label = new Date(day + 'T00:00:00Z').toLocaleDateString('en-US', {
+        weekday: 'short',
+        timeZone: 'UTC'
+      })
       out.push({
         key: day,
         label,
@@ -288,7 +316,7 @@ export default function ProductivityOverview() {
       })
     }
     return { days: out, avg: weekTotal / 7 }
-  }, [rawData, selectedDate])
+  }, [rawData, trendWeekDate, selectedDate])
 
 
   const handleSelectionChange = (apps, range) => {
@@ -309,7 +337,7 @@ export default function ProductivityOverview() {
     }
   }
 
-  const isToday = selectedDate === new Date().toISOString().split('T')[0]
+  const isToday = selectedDate === todayLocal()
   const prettyDate = new Date(selectedDate + 'T00:00:00').toLocaleDateString('en-US', {
     weekday: 'long',
     month: 'short',
@@ -318,7 +346,7 @@ export default function ProductivityOverview() {
   const ThemeIcon = theme === 'system' ? Monitor : resolvedTheme === 'dark' ? Sun : Moon
 
   return (
-    <div className="max-w-[1420px] mx-auto w-full px-3 pb-8 flex flex-col gap-5">
+    <div className="w-full px-3 sm:px-4 lg:px-6 pb-8 flex flex-col gap-5">
       {/* Header */}
       <header className="flex items-start justify-between gap-6 flex-wrap pt-3">
         <div>
@@ -414,6 +442,9 @@ export default function ProductivityOverview() {
         />
         <StatCard
           title={multiDay ? 'Daily average' : 'Total tracked'}
+          // totalSeconds now equals productiveSeconds + distractingSeconds, which is the
+          // sum of the donut's per-mode segments (all derive from getModeTotals' rollup),
+          // so "Total tracked" reconciles with Focus time + Distractions and the donut.
           value={hm(multiDay ? Math.round(productiveSeconds / windowDays) : totalSeconds)}
           sub={multiDay ? 'focus per day' : 'Active time'}
           swatch="muted"
@@ -553,16 +584,19 @@ export default function ProductivityOverview() {
         <FocusTrendBars
           days={trendDays.days}
           avgStr={`${hm(trendDays.avg)}`}
+          // Clicking a specific bar is the ONLY trend action that navigates the
+          // dashboard — it sets the global selectedDate to that day.
           onSelectDay={(day) => {
             handleDateChange(day)
           }}
-          // Page the 7-day window a week at a time. The window ends at the
-          // selected date, so shifting the selected date ±7 days moves it.
-          onShiftWeek={(dir) => handleDateChange(shiftDate(selectedDate, dir * 7))}
-          onGoToday={() => handleDateChange(new Date().toISOString().split('T')[0])}
-          // Disable "next" once the window already ends at (or past) today, so
-          // you can't page into the future, and hide the "today" shortcut then.
-          isCurrentWeek={isToday}
+          // Prev/next pages the BROWSED week only (trendWeekDate); it must NOT
+          // change selectedDate or reload the dashboard. The selected day stays put
+          // until you click a bar in the newly-shown week.
+          onShiftWeek={(dir) => setTrendWeekDate((d) => shiftDate(d, dir * 7))}
+          onGoToday={() => setTrendWeekDate(today)}
+          // Disable "next" and hide "today" once the browsed week is the current
+          // calendar week, so you can't page into the future.
+          isCurrentWeek={startOfWeek(trendWeekDate) === startOfWeek(today)}
         />
         <ActivityLog apps={activityApps} scope={scopeLabel} />
       </section>

@@ -1,8 +1,10 @@
 import { useState, useEffect } from 'react'
-import { Minus, X, Maximize2, Minimize2 } from 'lucide-react'
+import { Minus, X, Maximize2, Minimize2, Menu } from 'lucide-react'
+import { useSidebar } from '../../context/SidebarContext'
 
 export function TitleBar() {
   const [isMaximized, setIsMaximized] = useState(false)
+  const { isNarrow, toggleSidebar } = useSidebar()
 
   useEffect(() => {
     const checkMaximized = async () => {
@@ -43,7 +45,18 @@ export function TitleBar() {
       style={{ WebkitAppRegion: 'drag' }}
     >
       {/* App Title */}
-      <div className="flex items-center gap-2">
+      <div className="flex items-center gap-2" style={{ WebkitAppRegion: 'no-drag' }}>
+        {/* Hamburger — only when the sidebar is in overlay mode (narrow window). */}
+        {isNarrow && (
+          <button
+            onClick={toggleSidebar}
+            className="h-8 w-8 flex items-center justify-center transition-all duration-200 text-fb-muted hover:text-fb-accent hover:bg-fb-surface2 rounded"
+            title="Open menu"
+            aria-label="Open navigation menu"
+          >
+            <Menu size={16} />
+          </button>
+        )}
         <span className="font-display text-sm font-semibold tracking-wide text-fb-accent">
           FocusBook
         </span>

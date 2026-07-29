@@ -7,7 +7,12 @@ import FocusPage from './components/Focus/page'
 // the /chat route below to re-enable.
 // import ChatPage from './components/Chat/page'
 import UpdateNotification from './components/UpdateNotification'
-import AwayReturnPrompt from './components/AwayReturnPrompt'
+// Away-return prompt disabled — away-time is no longer surfaced anywhere in the app.
+// A single absence span can be many hours long (e.g. an overnight idle/locked block),
+// and labelling one "working" credited 15–17h of focus in a day and wrecked the totals.
+// Until away-spans are duration-capped, we neither prompt for nor record away-time.
+// Restore this import and <AwayReturnPrompt /> below to re-enable.
+// import AwayReturnPrompt from './components/AwayReturnPrompt'
 import WelcomeModal from './components/Onboarding/WelcomeModal'
 import { DateProvider } from './context/DateContext'
 import { ThemeProvider } from './context/ThemeContext'
@@ -64,7 +69,8 @@ function App() {
             </Routes>
           </MainLayout>
           <UpdateNotification />
-          <AwayReturnPrompt />
+          {/* Away-return prompt disabled (see import note above). */}
+          {/* <AwayReturnPrompt /> */}
           {onboarded === false && <WelcomeModal onComplete={completeOnboarding} />}
         </Router>
       </DateProvider>

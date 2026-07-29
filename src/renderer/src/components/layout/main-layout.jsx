@@ -4,7 +4,7 @@ import { TitleBar } from './TitleBar'
 import { useSidebar } from '../../context/SidebarContext'
 
 export function MainLayout({ children }) {
-  const { isCollapsed } = useSidebar()
+  const { isCollapsed, isNarrow, overlayOpen, closeOverlay } = useSidebar()
   const [isLoading] = useState(false)
 
   return (
@@ -39,27 +39,67 @@ export function MainLayout({ children }) {
         )}
 
         {/* Main content area - fills remaining height */}
-        <div className="flex-1 flex min-h-0">
+        <div className="flex-1 flex min-h-0 relative">
 
-          <div className={`
-            flex flex-col flex-shrink-0
-            transition-all duration-300 ease-in-out
-            ${isCollapsed ? 'w-20' : 'w-60 xl:w-64'}
-            overflow-y-auto custom-scrollbar
-          `}>
-            {/* flex-1 so the sidebar card stretches to the full content height */}
-            <div className="flex-1 flex p-3 min-h-0">
-              <Sidebar
-                collapsed={isCollapsed}
-                productivityScore={85}
-                dailyGoalProgress={68}
-                weeklyGoalProgress={72}
-              />
+          {/* DOCKED sidebar — only when the window is wide enough. On narrow
+              windows the rail is removed entirely so content spans full width;
+              the sidebar is reachable as an overlay drawer instead. */}
+          {!isNarrow && (
+            <div className={`
+              flex flex-col flex-shrink-0
+              transition-all duration-300 ease-in-out
+              ${isCollapsed ? 'w-20' : 'w-60 xl:w-64'}
+              overflow-y-auto custom-scrollbar
+            `}>
+              {/* flex-1 so the sidebar card stretches to the full content height */}
+              <div className="flex-1 flex p-3 min-h-0">
+                <Sidebar
+                  collapsed={isCollapsed}
+                  productivityScore={85}
+                  dailyGoalProgress={68}
+                  weeklyGoalProgress={72}
+                />
+              </div>
             </div>
-          </div>
+          )}
+
+          {/* OVERLAY drawer + backdrop — narrow windows only. The drawer slides
+              in from the left over the content and is dismissed by tapping the
+              backdrop, so it never squeezes the page. */}
+          {isNarrow && (
+            <>
+              <div
+                className={`fixed inset-0 z-40 bg-black/50 backdrop-blur-[2px] transition-opacity duration-200
+                  ${overlayOpen ? 'opacity-100' : 'opacity-0 pointer-events-none'}`}
+                onClick={closeOverlay}
+                aria-hidden="true"
+              />
+              <div
+                className={`fixed left-0 top-10 bottom-0 z-40 w-64 max-w-[85vw] p-3
+                  transition-transform duration-300 ease-in-out
+                  ${overlayOpen ? 'translate-x-0' : '-translate-x-full'}`}
+                role="dialog"
+                aria-modal="true"
+                aria-label="Navigation menu"
+              >
+                <div className="h-full flex">
+                  <Sidebar
+                    collapsed={false}
+                    productivityScore={85}
+                    dailyGoalProgress={68}
+                    weeklyGoalProgress={72}
+                    onNavigate={closeOverlay}
+                  />
+                </div>
+              </div>
+            </>
+          )}
 
           <main className="flex-1 overflow-y-auto custom-scrollbar p-2 min-w-0">
-            <div className="container mx-auto max-w-full">
+            {/* Full-width wrapper — no `container`/max-width cap, so pages expand to
+                fill the whole content area on wide screens instead of being clamped
+                to a centered column. Individual pages own their own padding. */}
+            <div className="w-full">
               {children}
             </div>
           </main>

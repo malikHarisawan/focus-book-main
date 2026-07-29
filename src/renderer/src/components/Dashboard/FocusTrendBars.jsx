@@ -1,5 +1,5 @@
 /**
- * FocusTrendBars — reference "Focus trend" card (last 7 days).
+ * FocusTrendBars — reference "Focus trend" card (calendar week, Sun–Sat).
  *
  * Presentational: the parent supplies the 7-day series and a click handler.
  *
@@ -30,7 +30,7 @@ export default function FocusTrendBars({
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0">
           <div className="font-display text-base font-semibold text-fb-text">Focus trend</div>
-          <div className="text-[13px] text-fb-muted mt-1">Last 7 days · click a bar to open it</div>
+          <div className="text-[13px] text-fb-muted mt-1">Sun–Sat · click a bar to open it</div>
         </div>
         <div className="flex items-center gap-3 shrink-0">
           {/* Week paging: ‹ previous · today · next › */}

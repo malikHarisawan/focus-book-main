@@ -1,60 +1,49 @@
 /**
  * CustomTooltip Component
  *
- * Custom tooltip for the productivity chart that shows aggregated data
- * and productivity metrics for the current selection or entire dataset.
+ * Custom tooltip for the productivity chart. Shows the hovered bucket's Focused and
+ * Distracted time (binary model) plus a Total and productivity %. All values are
+ * rounded ONCE to whole minutes and the total/percentage are derived from those
+ * rounded integers, so the displayed parts always sum to the displayed total
+ * (see docs/BUCKET_AGGREGATION_ENGINE.md §3).
  *
  * Props:
  * - active: Boolean indicating if tooltip should be shown
- * - payload: Data from Recharts for the hovered point
+ * - payload: Data from Recharts for the hovered point (carries focusedMs / distractedMs)
  * - label: The label of the hovered point
- * - aggregatedData: Object with productive, neutral, distracting, and total time
- * - hasSelection: Boolean indicating if there's an active selection
- * - zoomLevel: Current zoom level for contextual title
- * - zoomLevelDetail: Detailed description of current zoom level
  */
 
-import React from 'react'
-import { formatTooltipValue, getTooltipTitle } from '../utils/selectionUtils'
+// Format whole minutes as "2h 30m" / "45m". Input is already ROUNDED minutes, so no
+// rounding happens here — this is pure display (see the one-rounding-pass rule below).
+const fmtMinutes = (min) => {
+  if (min <= 0) return '0m'
+  const h = Math.floor(min / 60)
+  const m = min % 60
+  return h > 0 ? `${h}h ${m}m` : `${m}m`
+}
 
-// The five work-modes in display order, each with its design-system color token
-// (theme-aware) and the productivity band it rolls up into. Drives the tooltip's
-// Level-2 drill-down so the mode split reconciles with the Focused/Distracted rows.
-const MODE_META = [
-  { name: 'Deep work', color: 'var(--c-deep)', band: 'productive' },
-  { name: 'Creative', color: 'var(--c-create)', band: 'productive' },
-  { name: 'Collaboration', color: 'var(--c-comms)', band: 'productive' },
-  { name: 'Break', color: 'var(--c-break)', band: 'neutral' },
-  { name: 'Distraction', color: 'var(--c-distract)', band: 'distracting' }
-]
-
-const CustomTooltip = ({ active, payload, label, aggregatedData, hasSelection, zoomLevel, zoomLevelDetail }) => {
+const CustomTooltip = ({ active, payload, label }) => {
   if (!active || !payload || payload.length === 0) return null
 
-  // Get the data for the hovered point. The chart shows only productive and
-  // distracting (neutral is intentionally omitted), so the tooltip total is the
-  // sum of those two to stay consistent with what's drawn.
+  // Hovered bucket. BINARY model: the tooltip shows Focused + Distracted, and Total is
+  // DEFINED as their sum, so the displayed parts always reconcile with the displayed
+  // total. Values on the point are milliseconds.
   const pointData = payload[0]?.payload || {}
-  const productiveSeconds = pointData.productive || 0
-  const distractingSeconds = pointData.distracting || 0
-  const totalSeconds = productiveSeconds + distractingSeconds
+  const focusedMs = pointData.focusedMs || 0
+  const distractedMs = pointData.distractedMs || 0
 
-  // Level-2 drill-down: the per-mode split accrued onto every chart point. Show
-  // only the modes with time, in canonical order. Deep-work/Creative/Collaboration
-  // sum to the Focused row; Distraction to the Distracted row (Break is neutral and
-  // not drawn on the chart, so it can appear here without matching a band).
-  const modeSplit = pointData.modes || {}
-  const modeRows = MODE_META.map((m) => ({ ...m, seconds: modeSplit[m.name] || 0 })).filter(
-    (m) => m.seconds > 0
-  )
+  // ONE ROUNDING PASS (see docs/BUCKET_AGGREGATION_ENGINE.md §3): round each component
+  // to whole minutes ONCE, then derive the total and percentage FROM the rounded
+  // integers — never from the raw ms. This is what makes 4 + 1 == 5 on screen and the
+  // percentage match the numbers the user can add up themselves.
+  const fMin = Math.round(focusedMs / 60000)
+  const dMin = Math.round(distractedMs / 60000)
+  const totalMin = fMin + dMin
+  const productivePercentage = totalMin > 0 ? Math.round((fMin / totalMin) * 100) : null
 
-  const productiveTime = formatTooltipValue(productiveSeconds)
-  const distractingTime = formatTooltipValue(distractingSeconds)
-  const totalTime = formatTooltipValue(totalSeconds)
-  const productivePercentage =
-    totalSeconds > 0
-      ? Math.round((productiveSeconds / totalSeconds) * 100)
-      : 0
+  const productiveTime = fmtMinutes(fMin)
+  const distractingTime = fmtMinutes(dMin)
+  const totalTime = fmtMinutes(totalMin)
 
   return (
     <div
@@ -81,7 +70,9 @@ const CustomTooltip = ({ active, payload, label, aggregatedData, hasSelection, z
           <span className="text-white/70 text-sm">Total:</span>
           <span className="text-white text-sm font-semibold">{totalTime}</span>
         </div>
-        {totalSeconds > 0 && (
+        {/* Percentage is hidden (not shown as 0%) when there's no tracked time — "0%
+            productive" on an untracked bucket would be another untracked-as-zero lie. */}
+        {productivePercentage !== null && (
           <div className="flex items-center justify-between gap-4">
             <span className="text-white/70 text-sm">Productivity:</span>
             <span
@@ -90,24 +81,6 @@ const CustomTooltip = ({ active, payload, label, aggregatedData, hasSelection, z
             >
               {productivePercentage}%
             </span>
-          </div>
-        )}
-
-        {/* Level-2 work-mode drill-down for this point. */}
-        {modeRows.length > 0 && (
-          <div className="pt-2 mt-1.5 border-t border-white/15 space-y-1">
-            <div className="text-white/50 text-[11px] uppercase tracking-wide mb-1">By mode</div>
-            {modeRows.map((m) => (
-              <div key={m.name} className="flex items-center justify-between gap-4">
-                <div className="flex items-center gap-2">
-                  <div className="w-2 h-2 rounded-full" style={{ background: m.color }} />
-                  <span className="text-white/70 text-[13px]">{m.name}</span>
-                </div>
-                <span className="text-white text-[13px] font-medium">
-                  {formatTooltipValue(m.seconds)}
-                </span>
-              </div>
-            ))}
           </div>
         )}
       </div>

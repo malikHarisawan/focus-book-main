@@ -243,6 +243,9 @@ const AppUsageDetails = ({
 
       <CardContent className="p-0">
           <div className="bg-fb-surface2 rounded-b-lg overflow-hidden">
+          {/* Scrolls horizontally on narrow windows so the 11-col grid keeps shape. */}
+          <div className="overflow-x-auto custom-scrollbar">
+          <div className="min-w-[560px]">
             {/* Header */}
             <div className="grid grid-cols-11 text-xs text-fb-muted p-2.5 border-b border-fb-border bg-fb-surface2">
               <button
@@ -382,6 +385,8 @@ const AppUsageDetails = ({
                 </div>
               </div>
             )}
+          </div>
+          </div>
           </div>
         </CardContent>
     </Card>

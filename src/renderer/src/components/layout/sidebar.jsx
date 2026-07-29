@@ -11,11 +11,11 @@ import { useTheme } from '../../context/ThemeContext'
 import { useSidebar } from '../../context/SidebarContext'
 import { Menu, ChevronLeft } from 'lucide-react'
 
-export function Sidebar({ productivityScore, dailyGoalProgress, weeklyGoalProgress, collapsed = false }) {
+export function Sidebar({ productivityScore, dailyGoalProgress, weeklyGoalProgress, collapsed = false, onNavigate }) {
   const location = useLocation()
   const pathname = location.pathname
   const { resolvedTheme } = useTheme()
-  const { toggleSidebar } = useSidebar()
+  const { toggleSidebar, isNarrow } = useSidebar()
   const [currentSession, setCurrentSession] = useState(null)
   const [timeLeft, setTimeLeft] = useState(0)
   const [isStarting, setIsStarting] = useState(false)
@@ -118,16 +118,17 @@ export function Sidebar({ productivityScore, dailyGoalProgress, weeklyGoalProgre
   return (
     <Card className="w-full min-w-0 flex flex-col">
       <CardContent className="p-3 min-w-0 flex flex-col flex-1">
-        {/* Toggle Button - Top of Sidebar */}
+        {/* Toggle Button - Top of Sidebar. In overlay (narrow) mode it closes the
+            drawer; when docked it collapses/expands the rail. */}
         <div className="flex justify-end mb-3">
           <Button
             onClick={toggleSidebar}
             size="icon"
             variant="ghost"
             className="h-7 w-7 text-fb-muted hover:text-fb-accent hover:bg-fb-surface2"
-            title={collapsed ? 'Expand sidebar' : 'Collapse sidebar'}
+            title={isNarrow ? 'Close menu' : collapsed ? 'Expand sidebar' : 'Collapse sidebar'}
           >
-            {collapsed ? <Menu className="h-4 w-4" /> : <ChevronLeft className="h-4 w-4" />}
+            {isNarrow || !collapsed ? <ChevronLeft className="h-4 w-4" /> : <Menu className="h-4 w-4" />}
           </Button>
         </div>
 
@@ -144,15 +145,16 @@ export function Sidebar({ productivityScore, dailyGoalProgress, weeklyGoalProgre
         </div>
 
         <nav className="space-y-0.5">
-          <NavItem href="/" icon={Command} label="Dashboard" active={pathname === '/'} collapsed={collapsed} />
+          <NavItem href="/" icon={Command} label="Dashboard" active={pathname === '/'} collapsed={collapsed} onNavigate={onNavigate} />
           <NavItem
             href="/apps"
             icon={Activity}
             label="Apps"
             active={pathname === '/apps' || pathname === '/activity'}
             collapsed={collapsed}
+            onNavigate={onNavigate}
           />
-          <NavItem href="/focus" icon={Timer} label="Focus Timer" active={pathname === '/focus'} collapsed={collapsed} />
+          <NavItem href="/focus" icon={Timer} label="Focus Timer" active={pathname === '/focus'} collapsed={collapsed} onNavigate={onNavigate} />
           {/* AI service disabled — AI Insights entry hidden. Restore this NavItem to re-enable. */}
           {/* <NavItem href="/chat" icon={MessageSquare} label="AI Insights" active={pathname === '/chat'} collapsed={collapsed} /> */}
           <NavItem
@@ -161,6 +163,7 @@ export function Sidebar({ productivityScore, dailyGoalProgress, weeklyGoalProgre
             label="Settings"
             active={pathname === '/settings'}
             collapsed={collapsed}
+            onNavigate={onNavigate}
           />
         </nav>
 
@@ -225,7 +228,7 @@ export function Sidebar({ productivityScore, dailyGoalProgress, weeklyGoalProgre
                     asChild
                     className="w-full tracking-wide hover-lift"
                   >
-                    <Link to="/focus" className="flex items-center justify-center">
+                    <Link to="/focus" className="flex items-center justify-center" onClick={onNavigate}>
                       <Timer className="w-3.5 h-3.5 mr-1.5" />
                       <span className="text-xs">Custom Timer</span>
                     </Link>
@@ -242,7 +245,7 @@ export function Sidebar({ productivityScore, dailyGoalProgress, weeklyGoalProgre
 }
 
 // Component for nav items
-function NavItem({ icon: Icon, label, active, href, collapsed = false }) {
+function NavItem({ icon: Icon, label, active, href, collapsed = false, onNavigate }) {
   const buttonContent = (
     <Button
       variant="ghost"
@@ -254,7 +257,7 @@ function NavItem({ icon: Icon, label, active, href, collapsed = false }) {
           : 'text-fb-muted hover:text-fb-text hover:bg-fb-surface2'
       }`}
     >
-      <Link to={href} className={`flex items-center min-w-0 w-full ${collapsed ? 'justify-center' : 'gap-2.5'}`}>
+      <Link to={href} onClick={onNavigate} className={`flex items-center min-w-0 w-full ${collapsed ? 'justify-center' : 'gap-2.5'}`}>
         <Icon className={`h-5 w-5 flex-shrink-0 transition-transform duration-200 ${active ? 'scale-105' : 'group-hover:scale-105'}`} />
         {!collapsed && (
           <span className="truncate text-left font-normal tracking-normal">{label}</span>

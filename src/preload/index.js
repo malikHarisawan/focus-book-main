@@ -455,6 +455,24 @@ async function updateAppUsage() {
     if (state == 'idle' || state == 'locked' || state == 'unknown') {
       // Reset tracking variables when system is idle/locked/unknown to prevent false data recording
       console.log(`System is ${state}, resetting tracking variables`)
+      // Trailing-edge flush: real activity stopped when input stopped, NOT when we
+      // noticed idle 60s later. Record the pending interval for the last active app up
+      // to the true moment input ceased (now - idleSeconds), so the ~60s of genuine work
+      // before the idle threshold isn't discarded. Only 'idle' carries a meaningful
+      // seconds-since-input; for locked/unknown we can't trust it, so flush nothing.
+      if (state == 'idle' && lastActiveApp && lastActiveApp.windowClass) {
+        try {
+          const idleSeconds = await ipcRenderer.invoke('idle-seconds')
+          const activeEnd = Date.now() - Math.max(0, idleSeconds) * 1000
+          // Only flush if the true active-end is after our last recorded point (there is
+          // real work to attribute) — guards against clock skew / already-flushed state.
+          if (activeEnd > lastUpdateTime) {
+            await flushActiveInterval(activeEnd)
+          }
+        } catch (error) {
+          console.error('Trailing-edge flush failed on idle:', error)
+        }
+      }
       lastActiveApp = null
       lastUpdateTime = Date.now()
       // Reset productivity state on idle
@@ -608,6 +626,29 @@ async function startFocusSession(isFocused) {
         return
       }
 
+      // RESUME-BEFORE-START: the in-memory `isFocusSessionActive` flag can fall out
+      // of sync with the persisted session (e.g. after a reload, or when a session
+      // was auto-paused during an interruption). If the DB already holds a live
+      // session, adopt/resume it instead of spawning a NEW one — starting fresh here
+      // is what made the timer restart (and the sidebar / page timers disagree)
+      // when the user returned to productive work. A brand-new session is only
+      // created when there is genuinely none to continue.
+      const existing = await ipcRenderer.invoke('get-current-focus-session')
+      if (existing && !existing.error && (existing.status === 'active' || existing.status === 'paused')) {
+        if (existing.status === 'paused') {
+          await ipcRenderer.invoke('resume-focus-session', existing._id)
+          console.log('Adopted & resumed existing paused focus session:', existing._id)
+        } else {
+          console.log('Adopted existing active focus session:', existing._id)
+        }
+        isFocusSessionActive = true
+        focusSessionStartTime = Date.now()
+        // Re-attach the UI timers to the SAME session so both the sidebar and the
+        // Focus page count down the one live session rather than two.
+        ipcRenderer.send('start-focus', isFocused)
+        return
+      }
+
       // Start an actual focus session via IPC. Duration honors the user's
       // Settings → Focus & Blocking choice (defaults to 25 minutes).
       const sessionData = {
@@ -727,87 +768,108 @@ function isValidWindow(currentWindow) {
   return true
 }
 
-async function updateUsageData(currentWindow, hasAppSwitched) {
-  const currentTime = Date.now()
-  if (lastActiveApp && lastActiveApp.windowClass) {
-    const timeSpent = currentTime - lastUpdateTime
+// Minimum interval worth recording. Below this we treat the slice as window flicker
+// / rapid alt-tab noise and drop it. Lowered from 10s to 3s so genuine short glances
+// (checking a message, a quick tab switch) are no longer silently lost, while sub-3s
+// flicker is still ignored.
+const MIN_RECORDABLE_MS = 3000
 
-    // Check if the app or domain is in the exclusion list
-    const appClass = lastActiveApp.windowClass
-    const isAppExcluded = exclusionList.apps.some(excludedApp =>
-      appClass.toLowerCase().includes(excludedApp.toLowerCase())
-    )
+// Cap on how much a single interval can contribute. Intervals longer than this are
+// almost always a missed idle/sleep gap; we record the cap rather than the raw span
+// so a genuine long single-window session still counts (previously anything over
+// ~15min was dropped entirely, silently losing all of it). The presence engine +
+// liveness watermark are the real defense against sleep gaps; this is a belt-and-braces.
+const MAX_RECORDABLE_MS = 10 * 60 * 1000 // 10 minutes
 
-    // Check if it's a browser and if the domain is excluded
-    let isDomainExcluded = false
-    if (isBrowserExe(appClass) && active_domain) {
-      isDomainExcluded = exclusionList.domains.some(excludedDomain =>
-        active_domain.toLowerCase().includes(excludedDomain.toLowerCase()) ||
-        (active_url && active_url.toLowerCase().includes(excludedDomain.toLowerCase()))
-      )
-    }
-
-    if (isAppExcluded || isDomainExcluded) {
-      console.log(`⛔ Skipping tracking for excluded ${isAppExcluded ? 'app' : 'domain'}: ${isAppExcluded ? appClass : active_domain}`)
-      lastActiveApp = currentWindow
-      lastUpdateTime = currentTime
-      return
-    }
-
-    // Skip recording if the time gap is too large (likely a wake from sleep/idle)
-    const maxAllowedGap = 15 * 60 * 1000 // 15 minutes
-    if (timeSpent > maxAllowedGap) {
-      console.warn(
-        `⚠️ Skipping recording due to large time gap: ${Math.round(timeSpent / 60000)}min for ${lastActiveApp.windowClass} - likely system was sleeping/idle`
-      )
-      return
-    }
-
-    // Prevent recording excessive time gaps (likely due to missed idle states)
-    // Maximum recordable time is 10 minutes per interval
-    const maxRecordableTime = 10 * 60 * 1000 // 10 minutes
-    const actualTimeSpent = Math.min(timeSpent, maxRecordableTime)
-
-    if (actualTimeSpent > 1000 * 10) {
-      if (timeSpent > maxRecordableTime) {
-        console.warn(
-          `⚠️ Large time gap detected: ${timeSpent}ms (${Math.round(timeSpent / 60000)}min) - capped to ${actualTimeSpent}ms (${Math.round(actualTimeSpent / 60000)}min) for ${lastActiveApp.windowClass}`
-        )
-      } else {
-        console.log(`Recording ${actualTimeSpent}ms for ${lastActiveApp.windowClass}`)
-      }
-
-      // Use actualTimeSpent instead of timeSpent for recording
-      const recordTime = actualTimeSpent
-      const formattedDate = getFormattedDate()
-      const formattedHour = getFormattedHour()
-
-      if (!appUsageData.hasOwnProperty(formattedDate)) {
-        appUsageData[formattedDate] = { apps: {} }
-      }
-      if (!appUsageData[formattedDate].hasOwnProperty(formattedHour)) {
-        appUsageData[formattedDate][formattedHour] = {}
-      }
-
-      const appClass = lastActiveApp.windowClass
-      const appDescription = await getProcessDetails(lastActiveApp.windowPid, appClass)
-      //  const appDescription = processInfo ? processInfo.description : appClass;
-
-      // SPAN MODEL (Phase A): write ONE immutable span for this interval. No category
-      // or mode is computed here — resolution happens at read time in main. The span
-      // records only WHAT HAPPENED: the structured key + the interval + a friendly
-      // display name (FileDescription) for the dashboard.
-      await emitSpan({
-        appClass,
-        description: appDescription.description,
-        windowName: lastActiveApp.windowName,
-        start: lastUpdateTime,
-        end: currentTime,
-        durationMs: recordTime
-      })
-    }
+// Record the pending interval for `lastActiveApp`, running from `lastUpdateTime` up to
+// `endTime`, then advance `lastUpdateTime` to `endTime`. Shared by the normal per-tick
+// path and the idle trailing-edge flush. Does NOT touch `lastActiveApp` — the caller
+// owns that (the tick advances it to the new window; the idle path nulls it).
+async function recordInterval(endTime) {
+  if (!lastActiveApp || !lastActiveApp.windowClass) {
+    lastUpdateTime = endTime
+    return
   }
 
+  const timeSpent = endTime - lastUpdateTime
+  if (timeSpent <= 0) {
+    lastUpdateTime = endTime
+    return
+  }
+
+  // Check if the app or domain is in the exclusion list
+  const appClass = lastActiveApp.windowClass
+  const isAppExcluded = exclusionList.apps.some(excludedApp =>
+    appClass.toLowerCase().includes(excludedApp.toLowerCase())
+  )
+
+  // Check if it's a browser and if the domain is excluded
+  let isDomainExcluded = false
+  if (isBrowserExe(appClass) && active_domain) {
+    isDomainExcluded = exclusionList.domains.some(excludedDomain =>
+      active_domain.toLowerCase().includes(excludedDomain.toLowerCase()) ||
+      (active_url && active_url.toLowerCase().includes(excludedDomain.toLowerCase()))
+    )
+  }
+
+  if (isAppExcluded || isDomainExcluded) {
+    console.log(`⛔ Skipping tracking for excluded ${isAppExcluded ? 'app' : 'domain'}: ${isAppExcluded ? appClass : active_domain}`)
+    lastUpdateTime = endTime
+    return
+  }
+
+  // Cap (don't drop) over-long intervals: a genuine long single-window session should
+  // still count its capped share instead of vanishing entirely.
+  const actualTimeSpent = Math.min(timeSpent, MAX_RECORDABLE_MS)
+
+  if (actualTimeSpent >= MIN_RECORDABLE_MS) {
+    if (timeSpent > MAX_RECORDABLE_MS) {
+      console.warn(
+        `⚠️ Large time gap detected: ${timeSpent}ms (${Math.round(timeSpent / 60000)}min) - capped to ${actualTimeSpent}ms (${Math.round(actualTimeSpent / 60000)}min) for ${appClass}`
+      )
+    } else {
+      console.log(`Recording ${actualTimeSpent}ms for ${appClass}`)
+    }
+
+    const recordTime = actualTimeSpent
+    const formattedDate = getFormattedDate()
+    const formattedHour = getFormattedHour()
+
+    if (!appUsageData.hasOwnProperty(formattedDate)) {
+      appUsageData[formattedDate] = { apps: {} }
+    }
+    if (!appUsageData[formattedDate].hasOwnProperty(formattedHour)) {
+      appUsageData[formattedDate][formattedHour] = {}
+    }
+
+    const appDescription = await getProcessDetails(lastActiveApp.windowPid, appClass)
+
+    // SPAN MODEL (Phase A): write ONE immutable span for this interval. No category
+    // or mode is computed here — resolution happens at read time in main. The span
+    // records only WHAT HAPPENED: the structured key + the interval + a friendly
+    // display name (FileDescription) for the dashboard.
+    await emitSpan({
+      appClass,
+      description: appDescription.description,
+      windowName: lastActiveApp.windowName,
+      start: lastUpdateTime,
+      end: endTime,
+      durationMs: recordTime
+    })
+  }
+
+  lastUpdateTime = endTime
+}
+
+// Flush the pending interval up to an explicit end time (the true moment activity
+// stopped, before the idle threshold elapsed). Used by the idle trailing-edge flush.
+async function flushActiveInterval(endTime) {
+  await recordInterval(endTime)
+}
+
+async function updateUsageData(currentWindow, hasAppSwitched) {
+  const currentTime = Date.now()
+  await recordInterval(currentTime)
   lastActiveApp = currentWindow
   lastUpdateTime = currentTime
 }
@@ -1559,32 +1621,91 @@ function debouncedUpdateAppUsage() {
   }
 }
 
-// More frequent window checking for better accuracy
-setInterval(async () => {
+// Adaptive fast window check. Previously a fixed 5s setInterval that woke the CPU
+// 12x/min around the clock — the app's single biggest source of idle battery
+// drain. It now self-reschedules with a delay chosen from current activity, so it
+// polls fast only when fast distraction detection actually matters and backs off
+// hard when the machine is idle or blocking is off. See FAST_CHECK_INTERVALS.
+const FAST_CHECK_INTERVALS = {
+  FOCUS_SESSION: 3000, // active session: catch a distraction fast (beats the old 5s)
+  BURST: 3000, // right after a switch: switches cluster, so stay responsive briefly
+  NORMAL: 5000, // active use, no session: the old baseline
+  BLOCKING_OFF: 15000, // no popups possible, only tracking accuracy matters
+  IDLE: 30000 // idle/locked: nothing can meaningfully switch — barely wake the CPU
+}
+const BURST_WINDOW_MS = 15000 // stay in BURST mode this long after a detected switch
+
+// The 5s loop must not add IPC chatter, so cache the idle-state result briefly and
+// let the loop read the cache instead of invoking `idle-state` on every tick. The
+// 15s regular tick already refreshes real state via getCurrentState(60).
+let cachedSystemState = 'active'
+let cachedSystemStateAt = 0
+const SYSTEM_STATE_CACHE_TTL = 12000 // re-probe idle state at most every 12s
+let lastSwitchDetectedAt = 0
+
+async function getSystemStateCached() {
+  const now = Date.now()
+  if (now - cachedSystemStateAt < SYSTEM_STATE_CACHE_TTL) {
+    return cachedSystemState
+  }
+  cachedSystemState = await getCurrentState(60)
+  cachedSystemStateAt = now
+  return cachedSystemState
+}
+
+function nextFastCheckDelay(systemState) {
+  if (systemState === 'idle' || systemState === 'locked' || systemState === 'unknown') {
+    return FAST_CHECK_INTERVALS.IDLE
+  }
+  if (!blockingSettings.enabled) {
+    return FAST_CHECK_INTERVALS.BLOCKING_OFF
+  }
+  if (isFocusSessionActive) {
+    return FAST_CHECK_INTERVALS.FOCUS_SESSION
+  }
+  if (Date.now() - lastSwitchDetectedAt < BURST_WINDOW_MS) {
+    return FAST_CHECK_INTERVALS.BURST
+  }
+  return FAST_CHECK_INTERVALS.NORMAL
+}
+
+async function fastWindowCheck() {
+  let systemState = 'active'
   try {
-    const currentWindow = await getActiveWindow()
-    if (currentWindow && lastActiveApp) {
-      // Check if app has changed - either different application or different browser tab
-      const currentAppClass = currentWindow.windowClass
-      const currentAppName = currentWindow.windowName
-      
-      const hasAppSwitched =
-        (lastActiveApp && currentAppClass !== lastActiveApp.windowClass) ||
-        (isBrowserExe(currentAppClass) &&
-          lastActiveApp &&
-          lastActiveApp.windowClass === currentAppClass &&
-          currentAppName !== lastActiveApp.windowName)
-      
-      // If app switched, update immediately
-      if (hasAppSwitched) {
-        console.log(`App switched detected: ${lastActiveApp.windowClass} -> ${currentAppClass}`)
-        debouncedUpdateAppUsage()
+    systemState = await getSystemStateCached()
+    // When idle/locked, the foreground window is stale — skip the native query
+    // entirely and just coast on the long IDLE interval. This is the big saving.
+    if (systemState === 'active') {
+      const currentWindow = await getActiveWindow()
+      if (currentWindow && lastActiveApp) {
+        // Check if app has changed - either different application or different browser tab
+        const currentAppClass = currentWindow.windowClass
+        const currentAppName = currentWindow.windowName
+
+        const hasAppSwitched =
+          (lastActiveApp && currentAppClass !== lastActiveApp.windowClass) ||
+          (isBrowserExe(currentAppClass) &&
+            lastActiveApp &&
+            lastActiveApp.windowClass === currentAppClass &&
+            currentAppName !== lastActiveApp.windowName)
+
+        // If app switched, update immediately
+        if (hasAppSwitched) {
+          console.log(`App switched detected: ${lastActiveApp.windowClass} -> ${currentAppClass}`)
+          lastSwitchDetectedAt = Date.now()
+          debouncedUpdateAppUsage()
+        }
       }
     }
   } catch (error) {
     console.error('Error in fast window check:', error)
+  } finally {
+    // Self-reschedule with an activity-adaptive delay. setTimeout (not setInterval)
+    // so a slow tick can never let the next one stack on top of it.
+    setTimeout(fastWindowCheck, nextFastCheckDelay(systemState))
   }
-}, 5000) // Check every 5 seconds for window changes
+}
+setTimeout(fastWindowCheck, FAST_CHECK_INTERVALS.NORMAL)
 
 setInterval(debouncedUpdateAppUsage, 15000) // Regular updates every 15 seconds
 setInterval(() => {

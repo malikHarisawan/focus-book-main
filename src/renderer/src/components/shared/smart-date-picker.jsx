@@ -2,6 +2,7 @@ import { useRef } from 'react'
 import { ChevronLeft, ChevronRight, Calendar, Home } from 'lucide-react'
 import { useDate } from '../../context/DateContext'
 import { useTheme } from '../../context/ThemeContext'
+import { todayLocal, parseLocal } from '../../utils/dateUtils'
 
 const SmartDatePicker = ({ zoomLevel = 'hour', onDateChange, className = '' }) => {
   const { theme } = useTheme()
@@ -54,18 +55,18 @@ const SmartDatePicker = ({ zoomLevel = 'hour', onDateChange, className = '' }) =
   }
 
   const isToday = () => {
-    const today = new Date().toISOString().split('T')[0]
+    const today = todayLocal()
     if (zoomLevel === 'week') {
-      const currentDate = new Date(selectedDate)
-      const todayDate = new Date(today)
+      const currentDate = parseLocal(selectedDate)
+      const todayDate = parseLocal(today)
       const startOfWeek = new Date(currentDate)
       startOfWeek.setDate(currentDate.getDate() - currentDate.getDay())
       const endOfWeek = new Date(startOfWeek)
       endOfWeek.setDate(startOfWeek.getDate() + 6)
       return todayDate >= startOfWeek && todayDate <= endOfWeek
     } else if (zoomLevel === 'month') {
-      const currentDate = new Date(selectedDate)
-      const todayDate = new Date(today)
+      const currentDate = parseLocal(selectedDate)
+      const todayDate = parseLocal(today)
       return (
         currentDate.getMonth() === todayDate.getMonth() &&
         currentDate.getFullYear() === todayDate.getFullYear()

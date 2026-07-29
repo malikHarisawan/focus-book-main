@@ -13,6 +13,7 @@ import {
   getCategoryColorFromDB
 } from '../../utils/dataProcessor'
 import { useDate } from '../../context/DateContext'
+import { todayLocal } from '../../utils/dateUtils'
 import SmartDatePicker from '../shared/smart-date-picker'
 
 // Productivity → design token color + soft background.
@@ -68,9 +69,12 @@ export default function AppUsageTable() {
     loadApps()
     const onVis = () => document.visibilityState === 'visible' && loadApps()
     document.addEventListener('visibilitychange', onVis)
+    const onPresenceAnnotated = () => loadApps()
+    window.addEventListener('presence-annotated', onPresenceAnnotated)
     const removeListener = window.activeWindow.onCategoryUpdated(() => loadApps())
     return () => {
       document.removeEventListener('visibilitychange', onVis)
+      window.removeEventListener('presence-annotated', onPresenceAnnotated)
       if (removeListener) removeListener()
     }
   }, [selectedDate])
@@ -114,9 +118,9 @@ export default function AppUsageTable() {
   }
 
 
-  // Totals by productivity (seconds).
+  // Totals by productivity (seconds). BINARY model: Productive vs Distracting only.
   const totals = useMemo(() => {
-    const t = { Productive: 0, Neutral: 0, Distracting: 0, total: 0 }
+    const t = { Productive: 0, Distracting: 0, total: 0 }
     for (const a of apps) {
       t[a.productivity] = (t[a.productivity] || 0) + a.timeSpentSeconds
       t.total += a.timeSpentSeconds
@@ -164,7 +168,7 @@ export default function AppUsageTable() {
   }
   const arrow = (key) => (sortKey === key ? (sortDir === 'asc' ? '▲' : '▼') : '')
 
-  const isToday = selectedDate === new Date().toISOString().split('T')[0]
+  const isToday = selectedDate === todayLocal()
   const prettyDate = new Date(selectedDate + 'T00:00:00').toLocaleDateString('en-US', {
     weekday: 'long',
     month: 'short',
@@ -172,7 +176,7 @@ export default function AppUsageTable() {
   })
 
   return (
-    <div className="max-w-[1420px] mx-auto w-full px-3 pb-8 flex flex-col gap-5">
+    <div className="w-full px-3 sm:px-4 lg:px-6 pb-8 flex flex-col gap-5">
       {/* Header */}
       <header className="flex items-start justify-between gap-6 flex-wrap pt-3">
         <div>
@@ -204,12 +208,10 @@ export default function AppUsageTable() {
         <div className="flex-1 min-w-[280px]">
           <div className="flex h-3.5 rounded-lg overflow-hidden gap-0.5" style={{ background: 'var(--fb-track)' }}>
             <div style={{ width: `${pct(totals.Productive)}%`, background: '#1FA05A' }} />
-            <div style={{ width: `${pct(totals.Neutral)}%`, background: 'var(--fb-muted)' }} />
             <div style={{ width: `${pct(totals.Distracting)}%`, background: 'var(--c-distract)' }} />
           </div>
           <div className="flex gap-6 mt-3.5 flex-wrap">
             <LegendStat color="#1FA05A" label="Productive" value={fmt(totals.Productive)} />
-            <LegendStat color="var(--fb-muted)" label="Neutral" value={fmt(totals.Neutral)} />
             <LegendStat color="var(--c-distract)" label="Distracting" value={fmt(totals.Distracting)} />
           </div>
         </div>
@@ -241,10 +243,13 @@ export default function AppUsageTable() {
         </div>
       </div>
 
-      {/* Table */}
+      {/* Table — horizontally scrollable on narrow windows so the four columns
+          keep their proportions instead of crushing (min-width sets the floor). */}
       <section className="rounded-[18px] border border-fb-border bg-fb-surface shadow-[var(--fb-shadow)] overflow-hidden">
+        <div className="overflow-x-auto custom-scrollbar">
+        <div className="min-w-[640px]">
         {/* Column header */}
-        <div className="grid grid-cols-[2.4fr_1.7fr_1.4fr_1fr] gap-4 px-6 py-4 border-b border-fb-border items-center">
+        <div className="grid grid-cols-[2.4fr_1.7fr_1.4fr_1fr] gap-4 px-4 sm:px-6 py-4 border-b border-fb-border items-center">
           <button onClick={() => toggleSort('name')} className="flex items-center gap-1.5 text-left text-[12.5px] font-semibold uppercase tracking-wide text-fb-muted">
             Application <span className="text-fb-accent text-[11px]">{arrow('name')}</span>
           </button>
@@ -262,7 +267,7 @@ export default function AppUsageTable() {
           return (
             <div
               key={r.id}
-              className="grid grid-cols-[2.4fr_1.7fr_1.4fr_1fr] gap-4 px-6 py-3.5 items-center transition-colors hover:bg-fb-surface2"
+              className="grid grid-cols-[2.4fr_1.7fr_1.4fr_1fr] gap-4 px-4 sm:px-6 py-3.5 items-center transition-colors hover:bg-fb-surface2"
               style={{ borderBottom: '1px solid var(--fb-rowline, var(--fb-border))' }}
             >
               {/* App */}
@@ -325,6 +330,8 @@ export default function AppUsageTable() {
             {apps.length === 0 ? 'No activity tracked for this day.' : 'No applications match your search.'}
           </div>
         )}
+        </div>
+        </div>
       </section>
 
       {/* Category menu — portal-rendered so it never gets clipped by the table

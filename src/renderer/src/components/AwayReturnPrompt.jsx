@@ -100,6 +100,9 @@ export default function AwayReturnPrompt() {
       setSaving(true)
       try {
         await window.electronAPI.annotatePresenceSpan?.(current.spanId, label)
+        // Tell the dashboards to reload so the newly-credited away-time shows up
+        // immediately (Working/Meeting → productive, Break → neutral).
+        window.dispatchEvent(new CustomEvent('presence-annotated'))
       } catch (e) {
         console.error('Failed to save away annotation:', e)
       } finally {

@@ -35,8 +35,21 @@ class LocalFocusSessionService {
 
   async startSession(sessionData) {
     try {
-      // End any existing active session
+      // Guard against discarding a session that should continue. An AUTO-started
+      // session (blocking mode returning to productive work) must never clobber a
+      // live session — if one is already active or paused, resume/keep it and hand
+      // it back instead of inserting a new row. This is what stops the auto timer
+      // from restarting (and the sidebar/page timers from disagreeing). Only a
+      // MANUAL start is allowed to replace an in-flight session.
       if (this.currentSession) {
+        const status = this.currentSession.status
+        if (sessionData.isAutoStarted && (status === 'active' || status === 'paused')) {
+          if (status === 'paused') {
+            return await this.resumeSession(this.currentSession._id)
+          }
+          return this.currentSession
+        }
+        // Manual start (or a stale/completed currentSession): end the old one.
         await this.endSession(this.currentSession._id, 'cancelled')
       }
 

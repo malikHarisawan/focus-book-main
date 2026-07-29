@@ -47,7 +47,6 @@ import useSelectionState from './hooks/useSelectionState'
 
 // Import utilities
 import { getZoomLevelDisplay, getZoomProgress, getBreadcrumbPath } from './utils/zoomUtils'
-import { calculateAggregatedData } from './utils/selectionUtils'
 import {
   createMouseDownHandler,
   createMouseMoveHandler,
@@ -80,7 +79,6 @@ const ProductiveAreaChart = ({
   const accent = '#5B5BD6' // Violet accent — productive (both themes)
   const chartColors = {
     productive: accent,
-    neutral: isDark ? '#57ABF5' : '#3E9BF0', // Collaboration blue
     distracting: isDark ? '#F5788A' : '#F0596E', // Salmon — distracting
     selection: accent,
     grid: isDark ? '#272730' : '#ECECEA',
@@ -118,7 +116,6 @@ const ProductiveAreaChart = ({
 
   // Local state
   const [currentData, setCurrentData] = useState([])
-  const [aggregatedData, setAggregatedData] = useState({ productive: 0, neutral: 0, distracting: 0, total: 0 })
   const [isLoading, setIsLoading] = useState(false)
   const [showHelp, setShowHelp] = useState(false)
 
@@ -143,14 +140,6 @@ const ProductiveAreaChart = ({
       setIsLoading(false)
     }
   }
-
-  // Calculate aggregated data when current data or selection changes
-  useEffect(() => {
-    if (currentData && currentData.length > 0) {
-      const newAggregatedData = calculateAggregatedData(currentData, selectedRange)
-      setAggregatedData(newAggregatedData)
-    }
-  }, [currentData, selectedRange])
 
   // Custom-range mode: mirror the parent-supplied series into currentData.
   useEffect(() => {
@@ -292,6 +281,36 @@ const ProductiveAreaChart = ({
   const breadcrumbPath = getBreadcrumbPath(zoomLevel)
   const isZoomDisabled = !!selectedRange // Disable zoom when range is selected
 
+  // --- Bucket-aware display shape (see docs/BUCKET_AGGREGATION_ENGINE.md) ---
+  // The series are drawn in MILLISECONDS (focusedMs stacked on distractedMs). The
+  // axis is already fitted to the active window, so an empty bucket inside it is a
+  // genuine lull — we plot it as 0 (not null) so the smooth line flows continuously
+  // through it to the baseline instead of breaking into a gap.
+  const isHourScale = zoomLevel === 'hour' || zoomLevel === 'day'
+  const bucketCeilingMs = isHourScale ? 60 * 60 * 1000 : null // hour buckets pin to 60m
+
+  const displayData = (currentData || []).map((p) => ({
+    ...p,
+    focusedMs: p.focusedMs ?? 0,
+    distractedMs: p.distractedMs ?? 0
+  }))
+
+  // Y-axis: pin the ceiling to the bucket's known maximum so bars mean the same thing
+  // every day (§4). Hour buckets hold 60 min exactly. Day buckets (week/month view)
+  // have no natural "full", so nice-number the observed max instead.
+  const niceCeil = (maxMs) => {
+    if (!maxMs || maxMs <= 0) return 60 * 60 * 1000
+    const hours = Math.ceil(maxMs / (60 * 60 * 1000))
+    return hours * 60 * 60 * 1000
+  }
+  const observedMaxMs = displayData.reduce(
+    (m, p) => Math.max(m, (p.focusedMs || 0) + (p.distractedMs || 0)),
+    0
+  )
+  const yMaxMs = bucketCeilingMs || niceCeil(observedMaxMs)
+  // Nice ticks: quarters of the hour ceiling (0/15/30/45/60); quarters of the day cap.
+  const yTicks = [0, 0.25, 0.5, 0.75, 1].map((f) => Math.round(yMaxMs * f))
+
   // Loading state
   if (!currentData || currentData.length === 0) {
     return (
@@ -360,7 +379,7 @@ const ProductiveAreaChart = ({
         <ResponsiveContainer width="100%" height="100%">
           <AreaChart
             ref={chartRef}
-            data={currentData}
+            data={displayData}
             margin={{ top: 8, right: 16, left: 8, bottom: 20 }}
             onMouseDown={onMouseDown}
             onMouseMove={onMouseMove}
@@ -373,12 +392,6 @@ const ProductiveAreaChart = ({
               <stop offset="0%" stopColor={chartColors.productive} stopOpacity={0.6} />
               <stop offset="40%" stopColor={chartColors.productive} stopOpacity={0.35} />
               <stop offset="100%" stopColor={chartColors.productive} stopOpacity={0.05} />
-            </linearGradient>
-            {/* Neutral gradient - Slate (dark) / Cyan (light) */}
-            <linearGradient id="colorNeutral" x1="0" y1="0" x2="0" y2="1">
-              <stop offset="0%" stopColor={chartColors.neutral} stopOpacity={0.5} />
-              <stop offset="40%" stopColor={chartColors.neutral} stopOpacity={0.3} />
-              <stop offset="100%" stopColor={chartColors.neutral} stopOpacity={0.05} />
             </linearGradient>
             {/* Distracting gradient - salmon */}
             <linearGradient id="colorDistracting" x1="0" y1="0" x2="0" y2="1">
@@ -403,46 +416,59 @@ const ProductiveAreaChart = ({
             tickLine={false}
             axisLine={false}
             width={38}
-            tickFormatter={(seconds) => {
-              const minutes = Math.round(seconds / 60)
+            // Pinned domain + nice ticks (§4): the ceiling is the bucket's known max, so
+            // bar height means the same thing across days. Values are milliseconds.
+            domain={[0, yMaxMs]}
+            ticks={yTicks}
+            tickFormatter={(ms) => {
+              const minutes = Math.round(ms / 60000)
               return minutes >= 60 ? `${Math.floor(minutes / 60)}h${minutes % 60 ? ` ${minutes % 60}m` : ''}` : `${minutes}m`
             }}
             allowDecimals={false}
             style={{ userSelect: 'none' }}
           />
           <CartesianGrid strokeDasharray="3 3" stroke={isDark ? 'rgba(139, 139, 153, 0.12)' : 'rgba(117, 117, 127, 0.12)'} vertical={false} />
+          {/* Tooltip follows the cursor and Recharts auto-flips it to the opposite
+              side near the right edge, so it stops parking over the day's single peak
+              (§7). allowEscapeViewBox lets it rise above the plot rather than overlap
+              the bars. */}
           <Tooltip
             content={<CustomTooltip />}
             cursor={{ stroke: 'rgba(91, 91, 214, 0.3)', strokeWidth: 1 }}
-            position={{ y: -30 }}
+            offset={16}
+            allowEscapeViewBox={{ x: false, y: true }}
             wrapperStyle={{ outline: 'none' }}
           />
-          {/* Only Productive (cyan) and Distracting (red) are charted; neutral
-              time is intentionally omitted here (still shown in the stat cards).
-              Draw order matters for stacked areas: distracting is drawn first so
-              it sits at the BOTTOM, and productive is drawn last so it renders on
-              TOP — the dominant type visually dominates the chart. */}
+          {/* BINARY model: two stacked areas, Focused + Distracted, in milliseconds.
+              stackId keeps them parts-of-a-whole (stack height == tracked time).
+              type="monotoneX": smooth spline for a clean, continuous curve.
+              connectNulls={true}: bridge untracked buckets so the line stays
+              continuous across empty hours instead of breaking into gaps.
+              Draw order: distracted at the bottom (baseline), focused on top — the
+              series anchored to the axis is the one you compare across buckets. */}
           <Area
             type="monotoneX"
-            dataKey="distracting"
-            name="Distracting"
+            dataKey="distractedMs"
+            name="Distracted"
             stackId="1"
             stroke={distractColor}
             strokeWidth={2}
             fill="url(#colorDistracting)"
             dot={false}
             activeDot={false}
+            connectNulls={true}
           />
           <Area
             type="monotoneX"
-            dataKey="productive"
-            name="Productive"
+            dataKey="focusedMs"
+            name="Focused"
             stackId="1"
             stroke={chartColors.productive}
             strokeWidth={2}
             fill="url(#colorProductive)"
             dot={false}
             activeDot={false}
+            connectNulls={true}
           />
           {isDragging && dragStart && dragEnd && (
             <ReferenceArea

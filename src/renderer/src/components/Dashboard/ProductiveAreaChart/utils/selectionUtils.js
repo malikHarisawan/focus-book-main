@@ -9,14 +9,16 @@
  */
 
 /**
- * Calculate aggregated data for a given range or entire dataset
- * @param {Array} data - Chart data array
+ * Calculate aggregated data for a given range or entire dataset. BINARY model: sums
+ * focused/distracted MILLISECONDS across the buckets; total == focused + distracted
+ * (no neutral). Untracked time is not summed (it isn't focused or distracted).
+ * @param {Array} data - Chart data array (points carry focusedMs / distractedMs)
  * @param {Object|null} selectedRange - Selected range with startIndex and endIndex
- * @returns {Object} Aggregated productive, neutral, distracting, and total time
+ * @returns {Object} { focusedMs, distractedMs, totalMs }
  */
 export const calculateAggregatedData = (data, selectedRange = null) => {
   if (!data || data.length === 0) {
-    return { productive: 0, neutral: 0, distracting: 0, total: 0 }
+    return { focusedMs: 0, distractedMs: 0, totalMs: 0 }
   }
 
   let startIndex = 0
@@ -27,24 +29,17 @@ export const calculateAggregatedData = (data, selectedRange = null) => {
     endIndex = selectedRange.endIndex
   }
 
-  let totalProductive = 0
-  let totalNeutral = 0
-  let totalDistracting = 0
+  let focusedMs = 0
+  let distractedMs = 0
 
   for (let i = startIndex; i <= endIndex; i++) {
     if (data[i]) {
-      totalProductive += data[i].productive || 0
-      totalNeutral += data[i].neutral || 0
-      totalDistracting += data[i].distracting || 0
+      focusedMs += data[i].focusedMs || 0
+      distractedMs += data[i].distractedMs || 0
     }
   }
 
-  return {
-    productive: totalProductive,
-    neutral: totalNeutral,
-    distracting: totalDistracting,
-    total: totalProductive + totalNeutral + totalDistracting
-  }
+  return { focusedMs, distractedMs, totalMs: focusedMs + distractedMs }
 }
 
 /**

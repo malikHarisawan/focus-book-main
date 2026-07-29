@@ -288,6 +288,17 @@ All six steps built and tested (`presenceService.test.js`, 57 tests). The engine
 complete: typed, backdated, gapless presence spans, crash-survivable via the watermark,
 with false-idle corrected by user annotations resolved at query time.
 
+### 7. ✅ Crediting labelled away-time into the dashboards
+The return-prompt answers now COUNT. `load-data` (via `resolvedAppUsageData`) folds
+labelled absences into the same `appUsageData` shape the charts consume, so the totals
+update with no per-chart change. Mapping (user-confirmed): **working → productive,
+meeting → productive, break → neutral**; each becomes a synthetic "… (away)" row flagged
+`isAway`. **Only LABELLED absences count** — unanswered idle/locked stays out of the
+totals, exactly as before. After the user answers, the prompt dispatches a
+`presence-annotated` window event and the Dashboard + Activity pages reload so the credit
+appears immediately. **[built — `presenceUsageAdapter.js` (20 tests); merge in
+`resolvedAppUsageData`; `presence-annotated` listeners in productivity-overview + Activity]**
+
 ### Remaining (not part of the engine itself)
 A **presence/timeline dashboard** that visualizes the spans and credits annotated absences
 is out of scope here — `getResolvedPresence` is the seam it would consume. The engine

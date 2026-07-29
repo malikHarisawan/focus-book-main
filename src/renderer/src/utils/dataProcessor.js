@@ -24,16 +24,29 @@ const DEFAULT_CATEGORY_ICON = 'Package'
 
 // Fallbacks so the mode seam degrades gracefully when the DB is unreachable. These
 // mirror the schema seed (modes table + categories.default_mode) so behaviour is
-// identical offline. Break is the safe default mode (rolls up to neutral).
+// identical offline.
+//
+// BINARY VERDICT MODEL (see docs/BUCKET_AGGREGATION_ENGINE.md): every second is either
+// 'productive' (Focused) or 'distracted' (Distracted) — there is no 'neutral' band.
+// Anything not clearly productive rolls up to 'distracted', so Break, uncategorized,
+// and unknown time all count against Focus%. The mode TAXONOMY is unchanged; only its
+// ROLLUP collapses to two verdicts. `normalizeVerdict` below is the single choke point
+// that enforces this, so any stray 'neutral' from the DB is coerced to 'distracted'.
 const DEFAULT_MODE = 'Break'
-const DEFAULT_MODE_ROLLUP = 'neutral'
+const DEFAULT_MODE_ROLLUP = 'distracted' // not-clearly-productive -> distracted
 const FALLBACK_MODE_ROLLUP = {
   'Deep work': 'productive',
   Creative: 'productive',
   Collaboration: 'productive',
-  Break: 'neutral',
+  Break: 'distracted', // rest/uncategorized counts against focus under the binary model
   Distraction: 'distracted'
 }
+
+// The one place the binary rule lives: collapse any legacy three-band verdict
+// ('productive' | 'neutral' | 'distracting'/'distracted') to the two we keep. Only an
+// explicit 'productive' survives as productive; everything else is 'distracted'. Every
+// rollup/label path funnels through this so the numbers can never drift back apart.
+const normalizeVerdict = (raw) => (raw === 'productive' ? 'productive' : 'distracted')
 const FALLBACK_CATEGORY_MODE = {
   // Legacy category names (kept for any pre-cutover data).
   Code: 'Deep work',
@@ -84,11 +97,9 @@ async function loadCategoryProductivityMapping() {
       cats.forEach((c) => {
         if (!c || !c.name) return
         // New table uses default_productivity ('productive'|'neutral'|'distracting').
-        // Normalize 'distracting' -> 'distracted' so the existing getProductivity/
-        // getProductivityType consumers (which expect the legacy label) keep working.
-        const p = c.default_productivity
-        if (p === 'productive') pMap[c.name] = 'productive'
-        else if (p === 'distracting') pMap[c.name] = 'distracted'
+        // Under the binary model, only 'productive' stays productive; 'neutral' and
+        // 'distracting' both collapse to 'distracted' via normalizeVerdict.
+        pMap[c.name] = normalizeVerdict(c.default_productivity)
         if (SPAN_CATEGORY_COLORS[c.name]) cMap[c.name] = SPAN_CATEGORY_COLORS[c.name]
       })
       categoryProductivityMap = pMap
@@ -99,7 +110,7 @@ async function loadCategoryProductivityMapping() {
       categoryModeMap = {}
       categoryList = cats.map((c) => ({
         name: c.name,
-        type: c.default_productivity === 'distracting' ? 'distracted' : c.default_productivity,
+        type: normalizeVerdict(c.default_productivity), // 'productive' | 'distracted'
         color: SPAN_CATEGORY_COLORS[c.name] || DEFAULT_CATEGORY_COLOR
       }))
       console.log('Span category metadata loaded:', categoryList.length, 'categories')
@@ -186,35 +197,27 @@ export const formatTime = (milliseconds) => {
   return `${hours * 60 + minutes}`
 }
 
-// Map a category to its display productivity level.
-// Canonical labels: 'Productive' | 'Neutral' | 'Distracting'. Exported so all
-// components share this one mapping instead of hardcoding their own.
+// Map a category to its display productivity level. BINARY model: 'Productive' |
+// 'Distracting' only. Anything not clearly productive (including the old 'neutral')
+// reads as 'Distracting'. Exported so all components share this one mapping.
 export const getProductivity = (category) => {
-  switch (categoryProductivityMap[category]) {
-    case 'productive':
-      return 'Productive'
-    case 'distracted':
-      return 'Distracting'
-    default:
-      return 'Neutral'
-  }
+  return normalizeVerdict(categoryProductivityMap[category]) === 'productive'
+    ? 'Productive'
+    : 'Distracting'
 }
 
-// Export getProductivityType for external use — returns the raw DB type
-// ('productive' | 'distracted' | 'neutral').
+// Export getProductivityType for external use — returns the raw binary verdict
+// ('productive' | 'distracted'). Legacy 'neutral' collapses to 'distracted'.
 export const getProductivityType = (category) => {
-  return categoryProductivityMap[category] || 'neutral'
+  return normalizeVerdict(categoryProductivityMap[category])
 }
 
 // SPAN MODEL: map a resolver productivity ('productive'|'neutral'|'distracting') to
 // the display label. Under the span model each app row carries the RESOLVED
 // productivity (rule-driven), so prefer it over re-deriving from the legacy category
-// table (which doesn't know the new category names). Note the resolver uses
-// 'distracting' where the legacy type is 'distracted' — both map to 'Distracting'.
+// table. Binary: only 'productive' is Productive; everything else is 'Distracting'.
 export const productivityLabel = (raw) => {
-  if (raw === 'productive') return 'Productive'
-  if (raw === 'distracting' || raw === 'distracted') return 'Distracting'
-  return 'Neutral'
+  return normalizeVerdict(raw) === 'productive' ? 'Productive' : 'Distracting'
 }
 
 // Resolve an app's display productivity: prefer the resolver value carried on the
@@ -230,16 +233,18 @@ export const productivityForApp = (app) => {
 // pass a richer signature through the scorer, but the getMode* API stays the same.
 
 // Resolve the work-mode for a category. Falls back to the DB-less default map and
-// finally to Break (a safe neutral) so this never returns undefined.
+// finally to Break so this never returns undefined. (Break is a valid mode; it just
+// rolls up to 'distracted' under the binary model.)
 export const getMode = (category) => {
   return categoryModeMap[category] || FALLBACK_CATEGORY_MODE[category] || DEFAULT_MODE
 }
 
-// Roll a mode up to its Level-1 verdict ('productive' | 'distracted' | 'neutral').
-// This is the bridge that keeps the AreaChart's bands equal to the sum of their
-// modes — always drive band membership through this, never a hardcoded map.
+// Roll a mode up to its BINARY verdict ('productive' | 'distracted'). This is the
+// bridge that keeps the AreaChart's two bands equal to the sum of their modes — always
+// drive band membership through this, never a hardcoded map. Any legacy 'neutral' from
+// the DB is collapsed to 'distracted' via normalizeVerdict.
 export const getModeRollup = (mode) => {
-  return modeRollupMap[mode] || FALLBACK_MODE_ROLLUP[mode] || DEFAULT_MODE_ROLLUP
+  return normalizeVerdict(modeRollupMap[mode] || FALLBACK_MODE_ROLLUP[mode] || DEFAULT_MODE_ROLLUP)
 }
 
 export function formatAppsData(rawData, date) {
@@ -302,25 +307,21 @@ export function formatAppsData(rawData, date) {
 }
 
 // Add an app's time to the correct productivity bucket of a chart data point.
-// Buckets mirror the three DB-driven labels so the chart, summary cards, and
-// tooltip all agree: productive / neutral / distracting. It ALSO accrues the
-// Level-2 work-mode split into `bucket.modes`, so every chart point carries a mode
-// breakdown for the tooltip drill-down — no change needed in the per-view builders.
+// BINARY model: exactly two bands, `focused` and `distracted` (seconds), so the chart,
+// summary cards, and tooltip all agree and Focused + Distracted == tracked time. It
+// ALSO accrues the Level-2 work-mode split into `bucket.modes` (the taxonomy is
+// unchanged) so the donut/drill-down still have per-mode detail.
 const accumulateProductivity = (bucket, app) => {
   if (!app.category || !app.time) return
 
   const seconds = app.time / 1000
   // Prefer the resolver productivity carried on the row (span model); fall back to
-  // deriving from the category for any legacy-shaped data.
-  switch (productivityForApp(app)) {
-    case 'Productive':
-      bucket.productive += seconds
-      break
-    case 'Distracting':
-      bucket.distracting += seconds
-      break
-    default:
-      bucket.neutral += seconds
+  // deriving from the category. Only 'Productive' is Focused; everything else counts
+  // as Distracted.
+  if (productivityForApp(app) === 'Productive') {
+    bucket.focused += seconds
+  } else {
+    bucket.distracted += seconds
   }
 
   // Level-2 mode accrual (kept for the mode donut/drill-down). Mode is category-
@@ -332,11 +333,16 @@ const accumulateProductivity = (bucket, app) => {
   }
 }
 
+// A zero-seed chart point. `focused`/`distracted` are SECONDS accrued from spans;
+// `tracked` starts false and is flipped true by the per-view builder when any span
+// touches this bucket (untracked != zero — see docs/BUCKET_AGGREGATION_ENGINE.md §2).
+// The bucket builders derive `focusedMs`/`distractedMs`/`untrackedMs` from these at
+// the end; the raw `focused`/`distracted` seconds are kept for the tooltip.
 const emptyPoint = (day) => ({
   day,
-  productive: 0,
-  neutral: 0,
-  distracting: 0,
+  focused: 0,
+  distracted: 0,
+  tracked: false,
   modes: { 'Deep work': 0, Creative: 0, Collaboration: 0, Break: 0, Distraction: 0 }
 })
 
@@ -381,11 +387,13 @@ export const getDatesForView = (date, viewType = 'day') => {
   return [typeof date === 'string' ? date : toLocalDateStr(dateObj)]
 }
 
-// Aggregate productive / neutral / distracting / total SECONDS across the date
-// window for a view level. Used by the dashboard summary cards so they reflect
-// the current day/week/month view instead of always showing the selected day.
+// Aggregate focused / distracted / total SECONDS across the date window for a view
+// level. Used by the dashboard summary cards so they reflect the current day/week/month
+// view. BINARY model: totalSeconds == focused + distracted (no neutral). The legacy
+// keys `productiveSeconds`/`distractingSeconds`/`neutralSeconds` are still returned as
+// aliases so existing card code keeps working; `neutralSeconds` is always 0 now.
 export const getProductivityTotals = (jsonData, date, viewType = 'day') => {
-  const totals = { productive: 0, neutral: 0, distracting: 0 }
+  const totals = { focused: 0, distracted: 0 }
   if (jsonData) {
     for (const d of getDatesForView(date, viewType)) {
       const apps = jsonData[d]?.apps
@@ -395,14 +403,15 @@ export const getProductivityTotals = (jsonData, date, viewType = 'day') => {
       }
     }
   }
-  const productiveSeconds = Math.floor(totals.productive)
-  const neutralSeconds = Math.floor(totals.neutral)
-  const distractingSeconds = Math.floor(totals.distracting)
+  const productiveSeconds = Math.floor(totals.focused)
+  const distractingSeconds = Math.floor(totals.distracted)
   return {
     productiveSeconds,
-    neutralSeconds,
     distractingSeconds,
-    totalSeconds: productiveSeconds + neutralSeconds + distractingSeconds
+    neutralSeconds: 0, // binary model: neutral no longer exists (alias kept at 0)
+    focusedSeconds: productiveSeconds,
+    distractedSeconds: distractingSeconds,
+    totalSeconds: productiveSeconds + distractingSeconds
   }
 }
 
@@ -446,21 +455,43 @@ export const getModeTotals = (jsonData, date, viewType = 'day') => {
     }
   }
 
-  // Floor each mode and roll it up so the donut segments and the productive/
-  // neutral/distracting card totals reconcile to the same numbers.
-  const rollup = { productive: 0, neutral: 0, distracting: 0 }
+  // Floor each mode and roll it up so the donut segments and the focused/distracted
+  // card totals reconcile to the same numbers. BINARY: every mode lands in exactly one
+  // of two buckets (getModeRollup is guaranteed binary). `neutral` alias kept at 0.
+  const rollup = { productive: 0, distracting: 0, neutral: 0 }
   let totalSeconds = 0
   for (const [mode, secs] of Object.entries(byMode)) {
     const floored = Math.floor(secs)
     byMode[mode] = floored
     totalSeconds += floored
-    const verdict = getModeRollup(mode)
-    if (verdict === 'productive') rollup.productive += floored
-    else if (verdict === 'distracted') rollup.distracting += floored
-    else rollup.neutral += floored
+    if (getModeRollup(mode) === 'productive') rollup.productive += floored
+    else rollup.distracting += floored
   }
 
   return { byMode, rollup, totalSeconds }
+}
+
+// Bucket durations in ms — the fixed ceiling each bucket type can hold. Hour buckets
+// hold 60 min; the day/week/month/custom builders bucket by DAY (one point per day).
+const HOUR_MS = 60 * 60 * 1000
+const DAY_MS = 24 * HOUR_MS
+
+// Finalize a chart point: convert accrued focused/distracted SECONDS to ms, set the
+// `tracked` flag (untracked != zero — §2), and derive `untrackedMs` as the remainder of
+// the bucket so the three ALWAYS exhaust `bucketMs` (§1 EXHAUSTION invariant). Mutates
+// and returns the point. `focused`/`distracted` seconds are kept for the tooltip.
+const finalizeBucket = (point, bucketMs) => {
+  const focusedMs = Math.round(point.focused * 1000)
+  const distractedMs = Math.round(point.distracted * 1000)
+  const trackedMs = focusedMs + distractedMs
+  point.focusedMs = focusedMs
+  point.distractedMs = distractedMs
+  // Clamp: spans can slightly over-attribute a bucket (boundary overlap / float drift);
+  // untracked is never negative, and over-attribution is capped at the bucket.
+  point.untrackedMs = Math.max(0, bucketMs - trackedMs)
+  point.bucketMs = bucketMs
+  point.tracked = trackedMs > 0
+  return point
 }
 
 export const processProductiveChartData = (jsonData, date, viewType = 'day') => {
@@ -468,10 +499,34 @@ export const processProductiveChartData = (jsonData, date, viewType = 'day') => 
     if (!jsonData || !jsonData[date]) {
       return []
     }
-    const hourlyData = []
 
-    for (let i = 9; i <= 21; i++) {
-      hourlyData.push(emptyPoint(i === 12 ? '12PM' : i < 12 ? `${i}AM` : `${i - 12}PM`))
+    // Dynamic timeline (mirrors DayTimeline's fit-to-data axis): instead of a
+    // fixed 9am–9pm window, find the earliest and latest hours that actually
+    // hold activity, pad by one hour on each side, and clamp to [0, 23]. A
+    // 50-minute day no longer gets stretched across a static 13-hour axis, and
+    // early-morning / late-night usage is no longer clipped off the chart.
+    const activeHours = []
+    for (const [hourKey, hourData] of Object.entries(jsonData[date])) {
+      if (hourKey === 'apps') continue
+      const hour = parseInt(hourKey.split(':')[0])
+      if (isNaN(hour) || hour < 0 || hour > 23) continue
+      // Only count the hour as active if it actually carries usage.
+      const hasUsage = Object.values(hourData).some((app) => app && app.time > 0)
+      if (hasUsage) activeHours.push(hour)
+    }
+
+    // No activity at all → fall back to the conventional working-day window so
+    // the chart still renders a sensible empty axis rather than nothing.
+    let startHour = 9
+    let endHour = 21
+    if (activeHours.length > 0) {
+      startHour = Math.max(0, Math.min(...activeHours) - 1)
+      endHour = Math.min(23, Math.max(...activeHours) + 1)
+    }
+
+    const hourlyData = []
+    for (let i = startHour; i <= endHour; i++) {
+      hourlyData.push(emptyPoint(i === 0 ? '12AM' : i === 12 ? '12PM' : i < 12 ? `${i}AM` : `${i - 12}PM`))
     }
 
     for (const [hourKey, hourData] of Object.entries(jsonData[date])) {
@@ -480,7 +535,7 @@ export const processProductiveChartData = (jsonData, date, viewType = 'day') => 
       const hour = parseInt(hourKey.split(':')[0])
       if (isNaN(hour) || hour < 0 || hour > 23) continue
 
-      const index = hour - 9
+      const index = hour - startHour
       if (index < 0 || index >= hourlyData.length) continue
 
       for (const app of Object.values(hourData)) {
@@ -488,14 +543,34 @@ export const processProductiveChartData = (jsonData, date, viewType = 'day') => 
       }
     }
 
-    return hourlyData
+    return hourlyData.map((p) => finalizeBucket(p, HOUR_MS))
   } else if (viewType === 'day') {
     if (!jsonData || !jsonData[date]) {
       return []
     }
-    const fullDayData = []
 
-    for (let i = 0; i < 24; i++) {
+    // Dynamic timeline (mirrors DayTimeline's fit-to-data axis): fit the axis to
+    // the earliest→latest active hours (padded one hour each side, clamped to
+    // [0, 23]) instead of always drawing a mostly-empty 24-hour window. Falls
+    // back to the full day when there's no activity.
+    const activeHours = []
+    for (const [hourKey, hourData] of Object.entries(jsonData[date])) {
+      if (hourKey === 'apps') continue
+      const hour = parseInt(hourKey.split(':')[0])
+      if (isNaN(hour) || hour < 0 || hour > 23) continue
+      const hasUsage = Object.values(hourData).some((app) => app && app.time > 0)
+      if (hasUsage) activeHours.push(hour)
+    }
+
+    let startHour = 0
+    let endHour = 23
+    if (activeHours.length > 0) {
+      startHour = Math.max(0, Math.min(...activeHours) - 1)
+      endHour = Math.min(23, Math.max(...activeHours) + 1)
+    }
+
+    const fullDayData = []
+    for (let i = startHour; i <= endHour; i++) {
       fullDayData.push(
         emptyPoint(i === 0 ? '12AM' : i === 12 ? '12PM' : i < 12 ? `${i}AM` : `${i - 12}PM`)
       )
@@ -507,12 +582,16 @@ export const processProductiveChartData = (jsonData, date, viewType = 'day') => 
       const hour = parseInt(hourKey.split(':')[0])
       if (isNaN(hour) || hour < 0 || hour > 23) continue
 
+      const index = hour - startHour
+      if (index < 0 || index >= fullDayData.length) continue
+
       for (const app of Object.values(hourData)) {
-        accumulateProductivity(fullDayData[hour], app)
+        accumulateProductivity(fullDayData[index], app)
       }
     }
 
-    return fullDayData
+    // Day view is HOURLY buckets, so each holds at most 60 min.
+    return fullDayData.map((p) => finalizeBucket(p, HOUR_MS))
   } else if (viewType === 'week') {
     const weekData = []
     const dayNames = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']
@@ -532,7 +611,7 @@ export const processProductiveChartData = (jsonData, date, viewType = 'day') => 
       weekData.push(dayData)
     })
 
-    return weekData
+    return weekData.map((p) => finalizeBucket(p, DAY_MS))
   } else if (viewType === 'month') {
     const monthData = []
     // Shared local-date window (fixes the old toISOString() off-by-one that
@@ -552,16 +631,17 @@ export const processProductiveChartData = (jsonData, date, viewType = 'day') => 
       monthData.push(dayData)
     })
 
-    return monthData
+    return monthData.map((p) => finalizeBucket(p, DAY_MS))
   }
 }
 
 /**
  * Custom date-range chart series: one point per day between startDate and
- * endDate (inclusive), each holding that day's productive/neutral/distracting
- * seconds. Same point shape as processProductiveChartData so it drops straight
- * into ProductiveAreaChart. Dates are YYYY-MM-DD; order is auto-corrected if
- * start is after end. Capped at 366 days to keep the axis readable.
+ * endDate (inclusive), each holding that day's focused/distracted seconds (binary
+ * model) plus the exhaustive bucket fields (focusedMs/distractedMs/untrackedMs/tracked).
+ * Same point shape as processProductiveChartData so it drops straight into
+ * ProductiveAreaChart. Dates are YYYY-MM-DD; order is auto-corrected if start is after
+ * end. Capped at 366 days to keep the axis readable.
  */
 export const processCustomRangeChartData = (jsonData, startDate, endDate) => {
   if (!jsonData || !startDate || !endDate) return []
@@ -585,7 +665,7 @@ export const processCustomRangeChartData = (jsonData, startDate, endDate) => {
         accumulateProductivity(point, app)
       }
     }
-    out.push(point)
+    out.push(finalizeBucket(point, DAY_MS))
 
     cursor.setDate(cursor.getDate() + 1)
     guard++
