@@ -92,11 +92,21 @@ jobs:
       - name: Build Electron App
         run: npm run build
 
-      - name: Package App (Windows)
-        run: npx electron-builder --win
+      # Package AND publish via electron-builder itself. `--publish always` makes
+      # electron-builder generate the update manifest (latest.yml) + .blockmap and
+      # upload them alongside the installer to the GitHub Release named for the tag
+      # (per the publish: block in electron-builder.yml). This is what the in-app
+      # auto-updater (electron-updater) reads — a plain artifact upload omits
+      # latest.yml, which is why earlier releases never triggered an update prompt.
+      # On non-tag pushes/PRs electron-builder detects no release tag and only
+      # builds locally, so CI-on-every-push still works.
+      - name: Build & Publish (Windows)
+        run: npx electron-builder --win --publish always
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
+      # Keep the raw installer as a CI artifact too, so non-tag builds are still
+      # downloadable from the Actions run even though nothing is published.
       - name: Upload Windows artifacts
         uses: actions/upload-artifact@v4
         with:
@@ -105,35 +115,3 @@ jobs:
             dist/*.exe
             dist/*.msi
           retention-days: 30
-
-
-  # -----------------------------
-  # Release Job
-  # -----------------------------
-  release:
-    name: Publish Release
-    needs: build
-    # Just downloads the built artifacts and creates a GitHub release — no
-    # compilation or Windows tooling — so it runs on the free Ubuntu runner.
-    runs-on: ubuntu-latest
-    if: startsWith(github.ref, 'refs/tags/v')  # ONLY on tags
-
-    steps:
-      - uses: actions/checkout@v4
-
-      - name: Download Windows artifacts
-        uses: actions/download-artifact@v4
-        with:
-          name: focusbook-windows
-          path: dist/windows
-
-      - name: Create GitHub Release
-        uses: softprops/action-gh-release@v1
-        with:
-          files: |
-            dist/windows/*
-          draft: false
-          prerelease: false
-          generate_release_notes: true
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
